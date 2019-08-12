@@ -19,7 +19,7 @@
 
 (defpackage #:cl-avro
   (:nicknames #:avro)
-  (:use #:cl)
+  (:use #:cl #:trivial-gray-streams)
   (:export
 
    ;; primitive avro schemas
@@ -38,4 +38,13 @@
    #:array-schema
    #:map-schema
    #:enum-schema
-   #:record-schema))
+   #:record-schema
+
+   ;; avro array/map streams
+   #:array-input-stream
+   #:map-input-stream
+   #:stream-read-item
+
+   #:stream-serialize
+   #:stream-deserialize
+   #:validp))
