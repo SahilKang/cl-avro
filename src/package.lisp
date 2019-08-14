@@ -45,6 +45,7 @@
    #:map-input-stream
    #:stream-read-item
 
+   #:parse-schema
    #:stream-serialize
    #:stream-deserialize
    #:validp))
