@@ -20,9 +20,6 @@ are ignored.
 * [sort order](https://avro.apache.org/docs/current/spec.html#order)
 is ignored.
 
-* [object container](https://avro.apache.org/docs/current/spec.html#Object+Container+Files)
-files are not supported.
-
 * [schema resolution](https://avro.apache.org/docs/current/spec.html#Schema+Resolution)
 is not suppored.
 

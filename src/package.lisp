@@ -43,5 +43,17 @@
    #:validp
    #:serialize
    #:deserialize
+
    #:read-schema
-   #:write-schema))
+   #:write-schema
+
+   ;; avro object container files
+   #:file-input-stream
+   #:file-output-stream
+   #:schema
+   #:codec
+   #:metadata
+   #:sync
+   #:read-block
+   #:write-block
+   #:skip-block))

@@ -21,7 +21,12 @@
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :licence "GPLv3"
-  :depends-on (#:trivial-gray-streams #:babel #:ieee-floats #:st-json)
+  :depends-on (#:trivial-gray-streams
+               #:babel
+               #:ieee-floats
+               #:st-json
+               #:chipz
+               #:salza2)
   :build-pathname "cl-avro"
   :components
   ((:file "package" :pathname "src/package")
@@ -38,4 +43,11 @@
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
-             (:file "complex" :depends-on ("stream"))))))
+             (:file "complex" :depends-on ("stream"))))
+   (:module "object-container-file"
+            :pathname "src/object-container-file"
+            :depends-on ("io")
+            :components
+            ((:file "header")
+             (:file "read" :depends-on ("header"))
+             (:file "write" :depends-on ("header"))))))
