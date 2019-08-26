@@ -71,7 +71,7 @@
         :eof
         (let ((next-item (stream-deserialize input-stream schema)))
           (when (eq next-item :eof)
-            (error "~&Unexpected :eof while reading block"))
+            (error 'end-of-file :stream *error-output*))
           (incf items-read)
           next-item))))
 

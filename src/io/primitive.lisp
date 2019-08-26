@@ -101,7 +101,7 @@
        for next-byte = (stream-read-byte stream)
 
        if (eq next-byte :eof)
-       do (error "~&Unexpected :eof when deserializing bytes")
+       do (error 'end-of-file :stream *error-output*)
        else do (setf (elt buf i) next-byte))
     buf))
 
@@ -142,7 +142,7 @@
        for offset from 0
 
        if (eq byte :eof)
-       do (error "~&Reached end of stream before parsing number")
+       do (error 'end-of-file :stream *error-output*)
 
        else if (> offset max-bytes)
        do (error "~&Too many bytes for number, expected: ~A bytes max" max-bytes)
@@ -206,7 +206,7 @@
        for next-byte = (stream-read-byte byte-stream)
 
        if (eq next-byte :eof)
-       do (error "~&End of stream reached before parsing float")
+       do (error 'end-of-file :stream *error-output*)
        else do (setf (elt buf i) next-byte))
     (ieee-floats:decode-float32 (read-little-endian buf))))
 
@@ -217,7 +217,7 @@
        for next-byte = (stream-read-byte byte-stream)
 
        if (eq next-byte :eof)
-       do (error "~&End of stream reached before parsing double")
+       do (error 'end-of-file :stream *error-output*)
        else do (setf (elt buf i) next-byte))
     (ieee-floats:decode-float64 (read-little-endian buf))))
 
