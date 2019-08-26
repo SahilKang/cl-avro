@@ -108,8 +108,8 @@
 (defgeneric get-next-block-item (stream)) ; specialized by derived classes
 
 (defmethod initialize-instance :after ((stream blocked-input-stream) &key)
-  (with-slots (schema block-stream) stream
-    (setf block-stream (get-next-block stream schema))))
+  (with-slots (schema block-stream input-stream) stream
+    (setf block-stream (get-next-block input-stream schema))))
 
 (defmethod last-block-p ((stream blocked-input-stream))
   (with-slots (block-stream) stream
@@ -126,14 +126,14 @@
                    :schema schema)))
 
 (defmethod stream-read-item ((stream blocked-input-stream))
-  (with-slots (block-stream schema) stream
-    (let ((next-item (get-next-block-item stream)))
-      (if (not (eq next-item :eof))
-          next-item
-          (if (last-block-p stream)
-              :eof
+  (with-slots (block-stream schema input-stream) stream
+    (if (last-block-p stream)
+        :eof
+        (let ((next-item (get-next-block-item stream)))
+          (if (not (eq next-item :eof))
+              next-item
               (progn
-                (setf block-stream (get-next-block stream schema))
+                (setf block-stream (get-next-block input-stream schema))
                 (stream-read-item stream)))))))
 
 
