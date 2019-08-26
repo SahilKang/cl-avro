@@ -65,9 +65,21 @@
   (:documentation
    "Represents an avro block which composes array and map types."))
 
+(defgeneric end-of-block-p (stream))
+
+(defmethod end-of-block-p ((stream block-input-stream))
+  (with-slots (items-read item-count) stream
+    (>= items-read item-count)))
+
+(defmethod stream-read-byte ((stream block-input-stream))
+  (with-slots (input-stream) stream
+    (if (end-of-block-p stream)
+        :eof
+        (stream-read-byte input-stream))))
+
 (defmethod stream-read-item ((stream block-input-stream))
-  (with-slots (items-read item-count schema input-stream) stream
-    (if (= items-read item-count)
+  (with-slots (schema input-stream items-read) stream
+    (if (end-of-block-p stream)
         :eof
         (let ((next-item (stream-deserialize input-stream schema)))
           (when (eq next-item :eof)
@@ -142,7 +154,8 @@
 
 (defmethod get-next-block-item ((stream map-input-stream))
   (with-slots (block-stream) stream
-    (let ((key (stream-deserialize block-stream 'string-schema)))
-      (if (eq key :eof)
-          :eof
-          (list key (stream-read-item block-stream))))))
+    (if (end-of-block-p block-stream)
+        :eof
+        (let ((key (stream-deserialize block-stream 'string-schema))
+              (val (stream-read-item block-stream)))
+          (list key val)))))
