@@ -41,6 +41,6 @@
    #:record-schema
 
    #:parse-schema
-   #:stream-serialize
-   #:stream-deserialize
+   #:serialize
+   #:deserialize
    #:validp))

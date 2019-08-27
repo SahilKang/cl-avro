@@ -21,11 +21,11 @@
   (:documentation
    "Determine if OBJECT is valid according to avro SCHEMA."))
 
-(defgeneric stream-deserialize (input-stream schema)
+(defgeneric deserialize (input-stream schema)
   (:documentation
    "Deserialize next object from INPUT-STREAM according to avro SCHEMA or :EOF."))
 
-(defgeneric stream-serialize (output-stream schema object)
+(defgeneric serialize (output-stream schema object)
   (:documentation
    "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA."))
 
@@ -38,29 +38,29 @@
     (simple-error ()
       nil)))
 
-(defmethod stream-serialize :before (output-stream schema object)
+(defmethod serialize :before (output-stream schema object)
   (unless (validp schema object)
     (error "~&Object ~A does not match schema ~A" object schema)))
 
 
 ;;; null-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'null-schema)))
+(defmethod deserialize (stream (schema (eql 'null-schema)))
   "Read as zero bytes."
   nil)
 
-(defmethod stream-serialize (stream (schema (eql 'null-schema)) object)
+(defmethod serialize (stream (schema (eql 'null-schema)) object)
   "Written as zero bytes."
   nil)
 
 ;;; boolean-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'boolean-schema)))
+(defmethod deserialize (stream (schema (eql 'boolean-schema)))
   "Read as a single byte whose value is either 0 (false) or 1 (true)."
   (let ((byte (stream-read-byte stream)))
     (elt '(nil t) byte)))
 
-(defmethod stream-serialize (stream (schema (eql 'boolean-schema)) object)
+(defmethod serialize (stream (schema (eql 'boolean-schema)) object)
   "Written as a single byte whose value is either 0 (false) or 1 (true)."
   (if object
       (stream-write-byte stream 1)
@@ -68,50 +68,50 @@
 
 ;;; int-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'int-schema)))
+(defmethod deserialize (stream (schema (eql 'int-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 32))
 
-(defmethod stream-serialize (stream (schema (eql 'int-schema)) object)
+(defmethod serialize (stream (schema (eql 'int-schema)) object)
   "Written as variable-length zig-zag."
   (write-number stream object 32))
 
 ;;; long-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'long-schema)))
+(defmethod deserialize (stream (schema (eql 'long-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 64))
 
-(defmethod stream-serialize (stream (schema (eql 'long-schema)) object)
+(defmethod serialize (stream (schema (eql 'long-schema)) object)
   "Written as variable-length zig-zag."
   (write-number stream object 64))
 
 ;;; float-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'float-schema)))
+(defmethod deserialize (stream (schema (eql 'float-schema)))
   "Read as 4 bytes: 32-bit little-endian ieee-754."
   ;; might have to guarantee that this is a byte-stream
   (read-float stream))
 
-(defmethod stream-serialize (stream (schema (eql 'float-schema)) object)
+(defmethod serialize (stream (schema (eql 'float-schema)) object)
   "Written as 4 bytes: 32-bit little-endian ieee-754."
   (write-float stream object))
 
 ;;; double-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'double-schema)))
+(defmethod deserialize (stream (schema (eql 'double-schema)))
   "Read as 8 bytes: 64-bit little-endian ieee-754."
   (read-double stream))
 
-(defmethod stream-serialize (stream (schema (eql 'double-schema)) object)
+(defmethod serialize (stream (schema (eql 'double-schema)) object)
   "Written as 8 bytes: 64-bit little-endian ieee-754."
   (write-double stream object))
 
 ;;; bytes-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'bytes-schema)))
+(defmethod deserialize (stream (schema (eql 'bytes-schema)))
   "Read as a long followed by that many bytes."
-  (let* ((size (stream-deserialize stream 'long-schema))
+  (let* ((size (deserialize stream 'long-schema))
          (buf (make-array size :element-type '(unsigned-byte 8))))
     (loop
        for i below size
@@ -122,24 +122,24 @@
        else do (setf (elt buf i) next-byte))
     buf))
 
-(defmethod stream-serialize (stream (schema (eql 'bytes-schema)) (object sequence))
+(defmethod serialize (stream (schema (eql 'bytes-schema)) (object sequence))
   "Written as a long followed by that many bytes."
-  (stream-serialize stream 'long-schema (length object))
+  (serialize stream 'long-schema (length object))
   (loop
      for i below (length object)
      do (stream-write-byte stream (elt object i))))
 
 ;;; string-schema
 
-(defmethod stream-deserialize (stream (schema (eql 'string-schema)))
+(defmethod deserialize (stream (schema (eql 'string-schema)))
   "Read as a long followed by that many utf-8 bytes."
-  (let ((bytes (stream-deserialize stream 'bytes-schema)))
+  (let ((bytes (deserialize stream 'bytes-schema)))
     (babel:octets-to-string bytes :encoding :utf-8)))
 
-(defmethod stream-serialize (stream (schema (eql 'string-schema)) (object string))
+(defmethod serialize (stream (schema (eql 'string-schema)) (object string))
   "Written as a long followed by that many utf-8 bytes."
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
-    (stream-serialize stream 'bytes-schema bytes)))
+    (serialize stream 'bytes-schema bytes)))
 
 
 ;;; int/long utils

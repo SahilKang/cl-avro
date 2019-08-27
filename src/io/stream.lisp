@@ -65,7 +65,7 @@
   (with-slots (schema input-stream items-read) stream
     (if (end-of-block-p stream)
         :eof
-        (let ((next-item (stream-deserialize input-stream schema)))
+        (let ((next-item (deserialize input-stream schema)))
           (when (eq next-item :eof)
             (error 'end-of-file :stream *error-output*))
           (incf items-read)
@@ -100,9 +100,9 @@
     (zerop (block-count block-stream))))
 
 (defun get-next-block (stream schema)
-  (let* ((block-count (stream-deserialize stream 'long-schema))
+  (let* ((block-count (deserialize stream 'long-schema))
          (block-size (when (< block-count 0)
-                       (stream-deserialize stream 'long-schema))))
+                       (deserialize stream 'long-schema))))
     (make-instance 'block-input-stream
                    :input-stream stream
                    :item-count (abs block-count)
@@ -140,6 +140,6 @@
   (with-slots (block-stream) stream
     (if (end-of-block-p block-stream)
         :eof
-        (let ((key (stream-deserialize block-stream 'string-schema))
+        (let ((key (deserialize block-stream 'string-schema))
               (val (stream-read-item block-stream)))
           (list key val)))))

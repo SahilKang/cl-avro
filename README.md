@@ -88,7 +88,7 @@ is not suppored.
 (let* ((output-stream (make-instance 'output-stream))
        (input-stream (make-instance 'input-stream
                                     :bytes (get-bytes output-stream))))
-  (avro:stream-serialize output-stream *schema* '(2 (4 (6 (8 (10 nil))))))
-  (avro:stream-deserialize input-stream *schema*))
+  (avro:serialize output-stream *schema* '(2 (4 (6 (8 (10 nil))))))
+  (avro:deserialize input-stream *schema*))
 ;; => #(2 #(4 #(6 #(8 #(10 NIL)))))
 ```
