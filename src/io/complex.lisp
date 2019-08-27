@@ -90,67 +90,69 @@
 ;;; array-schema
 
 (defmethod validp ((schema array-schema) object)
-  (and (typep object 'array-input-stream)
-       (eq (item-schema schema) (schema object))))
+  (and (typep object 'sequence)
+       (every (lambda (elt) (validp (item-schema schema) elt)) object)))
 
 (defmethod stream-deserialize (stream (schema array-schema))
-  (make-instance 'array-input-stream
-                 :input-stream stream
-                 :schema (item-schema schema)))
+  (loop
+     with vector = (make-array 0 :adjustable t :fill-pointer 0)
+     with array-stream = (make-instance 'array-input-stream
+                                        :input-stream stream
+                                        :schema (item-schema schema))
 
-(defun buffer-stream (stream-read-item buf-size handle-buf)
-  (declare (function stream-read-item handle-buf)
-           (integer buf-size))
-  (let ((buf (make-array buf-size :fill-pointer 0 :adjustable nil)))
-    (loop
-       for item = (funcall stream-read-item)
-       until (eq item :eof)
+     for item = (stream-read-item array-stream)
+     until (eq item :eof)
+     do (vector-push-extend item vector)
 
-       when (= (length buf) (array-dimension buf 0))
-       do
-         (funcall handle-buf buf)
-         (setf (fill-pointer buf) 0)
+     finally (return vector)))
 
-       do (vector-push item buf))
-    (unless (zerop (length buf))
-      (funcall handle-buf buf))))
-
-(defmethod stream-serialize (stream (schema array-schema) (object array-input-stream))
-  (flet ((stream-read-item ()
-           (stream-read-item object))
-         (handle-buf (buf)
-           (stream-serialize stream 'long-schema (length buf))
-           (loop
-              with schema = (item-schema object)
-              for elem across buf
-              do (stream-serialize stream schema elem))))
-    (buffer-stream #'stream-read-item (* 1024 1024) #'handle-buf)
-    (stream-serialize stream 'long-schema 0)))
+(defmethod stream-serialize (stream (schema array-schema) (object sequence))
+  (let ((block-count (length object)))
+    (unless (zerop block-count)
+      (stream-serialize stream 'long-schema block-count)
+      (loop
+         with schema = (item-schema schema)
+         for i below block-count
+         do (stream-serialize stream schema (elt object i)))))
+  (stream-serialize stream 'long-schema 0))
 
 ;;; map-schema
 
 (defmethod validp ((schema map-schema) object)
-  (and (typep object 'map-input-stream)
-       (eq (value-schema schema) (schema object))))
+  (and (hash-table-p object)
+       (eq (hash-table-test object) 'equal)
+       (loop
+          with value-schema = (value-schema schema)
+
+          for key being the hash-keys of object using (hash-value value)
+
+          always (and (validp 'string-schema key)
+                      (validp value-schema value)))))
 
 (defmethod stream-deserialize (stream (schema map-schema))
-  (make-instance 'map-input-stream
-                 :input-stream stream
-                 :schema (value-schema schema)))
+  (loop
+     with hash-table = (make-hash-table :test #'equal)
+     with map-stream = (make-instance 'map-input-stream
+                                      :input-stream stream
+                                      :schema (value-schema schema))
 
-(defmethod stream-serialize (stream (schema map-schema) (object map-input-stream))
-  (flet ((stream-read-item ()
-           (stream-read-item object))
-         (handle-buf (buf)
-           (stream-serialize stream 'long-schema (length buf))
-           (loop
-              with schema = (value-schema object)
-              for (key val) across buf
-              do
-                (stream-serialize stream 'string-schema key)
-                (stream-serialize stream schema val))))
-    (buffer-stream #'stream-read-item (* 1024 1024) #'handle-buf)
-    (stream-serialize stream 'long-schema 0)))
+     for pair = (stream-read-item map-stream)
+     until (eq pair :eof)
+     for (key val) = pair
+     do (setf (gethash key hash-table) val)
+
+     finally (return hash-table)))
+
+(defmethod stream-serialize (stream (schema map-schema) (object hash-table))
+  (let ((block-count (hash-table-count object))
+        (value-schema (value-schema schema)))
+    (unless (zerop block-count)
+      (stream-serialize stream 'long-schema block-count)
+      (maphash (lambda (k v)
+                 (stream-serialize stream 'string-schema k)
+                 (stream-serialize stream value-schema v))
+               object)))
+  (stream-serialize stream 'long-schema 0))
 
 ;;; enum-schema
 

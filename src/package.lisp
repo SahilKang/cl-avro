@@ -40,11 +40,6 @@
    #:enum-schema
    #:record-schema
 
-   ;; avro array/map streams
-   #:array-input-stream
-   #:map-input-stream
-   #:stream-read-item
-
    #:parse-schema
    #:stream-serialize
    #:stream-deserialize
