@@ -59,7 +59,7 @@
   (with-slots (input-stream) stream
     (if (end-of-block-p stream)
         :eof
-        (stream-read-byte input-stream))))
+        (read-byte input-stream nil :eof))))
 
 (defmethod stream-read-item ((stream block-input-stream))
   (with-slots (schema input-stream items-read) stream

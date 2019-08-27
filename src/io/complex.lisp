@@ -28,7 +28,7 @@
   (let ((buf (make-array (size schema) :element-type '(unsigned-byte 8))))
     (loop
        for i below (size schema)
-       do (setf (elt buf i) (stream-read-byte stream)))
+       do (setf (elt buf i) (read-byte stream nil :eof)))
     buf))
 
 (defmethod serialize (stream (schema fixed-schema) object)

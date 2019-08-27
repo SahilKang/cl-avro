@@ -57,7 +57,7 @@
 
 (defmethod deserialize (stream (schema (eql 'boolean-schema)))
   "Read as a single byte whose value is either 0 (false) or 1 (true)."
-  (let ((byte (stream-read-byte stream)))
+  (let ((byte (read-byte stream nil :eof)))
     (elt '(nil t) byte)))
 
 (defmethod serialize (stream (schema (eql 'boolean-schema)) object)
@@ -115,7 +115,7 @@
          (buf (make-array size :element-type '(unsigned-byte 8))))
     (loop
        for i below size
-       for next-byte = (stream-read-byte stream)
+       for next-byte = (read-byte stream nil :eof)
 
        if (eq next-byte :eof)
        do (error 'end-of-file :stream *error-output*)
@@ -155,7 +155,7 @@
     (loop
        with max-bytes = (floor bits 7)
 
-       for byte = (stream-read-byte byte-stream)
+       for byte = (read-byte byte-stream nil :eof)
        for offset from 0
 
        if (eq byte :eof)
@@ -220,7 +220,7 @@
   (let ((buf (make-array 4 :element-type '(unsigned-byte 8))))
     (loop
        for i below (length buf)
-       for next-byte = (stream-read-byte byte-stream)
+       for next-byte = (read-byte byte-stream nil :eof)
 
        if (eq next-byte :eof)
        do (error 'end-of-file :stream *error-output*)
@@ -231,7 +231,7 @@
   (let ((buf (make-array 8 :element-type '(unsigned-byte 8))))
     (loop
        for i below (length buf)
-       for next-byte = (stream-read-byte byte-stream)
+       for next-byte = (read-byte byte-stream nil :eof)
 
        if (eq next-byte :eof)
        do (error 'end-of-file :stream *error-output*)
