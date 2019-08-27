@@ -17,25 +17,9 @@
 
 (in-package #:cl-avro)
 
-(defgeneric validp (schema object)
-  (:documentation
-   "Determine if OBJECT is valid according to avro SCHEMA."))
-
 (defgeneric stream-read-item (stream)
   (:documentation
    "Read next item from STREAM or :EOF."))
-
-(defgeneric stream-deserialize (input-stream schema)
-  (:documentation
-   "Deserialize next object from INPUT-STREAM according to avro SCHEMA or :EOF."))
-
-(defgeneric stream-serialize (output-stream schema object)
-  (:documentation
-   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA."))
-
-(defmethod stream-serialize :before (output-stream schema object)
-  (unless (validp schema object)
-    (error "~&Object ~A does not match schema ~A" object schema)))
 
 
 (defclass block-input-stream (fundamental-binary-input-stream)

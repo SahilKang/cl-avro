@@ -36,6 +36,6 @@
             :pathname "src/io"
             :depends-on ("schemas")
             :components
-            ((:file "stream")
-             (:file "primitive" :depends-on ("stream"))
+            ((:file "primitive")
+             (:file "stream" :depends-on ("primitive"))
              (:file "complex" :depends-on ("stream"))))))
