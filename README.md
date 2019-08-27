@@ -65,7 +65,7 @@ is not suppored.
 
 
 (defparameter *schema*
-  (avro:parse-schema
+  (avro:read-schema
    "{\"type\": \"record\",
       \"name\": \"LongList\",
       \"doc\": \"A linked-list of 64-bit values\",

@@ -20,9 +20,9 @@
 ;;; good old-fashioned, gmo-free, grass-fed recursive-descent parser
 ;;; handcrafted with love in San Francisco
 
-(defun parse-schema (json)
+(defun read-schema (json)
   "Return an avro schema according to JSON. JSON is a string or stream."
-  (%parse-schema (st-json:read-json json)))
+  (parse-schema (st-json:read-json json)))
 
 
 (defparameter *current-namespace* nil)
@@ -52,7 +52,7 @@ parsing."
 
      finally (return fullname->schema)))
 
-(defun %parse-schema (json &optional fullname->schema)
+(defun parse-schema (json &optional fullname->schema)
   (let ((*fullname->schema* (or fullname->schema (make-schema-hash-table))))
     (declare (special *fullname->schema*))
     (etypecase json
@@ -170,13 +170,13 @@ parsing."
   (declare (special *fullname->schema*))
   (with-fields (items) jso
     (make-instance 'array-schema
-                   :item-schema (%parse-schema items *fullname->schema*))))
+                   :item-schema (parse-schema items *fullname->schema*))))
 
 (defun parse-map (jso)
   (declare (special *fullname->schema*))
   (with-fields (values) jso
     (make-instance 'map-schema
-                   :value-schema (%parse-schema values *fullname->schema*))))
+                   :value-schema (parse-schema values *fullname->schema*))))
 
 (defun update-current-namespace (name &optional namespace)
   (let ((pos (position #\. name :from-end t)))
@@ -214,7 +214,7 @@ parsing."
      (make-instance 'field-schema
                     :name name
                     :doc doc
-                    :field-type (%parse-schema type *fullname->schema*)
+                    :field-type (parse-schema type *fullname->schema*)
                     :order order
                     :aliases aliases
                     :default default))))

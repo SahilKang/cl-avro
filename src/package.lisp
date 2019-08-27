@@ -40,7 +40,7 @@
    #:enum-schema
    #:record-schema
 
-   #:parse-schema
+   #:validp
    #:serialize
    #:deserialize
-   #:validp))
+   #:read-schema))
