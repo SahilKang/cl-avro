@@ -43,4 +43,5 @@
    #:validp
    #:serialize
    #:deserialize
-   #:read-schema))
+   #:read-schema
+   #:write-schema))
