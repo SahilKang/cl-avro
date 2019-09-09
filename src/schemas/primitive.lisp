@@ -149,5 +149,5 @@ START-CHAR."
   (let ((pred (gensym)))
     (setf (symbol-function pred)
           (lambda (maybe-enum)
-            (member maybe-enum enum-values :test #'equalp)))
+            (member maybe-enum enum-values :test #'equal)))
     `(satisfies ,pred)))
