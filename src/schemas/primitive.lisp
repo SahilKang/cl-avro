@@ -30,7 +30,7 @@
 
 (deftype int-schema ()
   (let ((min-max (get-signed-range 32))
-        (signed-32-bit-p (gensym)))
+        (signed-32-bit-p (intern-gensym)))
     (setf (symbol-function signed-32-bit-p)
           (lambda (int)
             (and (typep int 'integer)
@@ -40,7 +40,7 @@
 
 (deftype long-schema ()
   (let ((min-max (get-signed-range 64))
-        (signed-64-bit-p (gensym)))
+        (signed-64-bit-p (intern-gensym)))
     (setf (symbol-function signed-64-bit-p)
           (lambda (long)
             (and (typep long 'integer)
@@ -49,7 +49,7 @@
     `(satisfies ,signed-64-bit-p)))
 
 (deftype float-schema ()
-  (let ((32-bit-float-p (gensym)))
+  (let ((32-bit-float-p (intern-gensym)))
     (setf (symbol-function 32-bit-float-p)
           (lambda (float)
             (or (typep float 'integer)
@@ -59,7 +59,7 @@
     `(satisfies ,32-bit-float-p)))
 
 (deftype double-schema ()
-  (let ((64-bit-float-p (gensym)))
+  (let ((64-bit-float-p (intern-gensym)))
     (setf (symbol-function 64-bit-float-p)
           (lambda (float)
             (or (typep float 'integer)
@@ -135,8 +135,18 @@ START-CHAR."
 
 ;;; type utilities
 
+;; TODO use a hash-table to prevent unnecessary symbols from being
+;; created (use the args passed into the deftypes)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun intern-gensym ()
+    "Return a newly interned symbol."
+    (loop
+       for (symbol existsp) = (multiple-value-list (intern (symbol-name (gensym))))
+       when (null existsp)
+       return symbol)))
+
 (deftype typed-vector (elt-type)
-  (let ((pred (gensym)))
+  (let ((pred (intern-gensym)))
     (setf (symbol-function pred)
           (lambda (vector)
             (and (typep vector 'vector)
@@ -146,7 +156,7 @@ START-CHAR."
     `(satisfies ,pred)))
 
 (deftype enum (&rest enum-values)
-  (let ((pred (gensym)))
+  (let ((pred (intern-gensym)))
     (setf (symbol-function pred)
           (lambda (maybe-enum)
             (member maybe-enum enum-values :test #'equal)))
