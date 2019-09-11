@@ -138,6 +138,7 @@ parsing."
   nil)
 
 (defun register-named-schema (schema)
+  (declare (special *fullname->schema*))
   (let ((fullname (figure-out-fullname (name schema) (namespace schema))))
     (when (nth-value 1 (gethash fullname *fullname->schema*))
       (error "~&Name is already taken: ~A" fullname))
