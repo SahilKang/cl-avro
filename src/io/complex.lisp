@@ -46,7 +46,7 @@
    (position
     :initform (error "Must supply :position")
     :initarg :position
-    :type '(integer 0))))
+    :type (integer 0))))
 
 (defmethod print-object ((union-value union-value) stream)
   (with-slots (value) union-value

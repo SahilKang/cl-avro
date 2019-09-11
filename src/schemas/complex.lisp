@@ -22,26 +22,26 @@
     :initform (error "Must supply :name string")
     :initarg :name
     :reader name
-    :type 'avro-name)
+    :type avro-name)
    (namespace
     :initform nil
     :initarg :namespace
     :reader namespace
-    :type '(or null-schema avro-name))))
+    :type (or null-schema avro-name))))
 
 (defclass aliased-type ()
   ((aliases
     :initform nil
     :initarg :aliases
     :reader aliases
-    :type '(or null-schema (typed-vector avro-name)))))
+    :type (or null-schema (typed-vector avro-name)))))
 
 (defclass doc-type ()
   ((doc
     :initform nil
     :initarg :doc
     :reader doc
-    :type '(or null-schema string-schema))))
+    :type (or null-schema string-schema))))
 
 ;;; avro complex types
 
@@ -50,7 +50,7 @@
     :initform (error "Must supply :size signed 32-bit int")
     :initarg :size
     :reader size
-    :type 'int-schema)))
+    :type int-schema)))
 
 (defclass union-schema ()
   ((schemas
@@ -75,19 +75,19 @@
     :initform (error "Must supply :symbols vector")
     :initarg :symbols
     :reader symbols
-    :type '(typed-vector avro-name))
+    :type (typed-vector avro-name))
    (default
     :initform nil
     :initarg :default
     :reader default
-    :type '(or null-schema avro-name))))
+    :type (or null-schema avro-name))))
 
 (defclass field-schema (aliased-type doc-type)
   ((name
     :initform (error "Must supply :name string")
     :initarg :name
     :reader name
-    :type 'avro-name)
+    :type avro-name)
    (field-type
     :initform (error "Must supply :field-type schema")
     :initarg :field-type
@@ -96,7 +96,7 @@
     :initform "ascending"
     :initarg :order
     :reader order
-    :type '(enum "ascending" "descending" "ignore"))
+    :type (enum "ascending" "descending" "ignore"))
    (default
     :initform nil
     :initarg :default
@@ -107,4 +107,4 @@
     :initform (error "Must supply :field-schemas vector")
     :initarg :field-schemas
     :reader field-schemas
-    :type '(typed-vector field-schema))))
+    :type (typed-vector field-schema))))
