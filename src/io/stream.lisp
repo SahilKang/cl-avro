@@ -45,6 +45,7 @@
    (schema
     :initform (error "Must supply :schema")
     :initarg :schema
+    :type avro-schema
     :documentation "Schema describing the items contained in this block."))
   (:documentation
    "Represents an avro block which composes array and map types."))
@@ -80,6 +81,7 @@
     :initform (error "Must supply :schema")
     :initarg :schema
     :reader schema
+    :type avro-schema
     :documentation "The schema object used to deserialize constituent items.")
    (block-stream
     :type block-input-stream

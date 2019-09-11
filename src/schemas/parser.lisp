@@ -202,7 +202,10 @@ parsing."
     ;; record schemas can be recursive (fields can refer to the record
     ;; type), so let's register the record schema and then mutate the
     ;; fields vector
-    (let* ((field-schemas (make-array (length fields)))
+    (let* ((field-schemas (make-array (length fields)
+                                      :element-type 'avro-schema
+                                      :initial-element 'null-schema
+                                      :fill-pointer 0))
            (record (make-instance 'record-schema
                                   :name name
                                   :namespace namespace
@@ -212,9 +215,9 @@ parsing."
       (update-current-namespace name namespace)
       (register-named-schema record)
       (loop
-         for field-jso in fields and i from 0
+         for field-jso in fields
          for schema = (parse-field field-jso)
-         do (setf (elt field-schemas i) schema))
+         do (vector-push schema field-schemas))
       record)))
 
 (defun parse-field (jso)

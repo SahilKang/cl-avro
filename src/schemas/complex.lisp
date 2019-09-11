@@ -17,6 +17,27 @@
 
 (in-package #:cl-avro)
 
+(defun avro-schema-p (schema)
+  ;; primitve schemas are symbols, whereas complex schemas are
+  ;; instances
+  (typecase schema
+    (symbol (member schema '(null-schema
+                             boolean-schema
+                             int-schema
+                             long-schema
+                             float-schema
+                             double-schema
+                             bytes-schema
+                             string-schema)))
+    (fixed-schema t)
+    (union-schema t)
+    (array-schema t)
+    (map-schema t)
+    (enum-schema t)
+    (record-schema t)))
+
+(deftype avro-schema () '(satisfies avro-schema-p))
+
 (defclass named-type ()
   ((name
     :initform (error "Must supply :name string")
@@ -56,19 +77,22 @@
   ((schemas
     :initform (error "Must supply :schemas")
     :initarg :schemas
-    :reader schemas)))
+    :reader schemas
+    :type (typed-vector avro-schema))))
 
 (defclass array-schema ()
   ((item-schema
     :initform (error "Must supply :item-schema")
     :initarg :item-schema
-    :reader item-schema)))
+    :reader item-schema
+    :type avro-schema)))
 
 (defclass map-schema ()
   ((value-schema
     :initform (error "Must supply :value-schema")
     :initarg :value-schema
-    :reader value-schema)))
+    :reader value-schema
+    :type avro-schema)))
 
 (defclass enum-schema (named-type aliased-type doc-type)
   ((symbols
@@ -91,7 +115,8 @@
    (field-type
     :initform (error "Must supply :field-type schema")
     :initarg :field-type
-    :reader field-type)
+    :reader field-type
+    :type avro-schema)
    (order
     :initform "ascending"
     :initarg :order

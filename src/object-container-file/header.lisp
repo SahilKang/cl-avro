@@ -65,7 +65,8 @@ Returns NIL if there were no more blocks to skip and T otherwise."))
     :reader metadata
     :type hash-table)
    (schema
-    :reader schema)
+    :reader schema
+    :type avro-schema)
    (codec
     :reader codec
     :type (enum "null" "deflate" "snappy"))))
