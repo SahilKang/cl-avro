@@ -76,26 +76,6 @@
 
 (deftype avro-name () '(satisfies avro-name-p))
 
-(defun avro-name-p (name)
-  "True if NAME matches regex /^[A-Za-z_][A-Za-z0-9_]*$/ and nil otherwise"
-  (declare (string name)
-           (optimize (speed 3) (safety 0))
-           (inline lowercase-p uppercase-p underscore-p digit-p))
-  (when (and (typep name 'string)
-             (not (zerop (length name))))
-    (the boolean
-         (let ((first (char-code (char name 0))))
-           (when (or (lowercase-p first)
-                     (uppercase-p first)
-                     (underscore-p first))
-             (loop
-                for i from 1 below (length name)
-                for char-code = (char-code (char name i))
-
-                always (or (lowercase-p char-code)
-                           (uppercase-p char-code)
-                           (underscore-p char-code)
-                           (digit-p char-code))))))))
 
 (defmacro in-range-p (char-code start-char &optional end-char)
   "True if CHAR-CODE is between the char-code given by START-CHAR and END-CHAR.
@@ -113,25 +93,53 @@ START-CHAR."
         `(the boolean
               (= ,char-code ,start)))))
 
+(declaim (inline digit-p))
 (defun digit-p (char-code)
-  (declare (integer char-code)
+  (declare (fixnum char-code)
            (optimize (speed 3) (safety 0)))
   (in-range-p char-code #\0 #\9))
+(declaim (notinline digit-p))
 
+(declaim (inline uppercase-p))
 (defun uppercase-p (char-code)
-  (declare (integer char-code)
+  (declare (fixnum char-code)
            (optimize (speed 3) (safety 0)))
   (in-range-p char-code #\A #\Z))
+(declaim (notinline uppercase-p))
 
+(declaim (inline lowercase-p))
 (defun lowercase-p (char-code)
-  (declare (integer char-code)
+  (declare (fixnum char-code)
            (optimize (speed 3) (safety 0)))
   (in-range-p char-code #\a #\z))
+(declaim (notinline lowercase-p))
 
+(declaim (inline underscore-p))
 (defun underscore-p (char-code)
-  (declare (integer char-code)
+  (declare (fixnum char-code)
            (optimize (speed 3) (safety 0)))
   (in-range-p char-code #\_))
+(declaim (notinline underscore-p))
+
+(defun avro-name-p (name)
+  "True if NAME matches regex /^[A-Za-z_][A-Za-z0-9_]*$/ and nil otherwise"
+  (declare (optimize (speed 3) (safety 0))
+           (inline lowercase-p uppercase-p underscore-p digit-p))
+  (the boolean
+       (when (and (simple-string-p name)
+                  (not (zerop (length name))))
+         (let ((first (char-code (schar name 0))))
+           (when (or (lowercase-p first)
+                     (uppercase-p first)
+                     (underscore-p first))
+             (loop
+                for i from 1 below (length name)
+                for char-code = (char-code (schar name i))
+
+                always (or (lowercase-p char-code)
+                           (uppercase-p char-code)
+                           (underscore-p char-code)
+                           (digit-p char-code))))))))
 
 ;;; type utilities
 
