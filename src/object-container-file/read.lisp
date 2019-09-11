@@ -65,6 +65,7 @@
     :type (integer 0)
     :documentation "Number of objects read from this stream.")
    (schema
+    :type avro-schema
     :documentation "Schema to deserialize objects against.")
    (codec
     :type (enum "null" "deflate" "snappy"))

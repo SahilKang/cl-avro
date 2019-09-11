@@ -30,21 +30,22 @@
     :initform (error "Must supply :item-count")
     :initarg :item-count
     :reader block-count
-    :type 'long-schema
+    :type long-schema
     :documentation "Number of items in this block.")
    (items-read
     :initform 0
-    :type '(integer 0 (1- (expt 2 63)))
+    :type (integer 0 #.(1- (expt 2 63)))
     :documentation "Number of items read from this stream.")
    (size
     :initform nil
     :initarg :size
     :reader block-size
-    :type '(or nil (integer 0 (1- (expt 2 63))))
+    :type (or null (integer 0 #.(1- (expt 2 63))))
     :documentation "Number of bytes in this block.")
    (schema
     :initform (error "Must supply :schema")
     :initarg :schema
+    :type avro-schema
     :documentation "Schema describing the items contained in this block."))
   (:documentation
    "Represents an avro block which composes array and map types."))
@@ -80,9 +81,10 @@
     :initform (error "Must supply :schema")
     :initarg :schema
     :reader schema
+    :type avro-schema
     :documentation "The schema object used to deserialize constituent items.")
    (block-stream
-    :type 'block-input-stream
+    :type block-input-stream
     :documentation "Stream used to read constituent blocks."))
   (:documentation
    "Avro arrays and maps are pretty much the same so this is a base class."))
