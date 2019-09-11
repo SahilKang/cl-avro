@@ -76,6 +76,7 @@
 
 (deftype avro-name () '(satisfies avro-name-p))
 
+(deftype avro-fullname () '(satisfies avro-fullname-p))
 
 (defmacro in-range-p (char-code start-char &optional end-char)
   "True if CHAR-CODE is between the char-code given by START-CHAR and END-CHAR.
@@ -121,6 +122,24 @@ START-CHAR."
   (in-range-p char-code #\_))
 (declaim (notinline underscore-p))
 
+(declaim (inline split-on-dot))
+(defun split-on-dot (string)
+  "Split STRING on dot and return a list of strings."
+  (declare (simple-string string)
+           (optimize (speed 3) (safety 0)))
+  (loop
+     with buf of-type list = nil
+     with splits of-type list = nil
+
+     for char across string
+     if (char= char #\.)
+     do (setf splits (nconc splits (list (coerce buf 'simple-string)))
+              buf nil)
+     else do (setf buf (nconc buf (list char)))
+
+     finally (return (nconc splits (list (coerce buf 'simple-string))))))
+(declaim (notinline split-on-dot))
+
 (defun avro-name-p (name)
   "True if NAME matches regex /^[A-Za-z_][A-Za-z0-9_]*$/ and nil otherwise"
   (declare (optimize (speed 3) (safety 0))
@@ -140,6 +159,15 @@ START-CHAR."
                            (uppercase-p char-code)
                            (underscore-p char-code)
                            (digit-p char-code))))))))
+
+(defun avro-fullname-p (fullname)
+  "True if FULLNAME is either an avro-name or dot-separated string of avro-names."
+  (declare (optimize (speed 3) (safety 0))
+           (inline split-on-dot))
+  (the boolean
+       (when (simple-string-p fullname)
+         (let ((splits (split-on-dot fullname)))
+           (every #'avro-name-p splits)))))
 
 ;;; type utilities
 

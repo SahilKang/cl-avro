@@ -22,19 +22,19 @@
     :initform (error "Must supply :name string")
     :initarg :name
     :reader name
-    :type avro-name)
+    :type avro-fullname)
    (namespace
     :initform nil
     :initarg :namespace
     :reader namespace
-    :type (or null-schema avro-name))))
+    :type (or null-schema avro-fullname))))
 
 (defclass aliased-type ()
   ((aliases
     :initform nil
     :initarg :aliases
     :reader aliases
-    :type (or null-schema (typed-vector avro-name)))))
+    :type (or null-schema (typed-vector avro-fullname)))))
 
 (defclass doc-type ()
   ((doc
@@ -87,7 +87,7 @@
     :initform (error "Must supply :name string")
     :initarg :name
     :reader name
-    :type avro-name)
+    :type avro-fullname)
    (field-type
     :initform (error "Must supply :field-type schema")
     :initarg :field-type
