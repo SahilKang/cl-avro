@@ -26,40 +26,7 @@ is not suppored.
 # Examples
 
 ```lisp
-(ql:quickload '(:cl-avro :trivial-gray-streams))
-
-(use-package :trivial-gray-streams)
-
-;; create in-memory stream classes:
-
-(defclass input-stream (fundamental-binary-input-stream)
-  ((bytes
-    :initform (error "Must supply :bytes vector")
-    :initarg :bytes)
-   (position
-    :initform 0)))
-
-(defmethod stream-read-byte ((stream input-stream))
-  (with-slots (bytes position) stream
-    (if (= position (length bytes))
-        :eof
-        (prog1 (elt bytes position)
-          (incf position)))))
-
-(defclass output-stream (fundamental-binary-output-stream)
-  ((bytes
-    :initform (make-array 0
-                          :element-type '(unsigned-byte 8)
-                          :adjustable t
-                          :fill-pointer 0)
-    :reader get-bytes)))
-
-(defmethod stream-write-byte ((stream output-stream) (byte integer))
-  (check-type byte (unsigned-byte 8))
-  (with-slots (bytes) stream
-    (vector-push-extend byte bytes))
-  byte)
-
+(ql:quickload :cl-avro)
 
 (defparameter *schema*
   (avro:read-schema
@@ -82,10 +49,8 @@ is not suppored.
 (avro:validp *schema* '(2 (4 (6 (#.(expt 2 63) (10 nil))))))
 ;; => nil
 
-(let* ((output-stream (make-instance 'output-stream))
-       (input-stream (make-instance 'input-stream
-                                    :bytes (get-bytes output-stream))))
-  (avro:serialize output-stream *schema* '(2 (4 (6 (8 (10 nil))))))
-  (avro:deserialize input-stream *schema*))
+(avro:deserialize
+ (avro:serialize nil *schema* '(2 (4 (6 (8 (10 nil))))))
+ *schema*)
 ;; => #(2 #(4 #(6 #(8 #(10 NIL)))))
 ```

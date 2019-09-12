@@ -189,13 +189,15 @@ parsing."
     (make-instance 'map-schema
                    :value-schema (parse-schema values *fullname->schema*))))
 
-(defun update-current-namespace (name &optional namespace)
+(defun figure-out-namespace (name &optional namespace)
   (let ((pos (position #\. name :from-end t)))
     (cond
       (pos
-       (setf *current-namespace* (subseq name (1+ pos))))
+       (subseq name (1+ pos)))
       ((not (zerop (length namespace)))
-       (setf *current-namespace* namespace)))))
+       namespace)
+      (t
+       *current-namespace*))))
 
 (defun parse-record (jso)
   (with-fields (name namespace doc aliases fields) jso
@@ -210,28 +212,28 @@ parsing."
                                   :name name
                                   :namespace namespace
                                   :doc doc
-                                  :aliases aliases
+                                  :aliases (coerce aliases 'vector)
                                   :field-schemas field-schemas)))
-      (update-current-namespace name namespace)
-      (register-named-schema record)
-      (loop
-         for field-jso in fields
-         for schema = (parse-field field-jso)
-         do (vector-push schema field-schemas))
-      record)))
+      (let ((*current-namespace* (figure-out-namespace name namespace)))
+        (register-named-schema record)
+        (loop
+           for field-jso in fields
+           for schema = (parse-field field-jso)
+           do (vector-push schema field-schemas))
+        record))))
 
 (defun parse-field (jso)
   (declare (special *fullname->schema*))
   (with-fields (name doc type order aliases default) jso
-    (update-current-namespace name)
-    (register-named-schema
-     (make-instance 'field-schema
-                    :name name
-                    :doc doc
-                    :field-type (parse-schema type *fullname->schema*)
-                    :order (or order "ascending")
-                    :aliases aliases
-                    :default default))))
+    (let ((*current-namespace* (figure-out-namespace name)))
+      (register-named-schema
+       (make-instance 'field-schema
+                      :name name
+                      :doc doc
+                      :field-type (parse-schema type *fullname->schema*)
+                      :order (or order "ascending")
+                      :aliases aliases
+                      :default default)))))
 
 
 ;;; write schema object to json string:

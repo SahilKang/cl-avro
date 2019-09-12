@@ -21,13 +21,15 @@
   (:documentation
    "Determine if OBJECT is valid according to avro SCHEMA."))
 
-(defgeneric deserialize (input-stream schema)
+(defgeneric deserialize (stream-or-seq schema)
   (:documentation
-   "Deserialize next object from INPUT-STREAM according to avro SCHEMA or :EOF."))
+   "Deserialize next object from STREAM-OR-SEQ according to avro SCHEMA or :EOF."))
 
 (defgeneric serialize (output-stream schema object)
   (:documentation
-   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA."))
+   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA.
+
+If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 
 ;; all of the primitive schemas are deftypes so this works:
@@ -43,73 +45,138 @@
     (error "~&Object ~A does not match schema ~A" object schema)))
 
 
+(defclass input-stream (fundamental-binary-input-stream)
+  ((bytes
+    :initform (error "Must supply :bytes")
+    :initarg :bytes
+    :type (typed-vector (unsigned-byte 8)))
+   (position
+    :initform 0
+    :type (integer 0)))
+  (:documentation
+   "A binary input stream backed by a vector of bytes."))
+
+(defmethod stream-read-byte ((stream input-stream))
+  (with-slots (bytes position) stream
+    (if (= position (length bytes))
+        :eof
+        (prog1 (elt bytes position)
+          (incf position)))))
+
+(defclass output-stream (fundamental-binary-output-stream)
+  ((bytes
+    :initform (make-array 0
+                          :element-type '(unsigned-byte 8)
+                          :adjustable t
+                          :fill-pointer 0)
+    :type (typed-vector (unsigned-byte 8))
+    :reader bytes))
+  (:documentation
+   "A binary output stream backed by a vector of bytes."))
+
+(defmethod stream-write-byte ((stream output-stream) (byte integer))
+  (check-type byte (unsigned-byte 8))
+  (with-slots (bytes) stream
+    (vector-push-extend byte bytes))
+  byte)
+
+
+(defmethod deserialize ((bytes sequence) schema)
+  (let ((input-stream (make-instance 'input-stream :bytes (coerce bytes 'vector))))
+    (deserialize input-stream schema)))
+
+(defmethod serialize ((nada null) schema object)
+  "Return a vector of bytes instead of serializing to a stream."
+  (declare (ignore nada))
+  (let ((output-stream (make-instance 'output-stream)))
+    (serialize output-stream schema object)
+    (bytes output-stream)))
+
+
 ;;; null-schema
 
-(defmethod deserialize (stream (schema (eql 'null-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'null-schema)))
   "Read as zero bytes."
   nil)
 
-(defmethod serialize (stream (schema (eql 'null-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'null-schema))
+                      object)
   "Written as zero bytes."
   nil)
 
 ;;; boolean-schema
 
-(defmethod deserialize (stream (schema (eql 'boolean-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'boolean-schema)))
   "Read as a single byte whose value is either 0 (false) or 1 (true)."
   (let ((byte (read-byte stream nil :eof)))
     (elt '(nil t) byte)))
 
-(defmethod serialize (stream (schema (eql 'boolean-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'boolean-schema))
+                      object)
   "Written as a single byte whose value is either 0 (false) or 1 (true)."
-  (if object
-      (stream-write-byte stream 1)
-      (stream-write-byte stream 0)))
+  (write-byte (if object 1 0) stream))
 
 ;;; int-schema
 
-(defmethod deserialize (stream (schema (eql 'int-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'int-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 32))
 
-(defmethod serialize (stream (schema (eql 'int-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'int-schema))
+                      object)
   "Written as variable-length zig-zag."
   (write-number stream object 32))
 
 ;;; long-schema
 
-(defmethod deserialize (stream (schema (eql 'long-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'long-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 64))
 
-(defmethod serialize (stream (schema (eql 'long-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'long-schema))
+                      object)
   "Written as variable-length zig-zag."
   (write-number stream object 64))
 
 ;;; float-schema
 
-(defmethod deserialize (stream (schema (eql 'float-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'float-schema)))
   "Read as 4 bytes: 32-bit little-endian ieee-754."
   ;; might have to guarantee that this is a byte-stream
   (read-float stream))
 
-(defmethod serialize (stream (schema (eql 'float-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'float-schema))
+                      object)
   "Written as 4 bytes: 32-bit little-endian ieee-754."
   (write-float stream object))
 
 ;;; double-schema
 
-(defmethod deserialize (stream (schema (eql 'double-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'double-schema)))
   "Read as 8 bytes: 64-bit little-endian ieee-754."
   (read-double stream))
 
-(defmethod serialize (stream (schema (eql 'double-schema)) object)
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'double-schema))
+                      object)
   "Written as 8 bytes: 64-bit little-endian ieee-754."
   (write-double stream object))
 
 ;;; bytes-schema
 
-(defmethod deserialize (stream (schema (eql 'bytes-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'bytes-schema)))
   "Read as a long followed by that many bytes."
   (let* ((size (deserialize stream 'long-schema))
          (buf (make-array size :element-type '(unsigned-byte 8))))
@@ -122,21 +189,26 @@
        else do (setf (elt buf i) next-byte))
     buf))
 
-(defmethod serialize (stream (schema (eql 'bytes-schema)) (object sequence))
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'bytes-schema))
+                      (object sequence))
   "Written as a long followed by that many bytes."
   (serialize stream 'long-schema (length object))
   (loop
      for i below (length object)
-     do (stream-write-byte stream (elt object i))))
+     do (write-byte (elt object i) stream)))
 
 ;;; string-schema
 
-(defmethod deserialize (stream (schema (eql 'string-schema)))
+(defmethod deserialize ((stream fundamental-binary-input-stream)
+                        (schema (eql 'string-schema)))
   "Read as a long followed by that many utf-8 bytes."
   (let ((bytes (deserialize stream 'bytes-schema)))
     (babel:octets-to-string bytes :encoding :utf-8)))
 
-(defmethod serialize (stream (schema (eql 'string-schema)) (object string))
+(defmethod serialize ((stream fundamental-binary-output-stream)
+                      (schema (eql 'string-schema))
+                      (object string))
   "Written as a long followed by that many utf-8 bytes."
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
     (serialize stream 'bytes-schema bytes)))
@@ -175,9 +247,9 @@
      until (zerop (logand number (lognot #x7f)))
      for byte = (logior (logand number #x7f) #x80)
      do
-       (stream-write-byte byte-stream byte)
+       (write-byte byte byte-stream)
        (setf number (ash number -7)))
-  (stream-write-byte byte-stream (logand number #xff)))
+  (write-byte (logand number #xff) byte-stream))
 
 (defun get-range (bits)
   (let* ((max (1- (expt 2 (1- bits))))
@@ -244,7 +316,7 @@
     (write-little-endian number buf)
     (loop
        for byte across buf
-       do (stream-write-byte byte-stream byte))))
+       do (write-byte byte byte-stream))))
 
 (defun write-double (byte-stream double)
   (let ((number (ieee-floats:encode-float64 double))
@@ -252,4 +324,4 @@
     (write-little-endian number buf)
     (loop
        for byte across buf
-       do (stream-write-byte byte-stream byte))))
+       do (write-byte byte byte-stream))))
