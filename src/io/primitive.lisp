@@ -21,13 +21,15 @@
   (:documentation
    "Determine if OBJECT is valid according to avro SCHEMA."))
 
-(defgeneric deserialize (input-stream schema)
+(defgeneric deserialize (stream-or-seq schema)
   (:documentation
-   "Deserialize next object from INPUT-STREAM according to avro SCHEMA or :EOF."))
+   "Deserialize next object from STREAM-OR-SEQ according to avro SCHEMA or :EOF."))
 
 (defgeneric serialize (output-stream schema object)
   (:documentation
-   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA."))
+   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA.
+
+If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 
 ;; all of the primitive schemas are deftypes so this works:
@@ -41,6 +43,54 @@
 (defmethod serialize :before (output-stream schema object)
   (unless (validp schema object)
     (error "~&Object ~A does not match schema ~A" object schema)))
+
+
+(defclass input-stream (fundamental-binary-input-stream)
+  ((bytes
+    :initform (error "Must supply :bytes")
+    :initarg :bytes
+    :type (typed-vector (unsigned-byte 8)))
+   (position
+    :initform 0
+    :type (integer 0)))
+  (:documentation
+   "A binary input stream backed by a vector of bytes."))
+
+(defmethod stream-read-byte ((stream input-stream))
+  (with-slots (bytes position) stream
+    (if (= position (length bytes))
+        :eof
+        (prog1 (elt bytes position)
+          (incf position)))))
+
+(defclass output-stream (fundamental-binary-output-stream)
+  ((bytes
+    :initform (make-array 0
+                          :element-type '(unsigned-byte 8)
+                          :adjustable t
+                          :fill-pointer 0)
+    :type (typed-vector (unsigned-byte 8))
+    :reader bytes))
+  (:documentation
+   "A binary output stream backed by a vector of bytes."))
+
+(defmethod stream-write-byte ((stream output-stream) (byte integer))
+  (check-type byte (unsigned-byte 8))
+  (with-slots (bytes) stream
+    (vector-push-extend byte bytes))
+  byte)
+
+
+(defmethod deserialize ((bytes sequence) schema)
+  (let ((input-stream (make-instance 'input-stream :bytes (coerce bytes 'vector))))
+    (deserialize input-stream schema)))
+
+(defmethod serialize ((nada null) schema object)
+  "Return a vector of bytes instead of serializing to a stream."
+  (declare (ignore nada))
+  (let ((output-stream (make-instance 'output-stream)))
+    (serialize output-stream schema object)
+    (bytes output-stream)))
 
 
 ;;; null-schema
@@ -68,9 +118,7 @@
                       (schema (eql 'boolean-schema))
                       object)
   "Written as a single byte whose value is either 0 (false) or 1 (true)."
-  (if object
-      (write-byte 1 stream)
-      (write-byte 0 stream)))
+  (write-byte (if object 1 0) stream))
 
 ;;; int-schema
 

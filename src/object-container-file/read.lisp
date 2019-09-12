@@ -35,24 +35,6 @@
       ]
     }"))
 
-(defclass input-stream (fundamental-binary-input-stream)
-  ((bytes
-    :initform (error "Must supply :bytes")
-    :initarg :bytes
-    :type (typed-vector (unsigned-byte 8)))
-   (position
-    :initform 0
-    :type (integer 0)))
-  (:documentation
-   "A binary input stream backed by a vector of bytes."))
-
-(defmethod stream-read-byte ((stream input-stream))
-  (with-slots (bytes position) stream
-    (if (= position (length bytes))
-        :eof
-        (prog1 (elt bytes position)
-          (incf position)))))
-
 (defclass file-block (fundamental-binary-input-stream)
   ((block-count
     :initform (error "Must supply :block-count")

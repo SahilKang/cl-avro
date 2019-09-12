@@ -210,7 +210,7 @@ parsing."
                                   :name name
                                   :namespace namespace
                                   :doc doc
-                                  :aliases aliases
+                                  :aliases (coerce aliases 'vector)
                                   :field-schemas field-schemas)))
       (update-current-namespace name namespace)
       (register-named-schema record)

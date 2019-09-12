@@ -99,21 +99,6 @@
       (loop for byte across (sync-marker header) do (write-byte byte output-stream))
       (length bytes))))
 
-(defclass output-stream (fundamental-binary-output-stream)
-  ((bytes
-    :initform (make-array 0
-                          :element-type '(unsigned-byte 8)
-                          :adjustable t
-                          :fill-pointer 0)
-    :type (typed-vector (unsigned-byte 8))
-    :reader bytes)))
-
-(defmethod stream-write-byte ((stream output-stream) (byte integer))
-  (check-type byte (unsigned-byte 8))
-  (with-slots (bytes) stream
-    (vector-push-extend byte bytes))
-  byte)
-
 (defun serialize-then-compress (header block)
   (let ((output-stream (make-instance 'output-stream)))
     (loop
