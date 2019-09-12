@@ -34,7 +34,7 @@
 (defmethod serialize (stream (schema fixed-schema) object)
   (loop
      for i below (length object)
-     do (stream-write-byte stream (elt object i))))
+     do (write-byte (elt object i) stream)))
 
 ;;; union-schema
 

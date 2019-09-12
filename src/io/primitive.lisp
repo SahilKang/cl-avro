@@ -63,8 +63,8 @@
 (defmethod serialize (stream (schema (eql 'boolean-schema)) object)
   "Written as a single byte whose value is either 0 (false) or 1 (true)."
   (if object
-      (stream-write-byte stream 1)
-      (stream-write-byte stream 0)))
+      (write-byte 1 stream)
+      (write-byte 0 stream)))
 
 ;;; int-schema
 
@@ -127,7 +127,7 @@
   (serialize stream 'long-schema (length object))
   (loop
      for i below (length object)
-     do (stream-write-byte stream (elt object i))))
+     do (write-byte (elt object i) stream)))
 
 ;;; string-schema
 
@@ -175,9 +175,9 @@
      until (zerop (logand number (lognot #x7f)))
      for byte = (logior (logand number #x7f) #x80)
      do
-       (stream-write-byte byte-stream byte)
+       (write-byte byte byte-stream)
        (setf number (ash number -7)))
-  (stream-write-byte byte-stream (logand number #xff)))
+  (write-byte (logand number #xff) byte-stream))
 
 (defun get-range (bits)
   (let* ((max (1- (expt 2 (1- bits))))
@@ -244,7 +244,7 @@
     (write-little-endian number buf)
     (loop
        for byte across buf
-       do (stream-write-byte byte-stream byte))))
+       do (write-byte byte byte-stream))))
 
 (defun write-double (byte-stream double)
   (let ((number (ieee-floats:encode-float64 double))
@@ -252,4 +252,4 @@
     (write-little-endian number buf)
     (loop
        for byte across buf
-       do (stream-write-byte byte-stream byte))))
+       do (write-byte byte byte-stream))))
