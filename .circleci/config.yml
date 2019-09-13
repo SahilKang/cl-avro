@@ -4,6 +4,9 @@ jobs:
   test:
     working_directory: ~/cl-avro
 
+    docker:
+      - image: docker:stable-git
+
     steps:
       - checkout
       - setup_remote_docker
