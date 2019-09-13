@@ -23,7 +23,7 @@
   (and (typep object '(typed-vector (unsigned-byte 8)))
        (= (length object) (size schema))))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema fixed-schema))
   "Read using the number of bytes declared in the schema."
   (let ((buf (make-array (size schema) :element-type '(unsigned-byte 8))))
@@ -32,7 +32,7 @@
        do (setf (elt buf i) (read-byte stream nil :eof)))
     buf))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema fixed-schema)
                       object)
   (loop
@@ -63,21 +63,21 @@
     (when (< position (length (schemas schema)))
       (validp (elt (schemas schema) position) value))))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema union-schema))
   "Read with a long indicating the union type and then the value itself."
   (let* ((pos (deserialize stream 'long-schema))
          (val (deserialize stream (elt (schemas schema) pos))))
     (make-instance 'union-value :value val :position pos)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema union-schema)
                       (object union-value))
   (with-slots (value position) object
     (serialize stream 'long-schema position)
     (serialize stream (elt (schemas schema) position) value)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema union-schema)
                       object)
   (let ((pos (loop
@@ -101,7 +101,7 @@
   (and (typep object 'sequence)
        (every (lambda (elt) (validp (item-schema schema) elt)) object)))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema array-schema))
   (loop
      with vector = (make-array 0 :adjustable t :fill-pointer 0)
@@ -115,7 +115,7 @@
 
      finally (return vector)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema array-schema)
                       (object sequence))
   (let ((block-count (length object)))
@@ -140,7 +140,7 @@
           always (and (validp 'string-schema key)
                       (validp value-schema value)))))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema map-schema))
   (loop
      with hash-table = (make-hash-table :test #'equal)
@@ -155,7 +155,7 @@
 
      finally (return hash-table)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema map-schema)
                       (object hash-table))
   (let ((block-count (hash-table-count object))
@@ -174,12 +174,12 @@
   (and (typep object 'avro-name)
        (not (null (position object (symbols schema) :test #'string=)))))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema enum-schema))
   (let ((pos (deserialize stream 'int-schema)))
     (elt (symbols schema) pos)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema enum-schema)
                       (object string))
   (let ((pos (position object (symbols schema) :test #'string=)))
@@ -197,7 +197,7 @@
 (defmethod validp ((schema field-schema) object)
   (validp (field-type schema) object))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema record-schema))
   (let* ((field-schemas (field-schemas schema))
          (fields (make-array (length field-schemas))))
@@ -207,11 +207,11 @@
        do (setf (elt fields i) value))
     fields))
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema field-schema))
   (deserialize stream (field-type schema)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema record-schema)
                       object)
   (loop
@@ -219,7 +219,7 @@
      for field = (elt object i)
      do (serialize stream schema field)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema field-schema)
                       object)
   (serialize stream (field-type schema) object))
