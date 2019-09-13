@@ -101,9 +101,7 @@
 
 (defclass file-input-stream (fundamental-binary-input-stream)
   ((input-stream
-    :initform (error "Must supply :input-stream")
-    :initarg :input-stream
-    :reader input-stream)
+    :type stream)
    (header
     :type header)
    (file-block
@@ -112,9 +110,16 @@
   (:documentation
    "A stream representing an avro object container file."))
 
-(defmethod initialize-instance :after ((file-input-stream file-input-stream) &key)
+(defmethod initialize-instance :after
+    ((file-input-stream file-input-stream)
+     &key (stream-or-seq (error "Must supply :stream-or-seq.")))
+  (check-type stream-or-seq (or stream sequence))
   (with-slots (file-block input-stream header) file-input-stream
-    (setf header (read-header input-stream)
+    (setf input-stream (if (typep stream-or-seq 'sequence)
+                           (make-instance 'input-stream
+                                          :bytes (coerce stream-or-seq 'vector))
+                           stream-or-seq)
+          header (read-header input-stream)
           file-block (get-next-file-block input-stream header))))
 
 (defun read-header (input-stream)

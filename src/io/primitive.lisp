@@ -69,6 +69,7 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
                           :element-type '(unsigned-byte 8)
                           :adjustable t
                           :fill-pointer 0)
+    :initarg :bytes
     :type (typed-vector (unsigned-byte 8))
     :reader bytes))
   (:documentation

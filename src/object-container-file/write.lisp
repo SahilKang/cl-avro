@@ -36,8 +36,7 @@
 
 (defclass file-output-stream (fundamental-binary-output-stream)
   ((output-stream
-    :initform (error "Must supply :output-stream")
-    :initarg :output-stream)
+    :type stream)
    (header
     :type header)
    (wrote-header-p
@@ -47,12 +46,14 @@
 (defmethod initialize-instance :after
     ((file-output-stream file-output-stream)
      &key
+       (stream-or-vector (error "Must supply :stream-or-vector."))
        (schema (error "Must provide avro :schema."))
        (codec "null")
        (sync nil syncp)
        (meta (make-hash-table :test #'equal)))
   "SCHEMA and CODEC override avro.schema and avro.codec values in META."
   (check-type codec (enum "null" "deflate" "snappy"))
+  (check-type stream-or-vector (or stream vector))
   (unless syncp
     (setf sync (make-random-sync)))
   (assert-sync sync)
@@ -61,11 +62,14 @@
         (gethash "avro.codec" meta) (babel:string-to-octets codec :encoding :utf-8))
   (unless (validp +meta-schema+ meta)
     (error "~&Meta schema is not valid for an avro file."))
-  (with-slots (header) file-output-stream
+  (with-slots (output-stream header) file-output-stream
     (setf header (make-instance 'header
-                               :magic (coerce +magic+ 'vector)
-                               :meta meta
-                               :sync sync))))
+                                :magic (coerce +magic+ 'vector)
+                                :meta meta
+                                :sync sync)
+          output-stream (if (typep stream-or-vector 'vector)
+                            (make-instance 'output-stream :bytes stream-or-vector)
+                            stream-or-vector))))
 
 (defmethod schema ((file-output-stream file-output-stream))
   (with-slots (header) file-output-stream
