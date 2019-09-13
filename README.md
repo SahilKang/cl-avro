@@ -1,5 +1,6 @@
 # cl-avro
 
+[![CircleCI](https://circleci.com/gh/SahilKang/cl-avro.svg?style=shield)](https://circleci.com/gh/SahilKang/cl-avro)
 [![license](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](https://github.com/SahilKang/cl-avro/blob/master/LICENSE)
 
 A Common Lisp implementation of the
