@@ -20,7 +20,7 @@
   "Implementation of the Apache Avro data serialization system."
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
-  :licence "GPLv3"
+  :license "GPLv3"
   :depends-on (#:trivial-gray-streams
                #:babel
                #:ieee-floats
@@ -51,3 +51,16 @@
             ((:file "header")
              (:file "read" :depends-on ("header"))
              (:file "write" :depends-on ("header"))))))
+
+(asdf:defsystem #:cl-avro/test
+  :description "Tests for cl-avro."
+  :version (:read-file-form "version.lisp")
+  :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
+  :license "GPLv3"
+  :depends-on (#:cl-avro #:1am)
+  :perform (test-op (op sys) (uiop:symbol-call :1am :run))
+  :components
+  ((:module
+    "test"
+    :components
+    ((:file "object-container-file")))))

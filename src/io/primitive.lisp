@@ -69,6 +69,7 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
                           :element-type '(unsigned-byte 8)
                           :adjustable t
                           :fill-pointer 0)
+    :initarg :bytes
     :type (typed-vector (unsigned-byte 8))
     :reader bytes))
   (:documentation
@@ -95,12 +96,12 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; null-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'null-schema)))
   "Read as zero bytes."
   nil)
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'null-schema))
                       object)
   "Written as zero bytes."
@@ -108,13 +109,13 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; boolean-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'boolean-schema)))
   "Read as a single byte whose value is either 0 (false) or 1 (true)."
   (let ((byte (read-byte stream nil :eof)))
     (elt '(nil t) byte)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'boolean-schema))
                       object)
   "Written as a single byte whose value is either 0 (false) or 1 (true)."
@@ -122,12 +123,12 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; int-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'int-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 32))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'int-schema))
                       object)
   "Written as variable-length zig-zag."
@@ -135,12 +136,12 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; long-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'long-schema)))
   "Read as variable-length zig-zag."
   (read-number stream 64))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'long-schema))
                       object)
   "Written as variable-length zig-zag."
@@ -148,13 +149,13 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; float-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'float-schema)))
   "Read as 4 bytes: 32-bit little-endian ieee-754."
   ;; might have to guarantee that this is a byte-stream
   (read-float stream))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'float-schema))
                       object)
   "Written as 4 bytes: 32-bit little-endian ieee-754."
@@ -162,12 +163,12 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; double-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'double-schema)))
   "Read as 8 bytes: 64-bit little-endian ieee-754."
   (read-double stream))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'double-schema))
                       object)
   "Written as 8 bytes: 64-bit little-endian ieee-754."
@@ -175,7 +176,7 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; bytes-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'bytes-schema)))
   "Read as a long followed by that many bytes."
   (let* ((size (deserialize stream 'long-schema))
@@ -189,7 +190,7 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
        else do (setf (elt buf i) next-byte))
     buf))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'bytes-schema))
                       (object sequence))
   "Written as a long followed by that many bytes."
@@ -200,13 +201,13 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;;; string-schema
 
-(defmethod deserialize ((stream fundamental-binary-input-stream)
+(defmethod deserialize ((stream stream)
                         (schema (eql 'string-schema)))
   "Read as a long followed by that many utf-8 bytes."
   (let ((bytes (deserialize stream 'bytes-schema)))
     (babel:octets-to-string bytes :encoding :utf-8)))
 
-(defmethod serialize ((stream fundamental-binary-output-stream)
+(defmethod serialize ((stream stream)
                       (schema (eql 'string-schema))
                       (object string))
   "Written as a long followed by that many utf-8 bytes."
