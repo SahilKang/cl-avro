@@ -18,7 +18,7 @@
 (in-package #:cl-avro)
 
 (defparameter +header-schema+
-  (read-schema
+  (json->schema
    "{\"type\": \"record\", \"name\": \"org.apache.avro.file.Header\",
      \"fields\": [
        {\"name\": \"magic\",
@@ -108,7 +108,7 @@
     :type (or null file-block)
     :documentation "Current file-block being streamed through."))
   (:documentation
-   "A stream representing an avro object container file."))
+   "An input-stream representing an avro object container file."))
 
 (defmethod initialize-instance :after
     ((file-input-stream file-input-stream)

@@ -39,13 +39,28 @@
    #:map-schema
    #:enum-schema
    #:record-schema
+   #:field-schema
 
+   #:name
+   #:namespace
+   #:aliases
+   #:doc
+   #:size
+   #:schemas
+   #:item-schema
+   #:value-schema
+   #:symbols
+   #:default
+   #:field-type
+   #:order
+   #:field-schemas
+
+   ;; io
    #:validp
    #:serialize
    #:deserialize
-
-   #:read-schema
-   #:write-schema
+   #:json->schema
+   #:schema->json
 
    ;; avro object container files
    #:file-input-stream

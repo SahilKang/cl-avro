@@ -18,7 +18,7 @@
 (in-package #:cl-avro)
 
 (defparameter +meta-schema+
-  (read-schema
+  (json->schema
    "{\"type\": \"map\", \"values\": \"bytes\"}"))
 
 (defun assert-sync (sync)
@@ -41,7 +41,9 @@
     :type header)
    (wrote-header-p
     :initform nil
-    :type boolean)))
+    :type boolean))
+  (:documentation
+   "An output-stream representing an avro object container file."))
 
 (defmethod initialize-instance :after
     ((file-output-stream file-output-stream)
@@ -58,7 +60,7 @@
     (setf sync (make-random-sync)))
   (assert-sync sync)
   (setf (gethash "avro.schema" meta) (babel:string-to-octets
-                                      (write-schema schema) :encoding :utf-8)
+                                      (schema->json schema) :encoding :utf-8)
         (gethash "avro.codec" meta) (babel:string-to-octets codec :encoding :utf-8))
   (unless (validp +meta-schema+ meta)
     (error "~&Meta schema is not valid for an avro file."))
