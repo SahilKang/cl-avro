@@ -32,13 +32,28 @@
 If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 
-;; all of the primitive schemas are deftypes so this works:
-(defmethod validp (schema object)
-  ;; if schema is not a type-specifier, then typep will signal simple-error
-  (handler-case
-      (typep object schema)
-    (simple-error ()
-      nil)))
+;; specialize validp methods for primitive avro types:
+(macrolet
+    ((make-validp-methods (&rest symbols)
+       (loop
+          for s in symbols
+          for externalp = (eq :external (nth-value 1 (find-symbol (string s))))
+          unless externalp
+          do (error "~&~S is not an external symbol" s))
+       `(progn
+          ,@(loop
+               for s in symbols
+               collect `(defmethod validp ((schema (eql ',s)) object)
+                          (typep object schema))))))
+  (make-validp-methods
+   null-schema
+   boolean-schema
+   int-schema
+   long-schema
+   float-schema
+   double-schema
+   bytes-schema
+   string-schema))
 
 (defmethod serialize :before (output-stream schema object)
   (unless (validp schema object)
