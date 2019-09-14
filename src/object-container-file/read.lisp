@@ -18,7 +18,7 @@
 (in-package #:cl-avro)
 
 (defparameter +header-schema+
-  (read-schema
+  (json->schema
    "{\"type\": \"record\", \"name\": \"org.apache.avro.file.Header\",
      \"fields\": [
        {\"name\": \"magic\",

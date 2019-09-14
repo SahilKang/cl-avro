@@ -30,7 +30,7 @@ is not suppored.
 (ql:quickload :cl-avro)
 
 (defparameter *schema*
-  (avro:read-schema
+  (avro:json->schema
    "{\"type\": \"record\",
       \"name\": \"LongList\",
       \"doc\": \"A linked-list of 64-bit values\",

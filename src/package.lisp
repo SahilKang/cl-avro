@@ -44,8 +44,8 @@
    #:serialize
    #:deserialize
 
-   #:read-schema
-   #:write-schema
+   #:json->schema
+   #:schema->json
 
    ;; avro object container files
    #:file-input-stream

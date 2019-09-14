@@ -94,7 +94,7 @@ Returns NIL if there were no more blocks to skip and T otherwise."))
   (multiple-value-bind (avro.schema existsp) (gethash "avro.schema" meta)
     (unless existsp
       (error "~&Missing avro.schema in header"))
-    (read-schema (babel:octets-to-string avro.schema :encoding :utf-8))))
+    (json->schema (babel:octets-to-string avro.schema :encoding :utf-8))))
 
 (defun get-codec (meta)
   (multiple-value-bind (avro.codec existsp) (gethash "avro.codec" meta)

@@ -20,17 +20,17 @@
 ;;; good old-fashioned, gmo-free, grass-fed recursive-descent parser
 ;;; handcrafted with love in San Francisco
 
-(defun read-schema (json)
+(defun json->schema (json)
   "Return an avro schema according to JSON. JSON is a string or stream."
-  (parse-schema (st-json:read-json json)))
+  (let ((*fullname->schema* (make-schema-hash-table)))
+    (declare (special *fullname->schema*))
+    (parse-schema (st-json:read-json json))))
 
-(defgeneric write-schema (schema)
-  (:documentation
-   "Return the json string representation of avro SCHEMA.")
-  (:method (schema)
-    (let ((*schema->name* (make-hash-table :test #'eq)))
-      (declare (special *schema->name*))
-      (%write-schema schema))))
+(defun schema->json (schema)
+  "Return the json string representation of avro SCHEMA."
+  (let ((*schema->name* (make-hash-table :test #'eq)))
+    (declare (special *schema->name*))
+    (%write-schema schema)))
 
 
 ;;; read into schema object:
@@ -62,13 +62,11 @@ parsing."
 
      finally (return fullname->schema)))
 
-(defun parse-schema (json &optional fullname->schema)
-  (let ((*fullname->schema* (or fullname->schema (make-schema-hash-table))))
-    (declare (special *fullname->schema*))
-    (etypecase json
-      (list (parse-union json))
-      (string (parse-string json))
-      (st-json:jso (parse-jso json)))))
+(defun parse-schema (json)
+  (etypecase json
+    (list (parse-union json))
+    (string (parse-string json))
+    (st-json:jso (parse-jso json))))
 
 (defun parse-string (fullname)
   (declare (special *fullname->schema*))
@@ -178,16 +176,14 @@ parsing."
                     :size size))))
 
 (defun parse-array (jso)
-  (declare (special *fullname->schema*))
   (with-fields (items) jso
     (make-instance 'array-schema
-                   :item-schema (parse-schema items *fullname->schema*))))
+                   :item-schema (parse-schema items))))
 
 (defun parse-map (jso)
-  (declare (special *fullname->schema*))
   (with-fields (values) jso
     (make-instance 'map-schema
-                   :value-schema (parse-schema values *fullname->schema*))))
+                   :value-schema (parse-schema values))))
 
 (defun figure-out-namespace (name &optional namespace)
   (let ((pos (position #\. name :from-end t)))
@@ -223,14 +219,13 @@ parsing."
         record))))
 
 (defun parse-field (jso)
-  (declare (special *fullname->schema*))
   (with-fields (name doc type order aliases default) jso
     (let ((*current-namespace* (figure-out-namespace name)))
       (register-named-schema
        (make-instance 'field-schema
                       :name name
                       :doc doc
-                      :field-type (parse-schema type *fullname->schema*)
+                      :field-type (parse-schema type)
                       :order (or order "ascending")
                       :aliases aliases
                       :default default)))))
