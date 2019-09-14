@@ -39,11 +39,26 @@
    #:map-schema
    #:enum-schema
    #:record-schema
+   #:field-schema
 
+   #:name
+   #:namespace
+   #:aliases
+   #:doc
+   #:size
+   #:schemas
+   #:item-schema
+   #:value-schema
+   #:symbols
+   #:default
+   #:field-type
+   #:order
+   #:field-schemas
+
+   ;; io
    #:validp
    #:serialize
    #:deserialize
-
    #:json->schema
    #:schema->json
 
