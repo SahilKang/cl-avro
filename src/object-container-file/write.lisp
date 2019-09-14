@@ -41,7 +41,9 @@
     :type header)
    (wrote-header-p
     :initform nil
-    :type boolean)))
+    :type boolean))
+  (:documentation
+   "An output-stream representing an avro object container file."))
 
 (defmethod initialize-instance :after
     ((file-output-stream file-output-stream)

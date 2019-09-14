@@ -19,9 +19,13 @@
 
 ;;; avro primitive types
 
-(deftype null-schema () 'null)
+(deftype null-schema ()
+  "Represents the avro null schema."
+  'null)
 
-(deftype boolean-schema () 'boolean)
+(deftype boolean-schema ()
+  "Represents the avro boolean schema."
+  'boolean)
 
 (defmacro get-signed-range (bits)
   (let* ((max (1- (expt 2 (1- bits))))
@@ -29,6 +33,7 @@
     `'(,min ,max)))
 
 (deftype int-schema ()
+  "Represents the avro int schema."
   (let ((min-max (get-signed-range 32))
         (signed-32-bit-p (intern-gensym)))
     (setf (symbol-function signed-32-bit-p)
@@ -39,6 +44,7 @@
     `(satisfies ,signed-32-bit-p)))
 
 (deftype long-schema ()
+  "Represents the avro long schema."
   (let ((min-max (get-signed-range 64))
         (signed-64-bit-p (intern-gensym)))
     (setf (symbol-function signed-64-bit-p)
@@ -49,6 +55,7 @@
     `(satisfies ,signed-64-bit-p)))
 
 (deftype float-schema ()
+  "Represents the avro float schema."
   (let ((32-bit-float-p (intern-gensym)))
     (setf (symbol-function 32-bit-float-p)
           (lambda (float)
@@ -59,6 +66,7 @@
     `(satisfies ,32-bit-float-p)))
 
 (deftype double-schema ()
+  "Represents the avro double schema."
   (let ((64-bit-float-p (intern-gensym)))
     (setf (symbol-function 64-bit-float-p)
           (lambda (float)
@@ -68,9 +76,13 @@
                          (= 53 (float-precision float)))))))
     `(satisfies ,64-bit-float-p)))
 
-(deftype bytes-schema () '(typed-vector (unsigned-byte 8)))
+(deftype bytes-schema ()
+  "Represents the avro bytes schema."
+  '(typed-vector (unsigned-byte 8)))
 
-(deftype string-schema () 'string)
+(deftype string-schema ()
+  "Represents the avro string schema."
+  'string)
 
 ;;; avro-name
 

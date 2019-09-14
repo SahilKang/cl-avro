@@ -44,7 +44,7 @@ the block."))
   (:documentation
    "Deserialize the elements of BLOCK into STREAM.
 
-Returns the number of bytes written to the object container file."))
+Returns the number of bytes written to the object container file block."))
 
 (defgeneric skip-block (stream)
   (:documentation
