@@ -210,12 +210,102 @@ parsing."
 
 (defun parse-field (jso)
   (with-fields (name doc type order aliases default) jso
-    (let ((*current-namespace* (figure-out-namespace name)))
+    (let ((*current-namespace* (figure-out-namespace name))
+          (schema (parse-schema type)))
       (register-named-schema
-       (make-instance 'field-schema
-                      :name name
-                      :doc doc
-                      :field-type (parse-schema type)
-                      :order (or order "ascending")
-                      :aliases aliases
-                      :default default)))))
+       (let ((args (list :name name
+                         :doc doc
+                         :field-type schema
+                         :order (or order "ascending")
+                         :aliases aliases)))
+         (when default
+           (setf args (nconc args
+                             (list :default (parse-default schema default)))))
+         (apply #'make-instance 'field-schema args))))))
+
+(defun parse-default (schema default)
+  (etypecase schema
+
+    (symbol
+     (parse-primitive-default schema default))
+
+    (enum-schema
+     (if (validp schema default)
+         default
+         (error "~&Bad default value ~S for ~S" default (type-of schema))))
+
+    (array-schema
+     (let ((default (mapcar (lambda (x)
+                              (parse-default (item-schema schema) x))
+                            default)))
+       (if (validp schema default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
+
+    (map-schema
+     (let ((default (make-hash-table :test #'equal)))
+       (st-json:mapjso (lambda (k v)
+                         (setf (gethash k default)
+                               (parse-default (value-schema schema) v)))
+                       default)
+       (if (validp schema default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
+
+    (fixed-schema
+     (check-type default string)
+     (babel:string-to-octets default :encoding :latin-1))
+
+    (union-schema
+     (let ((default (parse-default (elt (schemas schema) 0) default)))
+       (if (validp (elt (schemas schema) 0) default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
+
+    (record-schema
+     (check-type default st-json:jso)
+     (let ((hash-table (make-hash-table :test #'equal))
+           (fields (field-schemas schema)))
+       (st-json:mapjso (lambda (k v) (setf (gethash k hash-table) v)) default)
+       (unless (= (length fields) (hash-table-count hash-table))
+         (error "~&Bad default value ~S for ~S" default (type-of schema)))
+       (loop
+          with vector = (make-array (length fields) :fill-pointer 0)
+
+          for field across fields
+
+          for type = (field-type field)
+          for name = (name field)
+          for (value valuep) = (multiple-value-list (gethash name hash-table))
+
+          if (not valuep)
+          do (error "~&Field ~S does not exist in default value" name)
+          else do (vector-push (parse-default type value) vector)
+
+          finally (return vector))))))
+
+(defun parse-primitive-default (schema default)
+  (ecase schema
+
+    (null-schema
+     (if (eq default :null)
+         nil
+         (error "~&Bad default value ~S for ~S" default schema)))
+
+    (boolean-schema
+     (st-json:from-json-bool default))
+
+    ((int-schema long-schema string-schema)
+     (if (validp schema default)
+         default
+         (error "~&Bad default value ~S for ~S" default schema)))
+
+    (float-schema
+     (coerce default 'single-float))
+
+    (double-schema
+     (coerce default 'double-float))
+
+    (bytes-schema
+     (check-type default string)
+     (babel:string-to-octets default :encoding :latin-1))))

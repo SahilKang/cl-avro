@@ -67,4 +67,5 @@
   ((:module
     "test"
     :components
-    ((:file "object-container-file")))))
+    ((:file "object-container-file")
+     (:file "parser")))))

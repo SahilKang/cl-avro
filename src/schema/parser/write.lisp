@@ -137,6 +137,65 @@
       (setf (gethash "doc" hash-table) (doc schema)))
     (unless (string= (order schema) "ascending")
       (setf (gethash "order" hash-table) (order schema)))
-    (when (default schema)
-      (setf (gethash "default" hash-table) (default schema)))
+    (multiple-value-bind (default defaultp) (default schema)
+      (when defaultp
+        (setf (gethash "default" hash-table)
+              (write-default (field-type schema) default))))
     (st-json:write-json-to-string hash-table)))
+
+(defun write-default (schema default)
+  (etypecase schema
+
+    (symbol
+     (get-primitive-default schema default))
+
+    (enum-schema
+     default)
+
+    (array-schema
+     (map 'list
+          (lambda (x)
+            (write-default (item-schema schema) x))
+          default))
+
+    (map-schema
+     (let ((hash-table (make-hash-table :test #'equal)))
+       (maphash (lambda (k v)
+                  (setf (gethash k hash-table)
+                        (write-default (value-schema schema) v)))
+                default)
+       hash-table))
+
+    (fixed-schema
+     (babel:octets-to-string default :encoding :latin-1))
+
+    (union-schema
+     (write-default (elt (schemas schema) 0) default))
+
+    (record-schema
+     (loop
+        with hash-table = (make-hash-table :test #'equal)
+        for field across (field-schemas schema)
+        for value across default
+
+        for type = (field-type field)
+        for name = (name field)
+
+        do (setf (gethash name hash-table) (write-default type value))
+
+        finally (return hash-table)))))
+
+(defun get-primitive-default (schema default)
+  (ecase schema
+
+    (null-schema
+     :null)
+
+    (boolean-schema
+     (st-json:from-json-bool default))
+
+    ((or int-schema long-schema string-schema float-schema double-schema)
+     default)
+
+    (bytes-schema
+     (babel:octets-to-string default :encoding :latin-1))))
