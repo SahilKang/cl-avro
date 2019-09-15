@@ -145,8 +145,6 @@ parsing."
                fields))
        ,@body)))
 
-;; TODO handle shit data
-
 (defun parse-enum (jso)
   (with-fields (name namespace aliases doc symbols default) jso
     (register-named-schema
