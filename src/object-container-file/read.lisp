@@ -150,14 +150,17 @@
                        (end-of-file ()
                          nil))))
     (when block-count
-      ;; TODO optimize the read-byte loop with read-sequence
       (let* ((object-bytes (deserialize stream 'long-schema))
-             (bytes (loop repeat object-bytes collect (read-byte stream)))
-             (sync (loop repeat 16 collect (read-byte stream))))
+             (bytes (make-array object-bytes :element-type '(unsigned-byte 8)))
+             (sync (make-array 16 :element-type '(unsigned-byte 8))))
+        (unless (= (read-sequence bytes stream) (array-dimension bytes 0))
+          (error "~&Failed to read all bytes from block."))
+        (unless (= (read-sequence sync stream) (array-dimension sync 0))
+          (error "~&Failed to read all bytes for sync."))
         (make-instance 'file-block
-                       :bytes (coerce bytes 'vector)
+                       :bytes bytes
                        :header header
-                       :sync-marker (coerce sync 'vector)
+                       :sync-marker sync
                        :block-count block-count)))))
 
 (defmethod read-block ((stream file-input-stream))
