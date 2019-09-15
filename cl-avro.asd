@@ -36,7 +36,11 @@
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
-             (:file "parser" :depends-on ("primitive" "complex"))))
+             (:module "parser"
+                      :depends-on ("primitive" "complex")
+                      :components
+                      ((:file "read")
+                       (:file "write")))))
    (:module "io"
             :pathname "src/io"
             :depends-on ("schema")
