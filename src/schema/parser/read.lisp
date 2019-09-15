@@ -100,7 +100,7 @@ parsing."
   (declare (special *fullname->schema*))
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
-      (list (parse-union type))  ; TODO does this occur/is it allowed?
+      (list (parse-union type))
       (st-json:jso (parse-jso type)) ; TODO does this recurse properly?
       (string
        (cond
