@@ -26,14 +26,6 @@
     (declare (special *fullname->schema*))
     (parse-schema (st-json:read-json json))))
 
-(defun schema->json (schema)
-  "Return the json string representation of avro SCHEMA."
-  (let ((*schema->name* (make-hash-table :test #'eq)))
-    (declare (special *schema->name*))
-    (%write-schema schema)))
-
-
-;;; read into schema object:
 
 (defparameter *current-namespace* nil)
 
@@ -108,7 +100,7 @@ parsing."
   (declare (special *fullname->schema*))
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
-      (list (parse-union type))  ; TODO does this occur/is it allowed?
+      (list (parse-union type))
       (st-json:jso (parse-jso type)) ; TODO does this recurse properly?
       (string
        (cond
@@ -152,8 +144,6 @@ parsing."
                        `(st-json:getjso ,(string-downcase (string binding)) ,j)))
                fields))
        ,@body)))
-
-;; TODO handle shit data
 
 (defun parse-enum (jso)
   (with-fields (name namespace aliases doc symbols default) jso
@@ -220,132 +210,102 @@ parsing."
 
 (defun parse-field (jso)
   (with-fields (name doc type order aliases default) jso
-    (let ((*current-namespace* (figure-out-namespace name)))
+    (let ((*current-namespace* (figure-out-namespace name))
+          (schema (parse-schema type)))
       (register-named-schema
-       (make-instance 'field-schema
-                      :name name
-                      :doc doc
-                      :field-type (parse-schema type)
-                      :order (or order "ascending")
-                      :aliases aliases
-                      :default default)))))
+       (let ((args (list :name name
+                         :doc doc
+                         :field-type schema
+                         :order (or order "ascending")
+                         :aliases aliases)))
+         (when default
+           (setf args (nconc args
+                             (list :default (parse-default schema default)))))
+         (apply #'make-instance 'field-schema args))))))
 
+(defun parse-default (schema default)
+  (etypecase schema
 
-;;; write schema object to json string:
+    (symbol
+     (parse-primitive-default schema default))
 
-(defgeneric %write-schema (schema))
+    (enum-schema
+     (if (validp schema default)
+         default
+         (error "~&Bad default value ~S for ~S" default (type-of schema))))
 
-;; these :before and :around methods prevent infinite recursion when
-;; writing a recursive schema
+    (array-schema
+     (let ((default (mapcar (lambda (x)
+                              (parse-default (item-schema schema) x))
+                            default)))
+       (if (validp schema default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
 
-(defmethod %write-schema :before ((schema named-type))
-  (declare (special *schema->name*))
-  (setf (gethash schema *schema->name*) (name schema)))
+    (map-schema
+     (let ((default (make-hash-table :test #'equal)))
+       (st-json:mapjso (lambda (k v)
+                         (setf (gethash k default)
+                               (parse-default (value-schema schema) v)))
+                       default)
+       (if (validp schema default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
 
-(defmethod %write-schema :around (schema)
-  (declare (special *schema->name*))
-  (let ((name (gethash schema *schema->name*)))
-    (if name
-        (format nil "~S" name)
-        (call-next-method))))
+    (fixed-schema
+     (check-type default string)
+     (babel:string-to-octets default :encoding :latin-1))
 
-;; specialize %write-schema methods for primitive avro types:
-(macrolet
-    ((defmethods (&rest schema-strings)
-       (let* ((->symbol (lambda (s)
-                          (read-from-string (concatenate 'string s "-schema"))))
-              (pairs (loop
-                        with package = (find-package 'cl-avro)
-                        for symbol being the external-symbols of package
-                        for string = (find-if (lambda (s)
-                                                (eq symbol (funcall ->symbol s)))
-                                              schema-strings)
-                        when string
-                        collect (list string symbol))))
-         (unless (= (length pairs) (length schema-strings))
-           (error "~&Not all schemas were found"))
-         `(progn
-            ,@(loop
-                 for (string symbol) in pairs
-                 collect `(defmethod %write-schema ((schema (eql ',symbol)))
-                            ,(format nil "~S" string)))))))
-  (defmethods "null" "boolean" "int" "long" "float" "double" "bytes" "string"))
+    (union-schema
+     (let ((default (parse-default (elt (schemas schema) 0) default)))
+       (if (validp (elt (schemas schema) 0) default)
+           default
+           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
 
-(defmethod %write-schema ((schema fixed-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "fixed"
-          (gethash "name" hash-table) (name schema)
-          (gethash "size" hash-table) (size schema))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (st-json:write-json-to-string hash-table)))
+    (record-schema
+     (check-type default st-json:jso)
+     (let ((hash-table (make-hash-table :test #'equal))
+           (fields (field-schemas schema)))
+       (st-json:mapjso (lambda (k v) (setf (gethash k hash-table) v)) default)
+       (unless (= (length fields) (hash-table-count hash-table))
+         (error "~&Bad default value ~S for ~S" default (type-of schema)))
+       (loop
+          with vector = (make-array (length fields) :fill-pointer 0)
 
-(defmethod %write-schema ((schema union-schema))
-  (st-json:write-json-to-string
-   (map 'list
-        (lambda (schema)
-          (st-json:read-json (%write-schema schema)))
-        (schemas schema))))
+          for field across fields
 
-(defmethod %write-schema ((schema array-schema))
-  (st-json:write-json-to-string
-   (st-json:jso
-    "type" "array"
-    "items" (st-json:read-json
-             (%write-schema (item-schema schema))))))
+          for type = (field-type field)
+          for name = (name field)
+          for (value valuep) = (multiple-value-list (gethash name hash-table))
 
-(defmethod %write-schema ((schema map-schema))
-  (st-json:write-json-to-string
-   (st-json:jso
-    "type" "map"
-    "values" (st-json:read-json
-              (%write-schema (value-schema schema))))))
+          if (not valuep)
+          do (error "~&Field ~S does not exist in default value" name)
+          else do (vector-push (parse-default type value) vector)
 
-(defmethod %write-schema ((schema enum-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "enum"
-          (gethash "name" hash-table) (name schema)
-          (gethash "symbols" hash-table) (coerce (symbols schema) 'list))
-    (when (default schema)
-      (setf (gethash "default" hash-table) (default schema)))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
-    (st-json:write-json-to-string hash-table)))
+          finally (return vector))))))
 
-(defmethod %write-schema ((schema record-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "record"
-          (gethash "name" hash-table) (name schema)
-          (gethash "fields" hash-table) (map 'list
-                                             (lambda (field)
-                                               (st-json:read-json
-                                                (%write-schema field)))
-                                             (field-schemas schema)))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
-    (st-json:write-json-to-string hash-table)))
+(defun parse-primitive-default (schema default)
+  (ecase schema
 
-(defmethod %write-schema ((schema field-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "name" hash-table) (name schema)
-          (gethash "type" hash-table) (st-json:read-json
-                                       (%write-schema (field-type schema))))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
-    (unless (string= (order schema) "ascending")
-      (setf (gethash "order" hash-table) (order schema)))
-    (when (default schema)
-      (setf (gethash "default" hash-table) (default schema)))
-    (st-json:write-json-to-string hash-table)))
+    (null-schema
+     (if (eq default :null)
+         nil
+         (error "~&Bad default value ~S for ~S" default schema)))
+
+    (boolean-schema
+     (st-json:from-json-bool default))
+
+    ((int-schema long-schema string-schema)
+     (if (validp schema default)
+         default
+         (error "~&Bad default value ~S for ~S" default schema)))
+
+    (float-schema
+     (coerce default 'single-float))
+
+    (double-schema
+     (coerce default 'double-float))
+
+    (bytes-schema
+     (check-type default string)
+     (babel:string-to-octets default :encoding :latin-1))))

@@ -30,16 +30,20 @@
   :build-pathname "cl-avro"
   :components
   ((:file "package" :pathname "src/package")
-   (:module "schemas"
-            :pathname "src/schemas"
+   (:module "schema"
+            :pathname "src/schema"
             :depends-on ("package")
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
-             (:file "parser" :depends-on ("primitive" "complex"))))
+             (:module "parser"
+                      :depends-on ("primitive" "complex")
+                      :components
+                      ((:file "read")
+                       (:file "write")))))
    (:module "io"
             :pathname "src/io"
-            :depends-on ("schemas")
+            :depends-on ("schema")
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
@@ -63,4 +67,5 @@
   ((:module
     "test"
     :components
-    ((:file "object-container-file")))))
+    ((:file "object-container-file")
+     (:file "parser")))))

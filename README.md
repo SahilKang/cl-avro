@@ -15,9 +15,6 @@ so there are a few TODOs:
 * [aliases](https://avro.apache.org/docs/current/spec.html#Aliases)
 are ignored.
 
-* [default values](https://avro.apache.org/docs/current/spec.html#schema_record)
-are ignored.
-
 * [sort order](https://avro.apache.org/docs/current/spec.html#order)
 is ignored.
 

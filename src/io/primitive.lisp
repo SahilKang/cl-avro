@@ -78,6 +78,9 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
         (prog1 (elt bytes position)
           (incf position)))))
 
+(defmethod stream-element-type ((stream input-stream))
+  '(unsigned-byte 8))
+
 (defclass output-stream (fundamental-binary-output-stream)
   ((bytes
     :initform (make-array 0
@@ -95,6 +98,9 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
   (with-slots (bytes) stream
     (vector-push-extend byte bytes))
   byte)
+
+(defmethod stream-element-type ((stream output-stream))
+  '(unsigned-byte 8))
 
 
 (defmethod deserialize ((bytes sequence) schema)
@@ -196,13 +202,8 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
   "Read as a long followed by that many bytes."
   (let* ((size (deserialize stream 'long-schema))
          (buf (make-array size :element-type '(unsigned-byte 8))))
-    (loop
-       for i below size
-       for next-byte = (read-byte stream nil :eof)
-
-       if (eq next-byte :eof)
-       do (error 'end-of-file :stream *error-output*)
-       else do (setf (elt buf i) next-byte))
+    (unless (= (read-sequence buf stream) (array-dimension buf 0))
+      (error 'end-of-file :stream *error-output*))
     buf))
 
 (defmethod serialize ((stream stream)
@@ -210,9 +211,7 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
                       (object sequence))
   "Written as a long followed by that many bytes."
   (serialize stream 'long-schema (length object))
-  (loop
-     for i below (length object)
-     do (write-byte (elt object i) stream)))
+  (write-sequence object stream))
 
 ;;; string-schema
 
@@ -306,38 +305,24 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 (defun read-float (byte-stream)
   (let ((buf (make-array 4 :element-type '(unsigned-byte 8))))
-    (loop
-       for i below (length buf)
-       for next-byte = (read-byte byte-stream nil :eof)
-
-       if (eq next-byte :eof)
-       do (error 'end-of-file :stream *error-output*)
-       else do (setf (elt buf i) next-byte))
+    (unless (= (read-sequence buf byte-stream) (array-dimension buf 0))
+      (error 'end-of-file :stream *error-output*))
     (ieee-floats:decode-float32 (read-little-endian buf))))
 
 (defun read-double (byte-stream)
   (let ((buf (make-array 8 :element-type '(unsigned-byte 8))))
-    (loop
-       for i below (length buf)
-       for next-byte = (read-byte byte-stream nil :eof)
-
-       if (eq next-byte :eof)
-       do (error 'end-of-file :stream *error-output*)
-       else do (setf (elt buf i) next-byte))
+    (unless (= (read-sequence buf byte-stream) (array-dimension buf 0))
+      (error 'end-of-file :stream *error-output*))
     (ieee-floats:decode-float64 (read-little-endian buf))))
 
 (defun write-float (byte-stream float)
   (let ((number (ieee-floats:encode-float32 float))
         (buf (make-array 4 :element-type '(unsigned-byte 8))))
     (write-little-endian number buf)
-    (loop
-       for byte across buf
-       do (write-byte byte byte-stream))))
+    (write-sequence buf byte-stream)))
 
 (defun write-double (byte-stream double)
   (let ((number (ieee-floats:encode-float64 double))
         (buf (make-array 8 :element-type '(unsigned-byte 8))))
     (write-little-endian number buf)
-    (loop
-       for byte across buf
-       do (write-byte byte byte-stream))))
+    (write-sequence buf byte-stream)))

@@ -62,6 +62,9 @@
         :eof
         (read-byte input-stream nil :eof))))
 
+(defmethod stream-element-type ((stream block-input-stream))
+  '(unsigned-byte 8))
+
 (defmethod stream-read-item ((stream block-input-stream))
   (with-slots (schema input-stream items-read) stream
     (if (end-of-block-p stream)
