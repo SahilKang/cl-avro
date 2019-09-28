@@ -156,3 +156,42 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
 
     (is (string= "BAR" (st-json:getjso* "values.default" roundtrip-jso)))
     (is (same-fields-p jso roundtrip-jso))))
+
+(test optional-fields
+  (let* ((json "{type: \"enum\",
+                 name: \"EnumName\",
+                 aliases: [],
+                 default: \"FOO\",
+                 symbols: [\"FOO\", \"BAR\", \"BAZ\"]}")
+         (schema (avro:json->schema json))
+         (jso (st-json:read-json json))
+         (roundtrip-jso (st-json:read-json
+                         (avro:schema->json schema))))
+    (is (same-fields-p jso roundtrip-jso))
+
+    (multiple-value-bind (aliases aliasesp)
+        (avro:aliases schema)
+      (is aliasesp)
+      (is (equalp #() aliases)))
+    (multiple-value-bind (aliases aliasesp)
+        (st-json:getjso "aliases" roundtrip-jso)
+      (is aliasesp)
+      (is (null aliases)))
+
+    (multiple-value-bind (doc docp)
+        (avro:doc schema)
+      (is (not docp))
+      (is (string= "" doc)))
+    (multiple-value-bind (doc docp)
+        (st-json:getjso "doc" roundtrip-jso)
+      (is (not docp))
+      (is (null doc)))
+
+    (multiple-value-bind (default defaultp)
+        (avro:default schema)
+      (is defaultp)
+      (is (string= "FOO" default)))
+    (multiple-value-bind (default defaultp)
+        (st-json:getjso "default" roundtrip-jso)
+      (is defaultp)
+      (is (string= "FOO" default)))))

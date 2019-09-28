@@ -7,19 +7,17 @@ A Common Lisp implementation of the
 [Apache Avro](https://github.com/apache/avro) data serialization system.
 
 This was written against the
-[Avro 1.9.0 spec](https://avro.apache.org/docs/current/spec.html)
-and currently adheres to the
-[happy-path](https://en.wikipedia.org/wiki/Happy_path)
-so there are a few TODOs:
+[Avro 1.9.0 spec](https://avro.apache.org/docs/1.9.0/spec.html)
+and there are a few TODOS:
 
-* [aliases](https://avro.apache.org/docs/current/spec.html#Aliases)
-are ignored.
-
-* [sort order](https://avro.apache.org/docs/current/spec.html#order)
+* [sort order](https://avro.apache.org/docs/1.9.0/spec.html#order)
 is ignored.
 
-* [schema resolution](https://avro.apache.org/docs/current/spec.html#Schema+Resolution)
+* [schema resolution](https://avro.apache.org/docs/1.9.0/spec.html#Schema+Resolution)
 is not suppored.
+
+* [canonical form](https://avro.apache.org/docs/1.9.0/spec.html#Parsing+Canonical+Form+for+Schemas)
+transformations are not supported.
 
 # Examples
 
