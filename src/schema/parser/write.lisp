@@ -46,8 +46,7 @@
        (let* ((->symbol (lambda (s)
                           (read-from-string (concatenate 'string s "-schema"))))
               (pairs (loop
-                        with package = (find-package 'cl-avro)
-                        for symbol being the external-symbols of package
+                        for symbol being the external-symbols of 'cl-avro
                         for string = (find-if (lambda (s)
                                                 (eq symbol (funcall ->symbol s)))
                                               schema-strings)
@@ -62,16 +61,37 @@
                             ,(format nil "~S" string)))))))
   (defmethods "null" "boolean" "int" "long" "float" "double" "bytes" "string"))
 
+(defmacro make-ht (schema type-field (&rest always-set) &rest set-only-when-non-nil)
+  (declare (string type-field))
+  (flet ((->string (symbol)
+           (string-downcase (string symbol))))
+    (let* ((hash-table (gensym))
+           (setf-pairs `((gethash "type" ,hash-table) ,type-field
+                         ,@(loop
+                              for symbol in always-set
+                              collect `(gethash ,(->string symbol) ,hash-table)
+                              collect (list symbol schema))))
+           (mvb-forms (mapcar
+                       (lambda (symbol)
+                         (let ((value (gensym))
+                               (valuep (gensym))
+                               (field (->string symbol)))
+                           `(multiple-value-bind (,value ,valuep)
+                                (,symbol ,schema)
+                              (when ,valuep
+                                (setf (gethash ,field ,hash-table) ,value)))))
+                       set-only-when-non-nil)))
+      `(let ((,hash-table (make-hash-table :test #'equal)))
+         (setf ,@setf-pairs)
+         ,@mvb-forms
+         ,hash-table))))
+
+(defmethod st-json:write-json-element ((element vector) stream)
+  (st-json:write-json-element (coerce element 'list) stream))
+
 (defmethod %write-schema ((schema fixed-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "fixed"
-          (gethash "name" hash-table) (name schema)
-          (gethash "size" hash-table) (size schema))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (st-json:write-json-to-string hash-table)))
+  (st-json:write-json-to-string
+   (make-ht schema "fixed" (name size) namespace aliases)))
 
 (defmethod %write-schema ((schema union-schema))
   (st-json:write-json-to-string
@@ -95,35 +115,17 @@
               (%write-schema (value-schema schema))))))
 
 (defmethod %write-schema ((schema enum-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "enum"
-          (gethash "name" hash-table) (name schema)
-          (gethash "symbols" hash-table) (coerce (symbols schema) 'list))
-    (when (default schema)
-      (setf (gethash "default" hash-table) (default schema)))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
-    (st-json:write-json-to-string hash-table)))
+  (st-json:write-json-to-string
+   (make-ht schema "enum" (name symbols) default namespace aliases doc)))
 
 (defmethod %write-schema ((schema record-schema))
-  (let ((hash-table (make-hash-table :test #'equal)))
-    (setf (gethash "type" hash-table) "record"
-          (gethash "name" hash-table) (name schema)
-          (gethash "fields" hash-table) (map 'list
-                                             (lambda (field)
-                                               (st-json:read-json
-                                                (%write-schema field)))
-                                             (field-schemas schema)))
-    (when (namespace schema)
-      (setf (gethash "namespace" hash-table) (namespace schema)))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
+  (let ((hash-table (make-ht schema "record" (name) namespace aliases doc)))
+    (setf (gethash "fields" hash-table)
+          (map 'list
+               (lambda (field)
+                 (st-json:read-json
+                  (%write-schema field)))
+               (field-schemas schema)))
     (st-json:write-json-to-string hash-table)))
 
 (defmethod %write-schema ((schema field-schema))
@@ -131,12 +133,15 @@
     (setf (gethash "name" hash-table) (name schema)
           (gethash "type" hash-table) (st-json:read-json
                                        (%write-schema (field-type schema))))
-    (when (aliases schema)
-      (setf (gethash "aliases" hash-table) (coerce (aliases schema) 'list)))
-    (when (doc schema)
-      (setf (gethash "doc" hash-table) (doc schema)))
-    (unless (string= (order schema) "ascending")
-      (setf (gethash "order" hash-table) (order schema)))
+    (multiple-value-bind (aliases aliasesp) (aliases schema)
+      (when aliasesp
+        (setf (gethash "aliases" hash-table) aliases)))
+    (multiple-value-bind (doc docp) (doc schema)
+      (when docp
+        (setf (gethash "doc" hash-table) doc)))
+    (multiple-value-bind (order orderp) (order schema)
+      (when orderp
+        (setf (gethash "order" hash-table) order)))
     (multiple-value-bind (default defaultp) (default schema)
       (when defaultp
         (setf (gethash "default" hash-table)

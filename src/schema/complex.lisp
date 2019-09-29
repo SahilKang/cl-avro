@@ -38,55 +38,81 @@
 
 (deftype avro-schema () '(satisfies avro-schema-p))
 
+(defun empty-string-p (string)
+  (and (stringp string)
+       (zerop (length string))))
+
+(deftype empty-string () '(satisfies empty-string-p))
+
 (defclass named-type ()
   ((name
     :reader name
     :type avro-fullname
     :documentation "Schema name.")
    (namespace
-    :reader namespace
-    :type (or null-schema avro-fullname)
-    :documentation "Schema namespace.")))
+    :type (or empty-string avro-fullname)
+    :documentation "Schema namespace.")
+   (namespacep
+    :type boolean)))
 
 (defmethod initialize-instance :after
     ((named-type named-type)
      &key
        (name (error "Must supply :name string"))
-       (namespace nil))
+       (namespace "" namespacep))
   (check-type name avro-fullname)
-  (when (string= namespace "")
-    (setf namespace nil))
-  (check-type namespace (or null avro-fullname))
-  (with-slots ((n name) (ns namespace)) named-type
+  (check-type namespace (or empty-string avro-fullname))
+  (with-slots ((n name) (ns namespace) (nsp namespacep)) named-type
     (setf n name
-          ns namespace)))
+          ns namespace
+          nsp namespacep)))
+
+(defmethod namespace ((named-type named-type))
+  "Schema namespace, returns (values namespace namespacep)."
+  (with-slots (namespace namespacep) named-type
+    (values namespace namespacep)))
 
 (defclass aliased-type ()
   ((aliases
-    :reader aliases
-    :type (or null-schema (typed-vector avro-fullname))
-    :documentation "Schema aliases.")))
+    :type (typed-vector avro-fullname)
+    :documentation "Schema aliases.")
+   (aliasesp
+    :type boolean)))
 
 (defmethod initialize-instance :after
     ((aliased-type aliased-type)
-     &key (aliases nil))
-  (when (and (not (null aliases))
-             (listp aliases))
+     &key (aliases #() aliasesp))
+  (when (listp aliases)
     (setf aliases (coerce aliases 'vector)))
-  (check-type aliases (or null (typed-vector avro-fullname)))
-  (setf (slot-value aliased-type 'aliases) aliases))
+  (check-type aliases (typed-vector avro-fullname))
+  (with-slots ((a aliases) (ap aliasesp)) aliased-type
+    (setf a aliases
+          ap aliasesp)))
+
+(defmethod aliases ((aliased-type aliased-type))
+  "Schema aliases, returns (values aliases aliasesp)."
+  (with-slots (aliases aliasesp) aliased-type
+    (values aliases aliasesp)))
 
 (defclass doc-type ()
   ((doc
-    :reader doc
-    :type (or null-schema string-schema)
-    :documentation "Schema doc.")))
+    :type string-schema
+    :documentation "Schema doc.")
+   (docp
+    :type boolean)))
 
 (defmethod initialize-instance :after
     ((doc-type doc-type)
-     &key (doc nil))
-  (check-type doc (or null string-schema))
-  (setf (slot-value doc-type 'doc) doc))
+     &key (doc "" docp))
+  (check-type doc string-schema)
+  (with-slots ((d doc) (dp docp)) doc-type
+    (setf d doc
+          dp docp)))
+
+(defmethod doc ((doc-type doc-type))
+  "Schema doc, returns (values doc docp)."
+  (with-slots (doc docp) doc-type
+    (values doc docp)))
 
 ;;; avro complex types
 
@@ -154,7 +180,6 @@
     :type (typed-vector avro-name)
     :documentation "Enum values.")
    (default
-    :reader default
     :type (or null-schema avro-name)
     :documentation "Default enum value."))
   (:documentation
@@ -178,6 +203,11 @@
     (setf s symbols
           d default)))
 
+(defmethod default ((enum-schema enum-schema))
+  "Default enum value, returns (values default defaultp)."
+  (with-slots (default) enum-schema
+    (values default (when default t))))
+
 (defclass field-schema (aliased-type doc-type)
   ((name
     :reader name
@@ -188,11 +218,13 @@
     :type avro-schema
     :documentation "Schema of record field.")
    (order
-    :reader order
     :type (enum "ascending" "descending" "ignore")
     :documentation "Order of record field.")
+   (orderp
+    :type boolean)
    (default)
-   (defaultp))
+   (defaultp
+    :type boolean))
   (:documentation
    "Represents an avro record's field schema."))
 
@@ -201,17 +233,28 @@
      &key
        (name (error "Must supply :name string"))
        (field-type (error "Must supply :field-type schema"))
-       (order "ascending")
+       (order "ascending" orderp)
        (default nil defaultp))
   (check-type name avro-fullname)
   (check-type field-type avro-schema)
   (check-type order (enum "ascending" "descending" "ignore"))
-  (with-slots ((n name) (ft field-type) (o order) (d default) (dp defaultp)) field-schema
+  (with-slots ((n name)
+               (ft field-type)
+               (o order)
+               (op orderp)
+               (d default)
+               (dp defaultp)) field-schema
     (setf n name
           ft field-type
           o order
+          op orderp
           d default
           dp defaultp)))
+
+(defmethod order ((field-schema field-schema))
+  "Order of record field, returns (values order orderp)."
+  (with-slots (order orderp) field-schema
+    (values order orderp)))
 
 (defmethod default ((field-schema field-schema))
   "Default value for record field, returns (values default defaultp)."

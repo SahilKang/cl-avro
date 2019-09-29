@@ -27,32 +27,38 @@
     (parse-schema (st-json:read-json json))))
 
 
-(defparameter *current-namespace* nil)
+(defparameter *current-namespace* "")
 
-(defun find-schema (name)
-  (loop
-     with schema-name = (string-upcase (concatenate 'string name "-schema"))
-
-     for s being the external-symbols of (find-package "CL-AVRO")
-     when (string= schema-name (symbol-name s))
-     return s))
-
-(defun make-schema-hash-table ()
-  "Return a hash-table mapping avro primitive type names to schemas.
+(macrolet
+    ((make-function (fname)
+       (let* ((->symbol (lambda (string)
+                          (read-from-string (format nil "~A-schema" string))))
+              (schema-strings '("null" "boolean" "int" "long"
+                                "float" "double" "bytes" "string"))
+              (pairs (loop
+                        for symbol being the external-symbols of 'cl-avro
+                        for string = (find-if
+                                      (lambda (string)
+                                        (eq symbol (funcall ->symbol string)))
+                                      schema-strings)
+                        when string
+                        collect (list string symbol)))
+              (hash-table (gensym))
+              (setf-form `(setf ,@(loop
+                                     for (name schema) in pairs
+                                     collect `(gethash ,name ,hash-table)
+                                     collect `',schema))))
+         (unless (= (length pairs) (length schema-strings))
+           (error "~&Not all primitive schemas were found: ~S" pairs))
+         `(defun ,fname ()
+            "Return a hash-table mapping avro primitive type names to schemas.
 
 This hash-table is meant to be added to during the course of schema
 parsing."
-  (loop
-     with fullname->schema = (make-hash-table :test #'equal)
-
-     for name in '("null" "boolean" "int" "long" "float" "double" "bytes" "string")
-     for schema = (find-schema name)
-
-     if (null schema)
-     do (error "~&Could not find schema for name: ~A" name)
-     else do (setf (gethash name fullname->schema) schema)
-
-     finally (return fullname->schema)))
+            (let ((,hash-table (make-hash-table :test #'equal)))
+              ,setf-form
+              ,hash-table)))))
+  (make-function make-schema-hash-table))
 
 (defun parse-schema (json)
   (etypecase json
@@ -125,7 +131,7 @@ parsing."
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
 (defmethod namespace (schema)
-  nil)
+  (values "" nil))
 
 (defun register-named-schema (schema)
   (declare (special *fullname->schema*))
@@ -134,36 +140,64 @@ parsing."
       (error "~&Name is already taken: ~A" fullname))
     (setf (gethash fullname *fullname->schema*) schema)))
 
-(defmacro with-fields (fields jso &body body)
-  "The symbols in FIELDS are downcased before the st-json:getjso call."
-  (let ((j (gensym)))
-    `(let* ((,j ,jso)
-            ,@(mapcar
-               (lambda (binding)
-                 (list binding
-                       `(st-json:getjso ,(string-downcase (string binding)) ,j)))
-               fields))
-       ,@body)))
+(defmacro +p (symbol)
+  "Returns SYMBOL with a 'p' appended to it."
+  `(read-from-string (format nil "~Sp" ,symbol)))
+
+(defmacro with-fields ((&rest fields) jso &body body)
+  "Binds FIELDS as well as its elements suffixed with 'p'."
+  (flet ((->string (symbol)
+           (string-downcase (string symbol))))
+    (let* ((j (gensym))
+           (fieldsp (mapcar (lambda (field) (+p field)) fields))
+           (mvb-forms (mapcar
+                       (lambda (field fieldp)
+                         (let ((value (gensym))
+                               (valuep (gensym)))
+                           `(multiple-value-bind (,value ,valuep)
+                                (st-json:getjso ,(->string field) ,j)
+                              (setf ,field ,value
+                                    ,fieldp ,valuep))))
+                       fields
+                       fieldsp)))
+      `(let ((,j ,jso)
+             ,@fields
+             ,@fieldsp)
+         ,@mvb-forms
+         ,@body))))
+
+(defmacro make-kwargs ((&rest always-included) &rest included-only-when-non-nil)
+  "Expects p-suffixed symbols of INCLUDED-ONLY-WHEN-NON-NIL to also exist."
+  (flet ((->keyword (symbol)
+           (intern (symbol-name symbol) 'keyword)))
+    (let* ((args (gensym))
+           (initial-args (loop
+                            for symbol in always-included
+                            collect (->keyword symbol)
+                            collect symbol))
+           (when-forms (mapcar
+                        (lambda (symbol)
+                          `(when ,(+p symbol)
+                             (push ,symbol ,args)
+                             (push ,(->keyword symbol) ,args)))
+                        included-only-when-non-nil)))
+      `(let ((,args (list ,@initial-args)))
+         ,@when-forms
+         ,args))))
 
 (defun parse-enum (jso)
   (with-fields (name namespace aliases doc symbols default) jso
     (register-named-schema
-     (make-instance 'enum-schema
-                    :name name
-                    :namespace namespace
-                    :aliases aliases
-                    :doc doc
-                    :symbols symbols
-                    :default default))))
+     (apply #'make-instance
+            'enum-schema
+            (make-kwargs (name symbols default) namespace aliases doc)))))
 
 (defun parse-fixed (jso)
   (with-fields (name namespace aliases size) jso
     (register-named-schema
-     (make-instance 'fixed-schema
-                    :name name
-                    :namespace namespace
-                    :aliases aliases
-                    :size size))))
+     (apply #'make-instance
+            'fixed-schema
+            (make-kwargs (name size) namespace aliases)))))
 
 (defun parse-array (jso)
   (with-fields (items) jso
@@ -194,12 +228,10 @@ parsing."
                                       :element-type 'avro-schema
                                       :initial-element 'null-schema
                                       :fill-pointer 0))
-           (record (make-instance 'record-schema
-                                  :name name
-                                  :namespace namespace
-                                  :doc doc
-                                  :aliases (coerce aliases 'vector)
-                                  :field-schemas field-schemas)))
+           (record (apply
+                    #'make-instance
+                    'record-schema
+                    (make-kwargs (name field-schemas) namespace doc aliases))))
       (let ((*current-namespace* (figure-out-namespace name namespace)))
         (register-named-schema record)
         (loop
@@ -210,18 +242,24 @@ parsing."
 
 (defun parse-field (jso)
   (with-fields (name doc type order aliases default) jso
-    (let ((*current-namespace* (figure-out-namespace name))
-          (schema (parse-schema type)))
+    (let* ((*current-namespace* (figure-out-namespace name))
+           (schema (parse-schema type))
+           (args (list :name name
+                       :field-type schema)))
+      (when order
+        (push order args)
+        (push :order args))
+      (when aliases
+        (push aliases args)
+        (push :aliases args))
+      (when doc
+        (push doc args)
+        (push :doc args))
+      (when default
+        (push (parse-default schema default) args)
+        (push :default args))
       (register-named-schema
-       (let ((args (list :name name
-                         :doc doc
-                         :field-type schema
-                         :order (or order "ascending")
-                         :aliases aliases)))
-         (when default
-           (setf args (nconc args
-                             (list :default (parse-default schema default)))))
-         (apply #'make-instance 'field-schema args))))))
+       (apply #'make-instance 'field-schema args)))))
 
 (defun parse-default (schema default)
   (etypecase schema
