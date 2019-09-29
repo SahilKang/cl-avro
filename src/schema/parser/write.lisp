@@ -46,8 +46,7 @@
        (let* ((->symbol (lambda (s)
                           (read-from-string (concatenate 'string s "-schema"))))
               (pairs (loop
-                        with package = (find-package 'cl-avro)
-                        for symbol being the external-symbols of package
+                        for symbol being the external-symbols of 'cl-avro
                         for string = (find-if (lambda (s)
                                                 (eq symbol (funcall ->symbol s)))
                                               schema-strings)

@@ -29,30 +29,36 @@
 
 (defparameter *current-namespace* "")
 
-(defun find-schema (name)
-  (loop
-     with schema-name = (string-upcase (concatenate 'string name "-schema"))
-
-     for s being the external-symbols of (find-package "CL-AVRO")
-     when (string= schema-name (symbol-name s))
-     return s))
-
-(defun make-schema-hash-table ()
-  "Return a hash-table mapping avro primitive type names to schemas.
+(macrolet
+    ((make-function (fname)
+       (let* ((->symbol (lambda (string)
+                          (read-from-string (format nil "~A-schema" string))))
+              (schema-strings '("null" "boolean" "int" "long"
+                                "float" "double" "bytes" "string"))
+              (pairs (loop
+                        for symbol being the external-symbols of 'cl-avro
+                        for string = (find-if
+                                      (lambda (string)
+                                        (eq symbol (funcall ->symbol string)))
+                                      schema-strings)
+                        when string
+                        collect (list string symbol)))
+              (hash-table (gensym))
+              (setf-form `(setf ,@(loop
+                                     for (name schema) in pairs
+                                     collect `(gethash ,name ,hash-table)
+                                     collect `',schema))))
+         (unless (= (length pairs) (length schema-strings))
+           (error "~&Not all primitive schemas were found: ~S" pairs))
+         `(defun ,fname ()
+            "Return a hash-table mapping avro primitive type names to schemas.
 
 This hash-table is meant to be added to during the course of schema
 parsing."
-  (loop
-     with fullname->schema = (make-hash-table :test #'equal)
-
-     for name in '("null" "boolean" "int" "long" "float" "double" "bytes" "string")
-     for schema = (find-schema name)
-
-     if (null schema)
-     do (error "~&Could not find schema for name: ~A" name)
-     else do (setf (gethash name fullname->schema) schema)
-
-     finally (return fullname->schema)))
+            (let ((,hash-table (make-hash-table :test #'equal)))
+              ,setf-form
+              ,hash-table)))))
+  (make-function make-schema-hash-table))
 
 (defun parse-schema (json)
   (etypecase json
