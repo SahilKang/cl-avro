@@ -13,8 +13,9 @@ and there are a few TODOS:
 * [sort order](https://avro.apache.org/docs/1.9.0/spec.html#order)
 is ignored.
 
-* [schema resolution](https://avro.apache.org/docs/1.9.0/spec.html#Schema+Resolution)
-is not suppored.
+* [aliases](https://avro.apache.org/docs/1.9.0/spec.html#Aliases)
+and [namespaces](https://avro.apache.org/docs/1.9.0/spec.html#names)
+are ignored during schema resolution.
 
 * [canonical form](https://avro.apache.org/docs/1.9.0/spec.html#Parsing+Canonical+Form+for+Schemas)
 transformations are not supported.
