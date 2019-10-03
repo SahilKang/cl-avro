@@ -27,6 +27,7 @@
                #:st-json
                #:chipz
                #:salza2)
+  :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :components
   ((:file "package" :pathname "src/package")
@@ -56,6 +57,7 @@
             ((:file "header")
              (:file "read" :depends-on ("header"))
              (:file "write" :depends-on ("header"))))))
+
 
 (asdf:defsystem #:cl-avro/test
   :description "Tests for cl-avro."
