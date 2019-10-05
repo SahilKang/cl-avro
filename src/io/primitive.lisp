@@ -21,9 +21,14 @@
   (:documentation
    "Determine if OBJECT is valid according to avro SCHEMA."))
 
-(defgeneric deserialize (stream-or-seq schema)
+(defgeneric deserialize (stream-or-seq reader-schema &optional writer-schema)
   (:documentation
-   "Deserialize next object from STREAM-OR-SEQ according to avro SCHEMA or :EOF."))
+   "Deserialize next object from STREAM-OR-SEQ according to READER-SCHEMA.
+
+If WRITER-SCHEMA is non-nil, then deserialization is performed after schema
+resolution.
+
+:EOF is returned if STREAM-OR-SEQ is empty."))
 
 (defgeneric serialize (output-stream schema object)
   (:documentation
@@ -103,7 +108,8 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
   '(unsigned-byte 8))
 
 
-(defmethod deserialize ((bytes sequence) schema)
+(defmethod deserialize ((bytes sequence) schema &optional writer-schema)
+  (declare (ignore writer-schema))
   (let ((input-stream (make-instance 'input-stream :bytes (coerce bytes 'vector))))
     (deserialize input-stream schema)))
 
@@ -118,8 +124,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; null-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'null-schema)))
+                        (schema (eql 'null-schema))
+                        &optional writer-schema)
   "Read as zero bytes."
+  (declare (ignore writer-schema))
   nil)
 
 (defmethod serialize ((stream stream)
@@ -131,8 +139,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; boolean-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'boolean-schema)))
+                        (schema (eql 'boolean-schema))
+                        &optional writer-schema)
   "Read as a single byte whose value is either 0 (false) or 1 (true)."
+  (declare (ignore writer-schema))
   (let ((byte (read-byte stream nil :eof)))
     (elt '(nil t) byte)))
 
@@ -145,8 +155,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; int-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'int-schema)))
+                        (schema (eql 'int-schema))
+                        &optional writer-schema)
   "Read as variable-length zig-zag."
+  (declare (ignore writer-schema))
   (read-number stream 32))
 
 (defmethod serialize ((stream stream)
@@ -158,8 +170,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; long-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'long-schema)))
+                        (schema (eql 'long-schema))
+                        &optional writer-schema)
   "Read as variable-length zig-zag."
+  (declare (ignore writer-schema))
   (read-number stream 64))
 
 (defmethod serialize ((stream stream)
@@ -171,8 +185,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; float-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'float-schema)))
+                        (schema (eql 'float-schema))
+                        &optional writer-schema)
   "Read as 4 bytes: 32-bit little-endian ieee-754."
+  (declare (ignore writer-schema))
   ;; might have to guarantee that this is a byte-stream
   (read-float stream))
 
@@ -185,8 +201,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; double-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'double-schema)))
+                        (schema (eql 'double-schema))
+                        &optional writer-schema)
   "Read as 8 bytes: 64-bit little-endian ieee-754."
+  (declare (ignore writer-schema))
   (read-double stream))
 
 (defmethod serialize ((stream stream)
@@ -198,8 +216,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; bytes-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'bytes-schema)))
+                        (schema (eql 'bytes-schema))
+                        &optional writer-schema)
   "Read as a long followed by that many bytes."
+  (declare (ignore writer-schema))
   (let* ((size (deserialize stream 'long-schema))
          (buf (make-array size :element-type '(unsigned-byte 8))))
     (unless (= (read-sequence buf stream) (array-dimension buf 0))
@@ -216,8 +236,10 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 ;;; string-schema
 
 (defmethod deserialize ((stream stream)
-                        (schema (eql 'string-schema)))
+                        (schema (eql 'string-schema))
+                        &optional writer-schema)
   "Read as a long followed by that many utf-8 bytes."
+  (declare (ignore writer-schema))
   (let ((bytes (deserialize stream 'bytes-schema)))
     (babel:octets-to-string bytes :encoding :utf-8)))
 

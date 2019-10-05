@@ -24,8 +24,10 @@
        (= (length object) (size schema))))
 
 (defmethod deserialize ((stream stream)
-                        (schema fixed-schema))
+                        (schema fixed-schema)
+                        &optional writer-schema)
   "Read using the number of bytes declared in the schema."
+  (declare (ignore writer-schema))
   (let ((buf (make-array (size schema) :element-type '(unsigned-byte 8))))
     (loop
        for i below (size schema)
@@ -64,8 +66,10 @@
       (validp (elt (schemas schema) position) value))))
 
 (defmethod deserialize ((stream stream)
-                        (schema union-schema))
+                        (schema union-schema)
+                        &optional writer-schema)
   "Read with a long indicating the union type and then the value itself."
+  (declare (ignore writer-schema))
   (let* ((pos (deserialize stream 'long-schema))
          (val (deserialize stream (elt (schemas schema) pos))))
     (make-instance 'union-value :value val :position pos)))
@@ -102,7 +106,9 @@
        (every (lambda (elt) (validp (item-schema schema) elt)) object)))
 
 (defmethod deserialize ((stream stream)
-                        (schema array-schema))
+                        (schema array-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
   (loop
      with vector = (make-array 0 :adjustable t :fill-pointer 0)
      with array-stream = (make-instance 'array-input-stream
@@ -141,7 +147,9 @@
                       (validp value-schema value)))))
 
 (defmethod deserialize ((stream stream)
-                        (schema map-schema))
+                        (schema map-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
   (loop
      with hash-table = (make-hash-table :test #'equal)
      with map-stream = (make-instance 'map-input-stream
@@ -175,7 +183,9 @@
        (not (null (position object (symbols schema) :test #'string=)))))
 
 (defmethod deserialize ((stream stream)
-                        (schema enum-schema))
+                        (schema enum-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
   (let ((pos (deserialize stream 'int-schema)))
     (elt (symbols schema) pos)))
 
@@ -198,7 +208,9 @@
   (validp (field-type schema) object))
 
 (defmethod deserialize ((stream stream)
-                        (schema record-schema))
+                        (schema record-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
   (let* ((field-schemas (field-schemas schema))
          (fields (make-array (length field-schemas))))
     (loop
@@ -208,7 +220,9 @@
     fields))
 
 (defmethod deserialize ((stream stream)
-                        (schema field-schema))
+                        (schema field-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
   (deserialize stream (field-type schema)))
 
 (defmethod serialize ((stream stream)
