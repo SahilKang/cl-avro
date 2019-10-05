@@ -22,8 +22,11 @@
 
 (in-package #:test/object-container-file)
 
+(defparameter *weather-filespec*
+  (asdf:system-relative-pathname 'cl-avro/test "test/weather.avro"))
+
 (test read-file
-  (with-open-file (stream "./weather.avro" :element-type '(unsigned-byte 8))
+  (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
     (let ((expected '(#("011990-99999" -619524000000 0)
                       #("011990-99999" -619506000000 22)
                       #("011990-99999" -619484400000 -11)
@@ -48,7 +51,7 @@
                            :element-type '(unsigned-byte 8)
                            :adjustable t
                            :fill-pointer 0)))
-    (with-open-file (stream "./weather.avro" :element-type '(unsigned-byte 8))
+    (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
       (loop
          with in = (make-instance 'avro:file-input-stream :stream-or-seq stream)
          with out = (make-instance 'avro:file-output-stream
@@ -77,7 +80,7 @@
            actual))))
 
 (test skip-block
-  (with-open-file (stream "./weather.avro" :element-type '(unsigned-byte 8))
+  (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
     (let ((stream (make-instance 'avro:file-input-stream :stream-or-seq stream)))
       (is (avro:skip-block stream))
       (is (null (avro:skip-block stream)))

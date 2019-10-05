@@ -27,6 +27,7 @@
                #:st-json
                #:chipz
                #:salza2)
+  :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :components
   ((:file "package" :pathname "src/package")
@@ -47,7 +48,8 @@
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
-             (:file "complex" :depends-on ("stream"))))
+             (:file "complex" :depends-on ("stream"))
+             (:file "resolve" :depends-on ("primitive"))))
    (:module "object-container-file"
             :pathname "src/object-container-file"
             :depends-on ("io")
@@ -55,6 +57,7 @@
             ((:file "header")
              (:file "read" :depends-on ("header"))
              (:file "write" :depends-on ("header"))))))
+
 
 (asdf:defsystem #:cl-avro/test
   :description "Tests for cl-avro."
@@ -68,4 +71,5 @@
     "test"
     :components
     ((:file "object-container-file")
-     (:file "parser")))))
+     (:file "parser")
+     (:file "resolve")))))
