@@ -60,10 +60,13 @@
                              default: \"baz\"}]}"))
         (reader-schema (avro:json->schema
                         "{type: \"record\",
-                          name: \"RecordName\",
+                          name: \"RecordName2\",
+                          aliases: [\"RecordName\"],
                           fields: [
                             {name: \"Field_2\", type: \"int\", default: 4},
-                            {name: \"Field_1\", type: \"string\"},
+                            {name: \"Field_11\",
+                             aliases: [\"FooField\", \"Field_1\"],
+                             type: \"string\"},
                             {name: \"Field_3\",
                              type: \"string\",
                              default: \"bar\"}]}")))

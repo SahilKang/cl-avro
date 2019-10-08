@@ -17,7 +17,46 @@
 
 (in-package #:cl-avro)
 
-;; TODO deal with namespaces and aliases during schema resolution
+(defparameter *reader-namespace* nil)
+
+(defparameter *writer-namespace* nil)
+
+(defun deduce-fullname (name namespace enclosing-namespace)
+  (cond
+    ((position #\. name)
+     name)
+    ((not (zerop (length namespace)))
+     (concatenate 'string namespace "." name))
+    ((not (zerop (length enclosing-namespace)))
+     (concatenate 'string enclosing-namespace "." name))
+    (t name)))
+
+(defun deduce-namespace (name namespace enclosing-namespace)
+  (let ((pos (position #\. name :from-end t)))
+    (cond
+      (pos
+       (subseq name 0 pos))
+      ((not (zerop (length namespace)))
+       namespace)
+      (t
+       enclosing-namespace))))
+
+(defun same-name-p (reader-schema writer-schema)
+  (let* ((rnamespace (namespace reader-schema))
+         (rname (deduce-fullname (name reader-schema)
+                                 rnamespace
+                                 *reader-namespace*))
+         (wname (deduce-fullname (name writer-schema)
+                                 (namespace writer-schema)
+                                 *writer-namespace*)))
+    (if (string= rname wname)
+        t
+        (loop
+           for name across (aliases reader-schema)
+           for fullname = (deduce-fullname name rnamespace *reader-namespace*)
+           when (string= fullname wname)
+           do (return-from same-name-p t)))))
+
 
 (defgeneric resolve (reader-schema writer-schema)
   (:documentation
@@ -63,9 +102,7 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 
 
 (defmethod matchp ((reader-schema enum-schema) (writer-schema enum-schema))
-  (let ((rname (name reader-schema))
-        (wname (name writer-schema)))
-    (string= rname wname)))
+  (same-name-p reader-schema writer-schema))
 
 (defclass resolved-enum-schema (enum-schema)
   ((reader-symbols
@@ -105,20 +142,16 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 
 
 (defmethod matchp ((reader-schema fixed-schema) (writer-schema fixed-schema))
-  (let ((rname (name reader-schema))
-        (wname (name writer-schema))
-        (rsize (size reader-schema))
+  (let ((rsize (size reader-schema))
         (wsize (size writer-schema)))
-    (and (string= rname wname) (= rsize wsize))))
+    (and (same-name-p reader-schema writer-schema) (= rsize wsize))))
 
 (defmethod resolve ((reader-schema fixed-schema) (writer-schema fixed-schema))
   reader-schema)
 
 
 (defmethod matchp ((reader-schema record-schema) (writer-schema record-schema))
-  (let ((rname (name reader-schema))
-        (wname (name writer-schema)))
-    (string= rname wname)))
+  (same-name-p reader-schema writer-schema))
 
 (defclass resolved-record-schema (record-schema)
   ((windex->rindex
@@ -152,7 +185,13 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 (defmethod resolve ((reader-schema record-schema) (writer-schema record-schema))
   (let ((windex->rindex (make-hash-table :test #'eql))
         (rindex->default (make-hash-table :test #'eql))
-        (new-fields (copy-seq (field-schemas writer-schema))))
+        (new-fields (copy-seq (field-schemas writer-schema)))
+        (*reader-namespace* (deduce-namespace (name reader-schema)
+                                              (namespace reader-schema)
+                                              *reader-namespace*))
+        (*writer-namespace* (deduce-namespace (name writer-schema)
+                                              (namespace writer-schema)
+                                              *writer-namespace*)))
     ;; from the spec:
     ;; * the ordering of fields may be different: fields are matched by name.
     ;; * schemas for fields with the same name in both records are resolved
@@ -170,10 +209,18 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
        with rfields = (field-schemas reader-schema)
 
        for wfield across wfields and windex from 0
-       for rindex = (position (name wfield) rfields :test #'string= :key #'name)
+       for rindex = (position-if (lambda (rfield)
+                                   (same-name-p rfield wfield))
+                                 rfields)
 
        when rindex
-       do (let ((rfield (elt rfields rindex)))
+       do (let* ((rfield (elt rfields rindex))
+                 (*reader-namespace* (deduce-namespace (name rfield)
+                                                       nil
+                                                       *reader-namespace*))
+                 (*writer-namespace* (deduce-namespace (name wfield)
+                                                       nil
+                                                       *writer-namespace*)))
             (setf (gethash windex windex->rindex) rindex
                   (elt new-fields windex) (make-instance
                                            'field-schema

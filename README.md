@@ -11,14 +11,19 @@ This was written against the
 and there are a few TODOS:
 
 * [sort order](https://avro.apache.org/docs/1.9.0/spec.html#order)
-is ignored.
-
-* [aliases](https://avro.apache.org/docs/1.9.0/spec.html#Aliases)
-and [namespaces](https://avro.apache.org/docs/1.9.0/spec.html#names)
-are ignored during schema resolution.
+is not supported.
 
 * [canonical form](https://avro.apache.org/docs/1.9.0/spec.html#Parsing+Canonical+Form+for+Schemas)
-transformations are not supported.
+schema transformations are not implemented, so
+[schema fingerprints](https://avro.apache.org/docs/1.9.0/spec.html#schema_fingerprints)
+and [single-object encoding](https://avro.apache.org/docs/1.9.0/spec.html#single_object_encoding)
+are not supported.
+
+* [Avro RPC](https://avro.apache.org/docs/1.9.0/spec.html#Protocol+Declaration)
+is not implemented.
+
+* [Logical Types](https://avro.apache.org/docs/1.9.0/spec.html#Logical+Types)
+are not supported.
 
 # Examples
 
