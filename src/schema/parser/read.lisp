@@ -213,7 +213,7 @@ parsing."
   (let ((pos (position #\. name :from-end t)))
     (cond
       (pos
-       (subseq name (1+ pos)))
+       (subseq name 0 pos))
       ((not (zerop (length namespace)))
        namespace)
       (t
