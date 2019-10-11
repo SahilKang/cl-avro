@@ -22,12 +22,11 @@
 
 (defun json->schema (json)
   "Return an avro schema according to JSON. JSON is a string or stream."
-  (let ((*fullname->schema* (make-schema-hash-table)))
-    (declare (special *fullname->schema*))
+  (let ((*fullname->schema* (make-schema-hash-table))
+        (*namespace* ""))
+    (declare (special *fullname->schema* *namespace*))
     (parse-schema (st-json:read-json json))))
 
-
-(defparameter *current-namespace* "")
 
 (macrolet
     ((make-function (fname)
@@ -119,23 +118,15 @@ parsing."
          ((string= type "fixed") (parse-fixed jso))
          (t (error "~&Unknown type: ~A" type)))))))
 
-(defun figure-out-fullname (name namespace)
-  (cond
-    ((position #\. name) name)
-    ((not (zerop (length namespace)))
-     (concatenate 'string namespace "." name))
-    ((not (zerop (length *current-namespace*)))
-     (concatenate 'string *current-namespace* "." name))
-    (t name)))
-
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
 (defmethod namespace (schema)
   (values "" nil))
 
 (defun register-named-schema (schema)
-  (declare (special *fullname->schema*))
-  (let ((fullname (figure-out-fullname (name schema) (namespace schema))))
+  (declare (special *fullname->schema* *namespace*))
+  (let ((fullname (deduce-fullname (name schema) (namespace schema) *namespace*)))
+    (declare (special *namespace*))
     (when (nth-value 1 (gethash fullname *fullname->schema*))
       (error "~&Name is already taken: ~A" fullname))
     (setf (gethash fullname *fullname->schema*) schema)))
@@ -209,17 +200,8 @@ parsing."
     (make-instance 'map-schema
                    :value-schema (parse-schema values))))
 
-(defun figure-out-namespace (name &optional namespace)
-  (let ((pos (position #\. name :from-end t)))
-    (cond
-      (pos
-       (subseq name 0 pos))
-      ((not (zerop (length namespace)))
-       namespace)
-      (t
-       *current-namespace*))))
-
 (defun parse-record (jso)
+  (declare (special *namespace*))
   (with-fields (name namespace doc aliases fields) jso
     ;; record schemas can be recursive (fields can refer to the record
     ;; type), so let's register the record schema and then mutate the
@@ -232,7 +214,8 @@ parsing."
                     #'make-instance
                     'record-schema
                     (make-kwargs (name field-schemas) namespace doc aliases))))
-      (let ((*current-namespace* (figure-out-namespace name namespace)))
+      (let ((*namespace* (deduce-namespace name namespace *namespace*)))
+        (declare (special *namespace*))
         (register-named-schema record)
         (loop
            for field-jso in fields
@@ -241,11 +224,13 @@ parsing."
         record))))
 
 (defun parse-field (jso)
+  (declare (special *namespace*))
   (with-fields (name doc type order aliases default) jso
-    (let* ((*current-namespace* (figure-out-namespace name))
+    (let* ((*namespace* (deduce-namespace name nil *namespace*))
            (schema (parse-schema type))
            (args (list :name name
                        :field-type schema)))
+      (declare (special *namespace*))
       (when order
         (push order args)
         (push :order args))

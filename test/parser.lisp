@@ -195,3 +195,37 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
         (st-json:getjso "default" roundtrip-jso)
       (is defaultp)
       (is (string= "FOO" default)))))
+
+(test canonical-form
+  (let ((schema (avro:json->schema
+                 "{type: \"record\",
+                   name: \"OuterRecord\",
+                   namespace: \"name.space\",
+                   fields: [
+                     {name: \"name\",
+                      type: \"string\"},
+                     {name: \"foo.nested\",
+                      default: {value: 4},
+                      type: {type: \"record\",
+                             name: \"InnerRecord\",
+                             namespace: \"f\\u006fo.bar\",
+                             fields: [
+                               {name: \"value\",
+                                type: \"int\"}
+                             ]}}
+                   ]}"))
+        (expected (concatenate
+                   'string
+                   "{\"name\":\"name.space.OuterRecord\","
+                   "\"type\":\"record\","
+                   "\"fields\":["
+                   "{\"name\":\"name.space.name\","
+                   "\"type\":\"string\"},"
+                   "{\"name\":\"foo.nested\","
+                   "\"type\":{"
+                   "\"name\":\"foo.bar.InnerRecord\","
+                   "\"type\":\"record\","
+                   "\"fields\":["
+                   "{\"name\":\"foo.bar.value\","
+                   "\"type\":\"int\"}]}}]}")))
+    (is (string= expected (avro:schema->json schema t)))))
