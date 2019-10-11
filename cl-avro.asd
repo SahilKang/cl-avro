@@ -42,7 +42,8 @@
                       :depends-on ("primitive" "complex")
                       :components
                       ((:file "read")
-                       (:file "write")))))
+                       (:file "canonicalize")
+                       (:file "write" :depends-on ("canonicalize"))))))
    (:module "io"
             :pathname "src/io"
             :components
