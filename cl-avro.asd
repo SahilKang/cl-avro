@@ -29,11 +29,12 @@
                #:salza2)
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
+  :serial t
   :components
   ((:file "package" :pathname "src/package")
+   (:file "common" :pathname "src/common")
    (:module "schema"
             :pathname "src/schema"
-            :depends-on ("package")
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
@@ -44,7 +45,6 @@
                        (:file "write")))))
    (:module "io"
             :pathname "src/io"
-            :depends-on ("schema")
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
@@ -52,7 +52,6 @@
              (:file "resolve" :depends-on ("primitive"))))
    (:module "object-container-file"
             :pathname "src/object-container-file"
-            :depends-on ("io")
             :components
             ((:file "header")
              (:file "read" :depends-on ("header"))

@@ -17,31 +17,8 @@
 
 (in-package #:cl-avro)
 
-(defparameter *reader-namespace* nil)
-
-(defparameter *writer-namespace* nil)
-
-(defun deduce-fullname (name namespace enclosing-namespace)
-  (cond
-    ((position #\. name)
-     name)
-    ((not (zerop (length namespace)))
-     (concatenate 'string namespace "." name))
-    ((not (zerop (length enclosing-namespace)))
-     (concatenate 'string enclosing-namespace "." name))
-    (t name)))
-
-(defun deduce-namespace (name namespace enclosing-namespace)
-  (let ((pos (position #\. name :from-end t)))
-    (cond
-      (pos
-       (subseq name 0 pos))
-      ((not (zerop (length namespace)))
-       namespace)
-      (t
-       enclosing-namespace))))
-
 (defun same-name-p (reader-schema writer-schema)
+  (declare (special *reader-namespace* *writer-namespace*))
   (let* ((rnamespace (namespace reader-schema))
          (rname (deduce-fullname (name reader-schema)
                                  rnamespace
@@ -74,6 +51,14 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 (defmethod resolve :before (reader-schema writer-schema)
   (unless (matchp reader-schema writer-schema)
     (error "Schemas don't match")))
+
+(defmethod resolve :around (reader-schema writer-schema)
+  (let ((*reader-namespace* (when (boundp '*reader-namespace*)
+                              (symbol-value '*reader-namespace*)))
+        (*writer-namespace* (when (boundp '*writer-namespace*)
+                              (symbol-value '*writer-namespace*))))
+    (declare (special *reader-namespace* *writer-namespace*))
+    (call-next-method)))
 
 (defmethod deserialize :around (stream-or-seq schema &optional writer-schema)
   (if writer-schema
@@ -183,6 +168,7 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
       rfields)))
 
 (defmethod resolve ((reader-schema record-schema) (writer-schema record-schema))
+  (declare (special *reader-namespace* *writer-namespace*))
   (let ((windex->rindex (make-hash-table :test #'eql))
         (rindex->default (make-hash-table :test #'eql))
         (new-fields (copy-seq (field-schemas writer-schema)))
@@ -192,6 +178,7 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
         (*writer-namespace* (deduce-namespace (name writer-schema)
                                               (namespace writer-schema)
                                               *writer-namespace*)))
+    (declare (special *reader-namespace* *writer-namespace*))
     ;; from the spec:
     ;; * the ordering of fields may be different: fields are matched by name.
     ;; * schemas for fields with the same name in both records are resolved
@@ -221,6 +208,7 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
                  (*writer-namespace* (deduce-namespace (name wfield)
                                                        nil
                                                        *writer-namespace*)))
+            (declare (special *reader-namespace* *writer-namespace*))
             (setf (gethash windex windex->rindex) rindex
                   (elt new-fields windex) (make-instance
                                            'field-schema
