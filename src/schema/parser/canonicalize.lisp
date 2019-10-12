@@ -60,27 +60,20 @@
 
 (defmethod canonicalize ((schema record-schema))
   (declare (special *namespace*))
-  (make-instance
-   'record-schema
-   :name (deduce-fullname (name schema)
-                          (namespace schema)
-                          *namespace*)
-   :field-schemas (let ((*namespace* (deduce-namespace (name schema)
-                                                       (namespace schema)
-                                                       *namespace*)))
-                    (declare (special *namespace*))
-                    (map 'vector
-                         (lambda (field-schema)
-                           (canonicalize field-schema))
-                         (field-schemas schema)))))
+  (let* ((name (deduce-fullname (name schema) (namespace schema) *namespace*))
+         (namespace (deduce-namespace name nil *namespace*)))
+    (make-instance
+     'record-schema
+     :name name
+     :field-schemas (let ((*namespace* namespace))
+                      (declare (special *namespace*))
+                      (map 'vector
+                           (lambda (field-schema)
+                             (canonicalize field-schema))
+                           (field-schemas schema))))))
 
 (defmethod canonicalize ((schema field-schema))
-  (declare (special *namespace*))
   (make-instance
    'field-schema
-   :name (deduce-fullname (name schema) nil *namespace*)
-   :field-type (let ((*namespace* (deduce-namespace (name schema)
-                                                    nil
-                                                    *namespace*)))
-                 (declare (special *namespace*))
-                 (canonicalize (field-type schema)))))
+   :name (name schema)
+   :field-type (canonicalize (field-type schema))))

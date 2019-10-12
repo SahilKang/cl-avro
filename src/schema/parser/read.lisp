@@ -205,13 +205,10 @@ parsing."
         record))))
 
 (defun parse-field (jso)
-  (declare (special *namespace*))
   (with-fields (name doc type order aliases default) jso
-    (let* ((*namespace* (deduce-namespace name nil *namespace*))
-           (schema (parse-schema type))
+    (let* ((schema (parse-schema type))
            (args (list :name name
                        :field-type schema)))
-      (declare (special *namespace*))
       (when order
         (push order args)
         (push :order args))
@@ -224,8 +221,7 @@ parsing."
       (when default
         (push (parse-default schema default) args)
         (push :default args))
-      (register-named-schema
-       (apply #'make-instance 'field-schema args)))))
+      (apply #'make-instance 'field-schema args))))
 
 (defun parse-default (schema default)
   (etypecase schema

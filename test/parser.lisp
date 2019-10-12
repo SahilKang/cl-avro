@@ -204,7 +204,7 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                    fields: [
                      {name: \"name\",
                       type: \"string\"},
-                     {name: \"foo.nested\",
+                     {name: \"foo\",
                       default: {value: 4},
                       type: {type: \"record\",
                              name: \"InnerRecord\",
@@ -219,13 +219,13 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                    "{\"name\":\"name.space.OuterRecord\","
                    "\"type\":\"record\","
                    "\"fields\":["
-                   "{\"name\":\"name.space.name\","
+                   "{\"name\":\"name\","
                    "\"type\":\"string\"},"
-                   "{\"name\":\"foo.nested\","
+                   "{\"name\":\"foo\","
                    "\"type\":{"
                    "\"name\":\"foo.bar.InnerRecord\","
                    "\"type\":\"record\","
                    "\"fields\":["
-                   "{\"name\":\"foo.bar.value\","
+                   "{\"name\":\"value\","
                    "\"type\":\"int\"}]}}]}")))
     (is (string= expected (avro:schema->json schema t)))))
