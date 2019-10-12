@@ -268,30 +268,12 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 
 
 ;; specialize matchp and resolve methods for primitive avro types:
-(macrolet
-    ((defmethods (&rest primitive-symbols)
-       (let* ((->schema (lambda (symbol)
-                          (read-from-string (format nil "~A-schema" symbol))))
-              (schemas (loop
-                          for symbol being the external-symbols of 'cl-avro
-                          for schema = (find-if
-                                        (lambda (s)
-                                          (eq symbol (funcall ->schema s)))
-                                        primitive-symbols)
-                          when schema
-                          collect symbol)))
-         (unless (= (length primitive-symbols) (length schemas))
-           (error "~&Not all schemas were found"))
-         `(progn
-            ,@(loop
-                 for schema in schemas
-                 collect `(defmethod matchp ((reader-schema (eql ',schema))
-                                             (writer-schema (eql ',schema)))
-                            t)
-                 collect `(defmethod resolve ((reader-schema (eql ',schema))
-                                              (writer-schema (eql ',schema)))
-                            reader-schema))))))
-  (defmethods null boolean int long float double bytes string))
+
+(defmethods-for-primitives matchp nil (reader-schema writer-schema)
+  t)
+
+(defmethods-for-primitives resolve nil (reader-schema writer-schema)
+  reader-schema)
 
 
 ;; TODO need to coerce the output type appropriately
@@ -302,20 +284,17 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
     ((promote ((&rest readers) writer)
        (let* ((->schema (lambda (symbol)
                           (read-from-string (format nil "~A-schema" symbol))))
-              (symbols (loop
-                          for symbol being the external-symbols of 'cl-avro
-                          collect symbol))
               (reader-schemas (loop
                                  for symbol in readers
                                  for schema = (find-if
                                                (lambda (s)
                                                  (eq s (funcall ->schema symbol)))
-                                               symbols)
+                                               +primitive-schemas+)
                                  when schema
                                  collect schema))
               (writer-schema (loop
                                 with writer-schema = (funcall ->schema writer)
-                                for symbol in symbols
+                                for symbol in +primitive-schemas+
                                 when (eq symbol writer-schema)
                                 return writer-schema)))
          (unless (= (length reader-schemas) (length readers))

@@ -27,24 +27,8 @@
     (call-next-method)))
 
 ;; specialize canonicalize methods for primitive avro types:
-(macrolet
-    ((defmethods (&rest symbols)
-       (flet ((->schema (symbol)
-                (read-from-string (format nil "~A-schema" symbol))))
-         (let ((schemas (loop
-                           for schema being the external-symbols of 'cl-avro
-                           when (find-if (lambda (symbol)
-                                           (eq schema (->schema symbol)))
-                                         symbols)
-                           collect schema)))
-           (unless (= (length symbols) (length schemas))
-             (error "~&Not all schemas were found"))
-           `(progn
-              ,@(mapcar (lambda (schema)
-                          `(defmethod canonicalize ((schema (eql ',schema)))
-                             schema))
-                        schemas))))))
-  (defmethods null boolean int long float double bytes string))
+(defmethods-for-primitives canonicalize nil (schema)
+  schema)
 
 (defmethod canonicalize ((schema fixed-schema))
   (declare (special *namespace*))

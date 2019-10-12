@@ -51,29 +51,8 @@ in the avro spec."
          (call-next-method)))))
 
 ;; specialize %write-schema methods for primitive avro types:
-(macrolet
-    ((defmethods (&rest schema-strings)
-       (let* ((->symbol (lambda (s)
-                          (read-from-string (concatenate 'string s "-schema"))))
-              (pairs (loop
-                        for symbol being the external-symbols of 'cl-avro
-                        for string = (find-if (lambda (s)
-                                                (eq symbol (funcall ->symbol s)))
-                                              schema-strings)
-                        when string
-                        collect (list string symbol))))
-         (unless (= (length pairs) (length schema-strings))
-           (error "~&Not all schemas were found"))
-         `(progn
-            ,@(loop
-                 for (string symbol) in pairs
-                 collect `(defmethod %write-schema ((schema (eql ',symbol)))
-                            ,(format nil "~A" string)))))))
-  (defmethods "null" "boolean" "int" "long" "float" "double" "bytes" "string"))
-
-(defmacro ->string (symbol)
-  "Return downcased string from SYMBOL."
-  `(string-downcase (string ,symbol)))
+(defmethods-for-primitives %write-schema schema-name (schema)
+  schema-name)
 
 (defmacro append-optionals (schema args &rest symbols)
   "Append optional fields to ARGS when they're non-nil and return ARGS."
@@ -81,7 +60,7 @@ in the avro spec."
                     (lambda (symbol)
                       (let ((value (gensym))
                             (valuep (gensym))
-                            (field (->string symbol)))
+                            (field (downcase-symbol symbol)))
                         `(multiple-value-bind (,value ,valuep)
                              (,symbol ,schema)
                            (when ,valuep
@@ -100,7 +79,7 @@ in the avro spec."
                            (declare ((or string symbol) s))
                            (if (stringp s)
                                (list "type" s)
-                               (list (->string s) (list s schema))))
+                               (list (downcase-symbol s) (list s schema))))
                          required-fields))))
     `(let ((,fields (list ,@initial)))
        (append-optionals ,schema ,fields ,@optional-fields))))
