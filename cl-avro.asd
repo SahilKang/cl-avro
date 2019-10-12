@@ -30,29 +30,28 @@
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :serial t
+  :pathname "src"
   :components
-  ((:file "package" :pathname "src/package")
-   (:file "common" :pathname "src/common")
+  ((:file "package")
+   (:file "common")
    (:module "schema"
-            :pathname "src/schema"
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
              (:module "parser"
-                      :depends-on ("primitive" "complex")
+                      :depends-on ("complex")
                       :components
                       ((:file "read")
                        (:file "canonicalize")
-                       (:file "write" :depends-on ("canonicalize"))))))
+                       (:file "write" :depends-on ("canonicalize"))))
+             (:file "fingerprint" :depends-on ("parser"))))
    (:module "io"
-            :pathname "src/io"
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
              (:file "complex" :depends-on ("stream"))
              (:file "resolve" :depends-on ("primitive"))))
    (:module "object-container-file"
-            :pathname "src/object-container-file"
             :components
             ((:file "header")
              (:file "read" :depends-on ("header"))
@@ -66,10 +65,9 @@
   :license "GPLv3"
   :depends-on (#:cl-avro #:1am)
   :perform (test-op (op sys) (uiop:symbol-call :1am :run))
+  :pathname "test"
   :components
-  ((:module
-    "test"
-    :components
-    ((:file "object-container-file")
-     (:file "parser")
-     (:file "resolve")))))
+  ((:file "object-container-file")
+   (:file "parser")
+   (:file "resolve")
+   (:file "fingerprint")))

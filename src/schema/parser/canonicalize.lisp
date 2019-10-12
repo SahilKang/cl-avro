@@ -20,31 +20,25 @@
 (defgeneric canonicalize (schema))
 
 
+(defmethod canonicalize :before ((schema named-type))
+  (declare (special *namespace* *schema->name*))
+  (let ((name (deduce-fullname (name schema) (namespace schema) *namespace*)))
+    (setf (gethash schema *schema->name*) name)))
+
 (defmethod canonicalize :around (schema)
+  (declare (special *schema->name*))
   (let ((*namespace* (when (boundp '*namespace*)
                        (symbol-value '*namespace*))))
     (declare (special *namespace*))
-    (call-next-method)))
+    ;; if schema's already been seen, then just keep the current one
+    ;; and let %write-schema replace it with its name.
+    (if (nth-value 1 (gethash schema *schema->name*))
+        schema
+        (call-next-method))))
 
 ;; specialize canonicalize methods for primitive avro types:
-(macrolet
-    ((defmethods (&rest symbols)
-       (flet ((->schema (symbol)
-                (read-from-string (format nil "~A-schema" symbol))))
-         (let ((schemas (loop
-                           for schema being the external-symbols of 'cl-avro
-                           when (find-if (lambda (symbol)
-                                           (eq schema (->schema symbol)))
-                                         symbols)
-                           collect schema)))
-           (unless (= (length symbols) (length schemas))
-             (error "~&Not all schemas were found"))
-           `(progn
-              ,@(mapcar (lambda (schema)
-                          `(defmethod canonicalize ((schema (eql ',schema)))
-                             schema))
-                        schemas))))))
-  (defmethods null boolean int long float double bytes string))
+(defmethods-for-primitives canonicalize nil (schema)
+  schema)
 
 (defmethod canonicalize ((schema fixed-schema))
   (declare (special *namespace*))
@@ -76,27 +70,20 @@
 
 (defmethod canonicalize ((schema record-schema))
   (declare (special *namespace*))
-  (make-instance
-   'record-schema
-   :name (deduce-fullname (name schema)
-                          (namespace schema)
-                          *namespace*)
-   :field-schemas (let ((*namespace* (deduce-namespace (name schema)
-                                                       (namespace schema)
-                                                       *namespace*)))
-                    (declare (special *namespace*))
-                    (map 'vector
-                         (lambda (field-schema)
-                           (canonicalize field-schema))
-                         (field-schemas schema)))))
+  (let* ((name (deduce-fullname (name schema) (namespace schema) *namespace*))
+         (namespace (deduce-namespace name nil *namespace*)))
+    (make-instance
+     'record-schema
+     :name name
+     :field-schemas (let ((*namespace* namespace))
+                      (declare (special *namespace*))
+                      (map 'vector
+                           (lambda (field-schema)
+                             (canonicalize field-schema))
+                           (field-schemas schema))))))
 
 (defmethod canonicalize ((schema field-schema))
-  (declare (special *namespace*))
   (make-instance
    'field-schema
-   :name (deduce-fullname (name schema) nil *namespace*)
-   :field-type (let ((*namespace* (deduce-namespace (name schema)
-                                                    nil
-                                                    *namespace*)))
-                 (declare (special *namespace*))
-                 (canonicalize (field-type schema)))))
+   :name (name schema)
+   :field-type (canonicalize (field-type schema))))

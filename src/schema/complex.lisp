@@ -211,7 +211,7 @@
 (defclass field-schema (aliased-type doc-type)
   ((name
     :reader name
-    :type avro-fullname
+    :type avro-name
     :documentation "Name of record field.")
    (field-type
     :reader field-type
@@ -235,7 +235,7 @@
        (field-type (error "Must supply :field-type schema"))
        (order "ascending" orderp)
        (default nil defaultp))
-  (check-type name avro-fullname)
+  (check-type name avro-name)
   (check-type field-type avro-schema)
   (check-type order (enum "ascending" "descending" "ignore"))
   (with-slots ((n name)

@@ -39,26 +39,15 @@ If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
 
 ;; specialize validp methods for primitive avro types:
 (macrolet
-    ((make-validp-methods (&rest symbols)
-       (loop
-          for s in symbols
-          for externalp = (eq :external (nth-value 1 (find-symbol (string s))))
-          unless externalp
-          do (error "~&~S is not an external symbol" s))
-       `(progn
-          ,@(loop
-               for s in symbols
-               collect `(defmethod validp ((schema (eql ',s)) object)
-                          (typep object schema))))))
-  (make-validp-methods
-   null-schema
-   boolean-schema
-   int-schema
-   long-schema
-   float-schema
-   double-schema
-   bytes-schema
-   string-schema))
+    ((make-validp-methods ()
+       (let ((defmethods (mapcar
+                          (lambda (schema)
+                            `(defmethod validp ((schema (eql ',schema)) object)
+                               (typep object schema)))
+                          +primitive-schemas+)))
+         `(progn
+            ,@defmethods))))
+  (make-validp-methods))
 
 (defmethod serialize :before (output-stream schema object)
   (unless (validp schema object)

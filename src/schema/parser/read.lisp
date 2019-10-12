@@ -28,36 +28,19 @@
     (parse-schema (st-json:read-json json))))
 
 
-(macrolet
-    ((make-function (fname)
-       (let* ((->symbol (lambda (string)
-                          (read-from-string (format nil "~A-schema" string))))
-              (schema-strings '("null" "boolean" "int" "long"
-                                "float" "double" "bytes" "string"))
-              (pairs (loop
-                        for symbol being the external-symbols of 'cl-avro
-                        for string = (find-if
-                                      (lambda (string)
-                                        (eq symbol (funcall ->symbol string)))
-                                      schema-strings)
-                        when string
-                        collect (list string symbol)))
-              (hash-table (gensym))
-              (setf-form `(setf ,@(loop
-                                     for (name schema) in pairs
-                                     collect `(gethash ,name ,hash-table)
-                                     collect `',schema))))
-         (unless (= (length pairs) (length schema-strings))
-           (error "~&Not all primitive schemas were found: ~S" pairs))
-         `(defun ,fname ()
-            "Return a hash-table mapping avro primitive type names to schemas.
+(defun make-schema-hash-table ()
+  "Return a hash-table mapping avro primitive type names to schemas.
 
 This hash-table is meant to be added to during the course of schema
 parsing."
-            (let ((,hash-table (make-hash-table :test #'equal)))
-              ,setf-form
-              ,hash-table)))))
-  (make-function make-schema-hash-table))
+  (loop
+     with hash-table = (make-hash-table :test #'equal)
+
+     for schema in +primitive-schemas+
+     for name = (schema->name schema)
+     do (setf (gethash name hash-table) schema)
+
+     finally (return hash-table)))
 
 (defun parse-schema (json)
   (etypecase json
@@ -66,11 +49,10 @@ parsing."
     (st-json:jso (parse-jso json))))
 
 (defun parse-string (fullname)
-  (declare (special *fullname->schema*))
-  (multiple-value-bind (schema schemap) (gethash fullname *fullname->schema*)
-    (unless schemap
-      (error "~&Unknown schema with fullname: ~A" fullname))
-    schema))
+  (declare (special *fullname->schema* *namespace*))
+  (or (gethash fullname *fullname->schema*)
+      (gethash (deduce-fullname fullname nil *namespace*) *fullname->schema*)
+      (error "~&Unknown schema with fullname: ~A" fullname)))
 
 (defun parse-union (union-list)
   (loop
@@ -102,21 +84,18 @@ parsing."
                                     :schemas (coerce schemas 'vector)))))
 
 (defun parse-jso (jso)
-  (declare (special *fullname->schema*))
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
       (list (parse-union type))
       (st-json:jso (parse-jso type)) ; TODO does this recurse properly?
       (string
        (cond
-         ((nth-value 1 (gethash type *fullname->schema*))
-          (parse-string type))
          ((string= type "record") (parse-record jso))
          ((string= type "enum") (parse-enum jso))
          ((string= type "array") (parse-array jso))
          ((string= type "map") (parse-map jso))
          ((string= type "fixed") (parse-fixed jso))
-         (t (error "~&Unknown type: ~A" type)))))))
+         (t (parse-string type)))))))
 
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
@@ -137,25 +116,23 @@ parsing."
 
 (defmacro with-fields ((&rest fields) jso &body body)
   "Binds FIELDS as well as its elements suffixed with 'p'."
-  (flet ((->string (symbol)
-           (string-downcase (string symbol))))
-    (let* ((j (gensym))
-           (fieldsp (mapcar (lambda (field) (+p field)) fields))
-           (mvb-forms (mapcar
-                       (lambda (field fieldp)
-                         (let ((value (gensym))
-                               (valuep (gensym)))
-                           `(multiple-value-bind (,value ,valuep)
-                                (st-json:getjso ,(->string field) ,j)
-                              (setf ,field ,value
-                                    ,fieldp ,valuep))))
-                       fields
-                       fieldsp)))
-      `(let ((,j ,jso)
-             ,@fields
-             ,@fieldsp)
-         ,@mvb-forms
-         ,@body))))
+  (let* ((j (gensym))
+         (fieldsp (mapcar (lambda (field) (+p field)) fields))
+         (mvb-forms (mapcar
+                     (lambda (field fieldp)
+                       (let ((value (gensym))
+                             (valuep (gensym)))
+                         `(multiple-value-bind (,value ,valuep)
+                              (st-json:getjso ,(downcase-symbol field) ,j)
+                            (setf ,field ,value
+                                  ,fieldp ,valuep))))
+                     fields
+                     fieldsp)))
+    `(let ((,j ,jso)
+           ,@fields
+           ,@fieldsp)
+       ,@mvb-forms
+       ,@body)))
 
 (defmacro make-kwargs ((&rest always-included) &rest included-only-when-non-nil)
   "Expects p-suffixed symbols of INCLUDED-ONLY-WHEN-NON-NIL to also exist."
@@ -224,13 +201,10 @@ parsing."
         record))))
 
 (defun parse-field (jso)
-  (declare (special *namespace*))
   (with-fields (name doc type order aliases default) jso
-    (let* ((*namespace* (deduce-namespace name nil *namespace*))
-           (schema (parse-schema type))
+    (let* ((schema (parse-schema type))
            (args (list :name name
                        :field-type schema)))
-      (declare (special *namespace*))
       (when order
         (push order args)
         (push :order args))
@@ -243,8 +217,7 @@ parsing."
       (when default
         (push (parse-default schema default) args)
         (push :default args))
-      (register-named-schema
-       (apply #'make-instance 'field-schema args)))))
+      (apply #'make-instance 'field-schema args))))
 
 (defun parse-default (schema default)
   (etypecase schema
