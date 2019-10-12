@@ -54,6 +54,9 @@
    #:field-type
    #:order
    #:field-schemas
+   #:fingerprint
+   #:*default-fingerprint-algorithm*
+   #:avro-64bit-crc
 
    ;; io
    #:validp

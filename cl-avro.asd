@@ -43,7 +43,8 @@
                       :components
                       ((:file "read")
                        (:file "canonicalize")
-                       (:file "write" :depends-on ("canonicalize"))))))
+                       (:file "write" :depends-on ("canonicalize"))))
+             (:file "fingerprint" :depends-on ("parser"))))
    (:module "io"
             :components
             ((:file "primitive")
@@ -68,4 +69,5 @@
   :components
   ((:file "object-container-file")
    (:file "parser")
-   (:file "resolve")))
+   (:file "resolve")
+   (:file "fingerprint")))
