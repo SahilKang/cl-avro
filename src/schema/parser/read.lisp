@@ -49,11 +49,10 @@ parsing."
     (st-json:jso (parse-jso json))))
 
 (defun parse-string (fullname)
-  (declare (special *fullname->schema*))
-  (multiple-value-bind (schema schemap) (gethash fullname *fullname->schema*)
-    (unless schemap
-      (error "~&Unknown schema with fullname: ~A" fullname))
-    schema))
+  (declare (special *fullname->schema* *namespace*))
+  (or (gethash fullname *fullname->schema*)
+      (gethash (deduce-fullname fullname nil *namespace*) *fullname->schema*)
+      (error "~&Unknown schema with fullname: ~A" fullname)))
 
 (defun parse-union (union-list)
   (loop
@@ -85,21 +84,18 @@ parsing."
                                     :schemas (coerce schemas 'vector)))))
 
 (defun parse-jso (jso)
-  (declare (special *fullname->schema*))
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
       (list (parse-union type))
       (st-json:jso (parse-jso type)) ; TODO does this recurse properly?
       (string
        (cond
-         ((nth-value 1 (gethash type *fullname->schema*))
-          (parse-string type))
          ((string= type "record") (parse-record jso))
          ((string= type "enum") (parse-enum jso))
          ((string= type "array") (parse-array jso))
          ((string= type "map") (parse-map jso))
          ((string= type "fixed") (parse-fixed jso))
-         (t (error "~&Unknown type: ~A" type)))))))
+         (t (parse-string type)))))))
 
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
