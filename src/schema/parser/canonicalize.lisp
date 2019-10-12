@@ -20,11 +20,21 @@
 (defgeneric canonicalize (schema))
 
 
+(defmethod canonicalize :before ((schema named-type))
+  (declare (special *namespace* *schema->name*))
+  (let ((name (deduce-fullname (name schema) (namespace schema) *namespace*)))
+    (setf (gethash schema *schema->name*) name)))
+
 (defmethod canonicalize :around (schema)
+  (declare (special *schema->name*))
   (let ((*namespace* (when (boundp '*namespace*)
                        (symbol-value '*namespace*))))
     (declare (special *namespace*))
-    (call-next-method)))
+    ;; if schema's already been seen, then just keep the current one
+    ;; and let %write-schema replace it with its name.
+    (if (nth-value 1 (gethash schema *schema->name*))
+        schema
+        (call-next-method))))
 
 ;; specialize canonicalize methods for primitive avro types:
 (defmethods-for-primitives canonicalize nil (schema)

@@ -23,14 +23,13 @@
 If CANONICAL-FORM is true, then return the Canonical Form as defined
 in the avro spec."
   (let ((*schema->name* (make-hash-table :test #'eq))
-        (schema (if canonical-form
-                    (canonicalize schema)
-                    schema))
         (st-json:*output-literal-unicode*
          (or canonical-form
              st-json:*output-literal-unicode*)))
     (declare (special *schema->name*))
-    (%write-schema schema)))
+    (%write-schema (if canonical-form
+                       (canonicalize schema)
+                       schema))))
 
 
 (defgeneric %write-schema (schema))
