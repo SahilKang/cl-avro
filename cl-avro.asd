@@ -29,12 +29,12 @@
                #:salza2)
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
-  :serial t
   :pathname "src"
   :components
   ((:file "package")
-   (:file "common")
+   (:file "common" :depends-on ("package"))
    (:module "schema"
+            :depends-on ("common")
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
@@ -46,16 +46,19 @@
                        (:file "write" :depends-on ("canonicalize"))))
              (:file "fingerprint" :depends-on ("parser"))))
    (:module "io"
+            :depends-on ("schema")
             :components
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
              (:file "complex" :depends-on ("stream"))
              (:file "resolve" :depends-on ("primitive"))))
    (:module "object-container-file"
+            :depends-on ("io")
             :components
             ((:file "header")
              (:file "read" :depends-on ("header"))
-             (:file "write" :depends-on ("header"))))))
+             (:file "write" :depends-on ("header"))))
+   (:file "single-object-encoding" :depends-on ("io"))))
 
 
 (asdf:defsystem #:cl-avro/test
@@ -70,4 +73,5 @@
   ((:file "object-container-file")
    (:file "parser")
    (:file "resolve")
-   (:file "fingerprint")))
+   (:file "fingerprint")
+   (:file "single-object-encoding")))
