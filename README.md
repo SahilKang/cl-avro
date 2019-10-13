@@ -13,9 +13,6 @@ and there are a few TODOS:
 * [sort order](https://avro.apache.org/docs/1.9.0/spec.html#order)
 is not supported.
 
-* [single-object encoding](https://avro.apache.org/docs/1.9.0/spec.html#single_object_encoding)
-is not supported.
-
 * [Avro RPC](https://avro.apache.org/docs/1.9.0/spec.html#Protocol+Declaration)
 is not implemented.
 

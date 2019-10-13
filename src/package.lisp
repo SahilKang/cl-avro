@@ -41,6 +41,7 @@
    #:record-schema
    #:field-schema
 
+   ;; methods on complex schemas
    #:name
    #:namespace
    #:aliases
@@ -54,9 +55,6 @@
    #:field-type
    #:order
    #:field-schemas
-   #:fingerprint
-   #:*default-fingerprint-algorithm*
-   #:avro-64bit-crc
 
    ;; io
    #:validp
@@ -74,4 +72,14 @@
    #:sync
    #:read-block
    #:write-block
-   #:skip-block))
+   #:skip-block
+
+   ;; fingerprinting avro schemas
+   #:fingerprint
+   #:*default-fingerprint-algorithm*
+   #:avro-64bit-crc
+
+   ;; avro single object encoding
+   #:single-object-p
+   #:write-single-object
+   #:read-single-object))
