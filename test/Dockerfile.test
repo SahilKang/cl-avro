@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
             --eval '(sb-ext:save-lisp-and-die \
                       "test-image" \
                       :toplevel (lambda () \
-                                  (asdf:operate :test-op :cl-avro)))' \
+                                  (asdf:test-system :cl-avro)))' \
             --end-toplevel-options \
     && mkdir /app \
     && mv ./test-image /app/test-image
