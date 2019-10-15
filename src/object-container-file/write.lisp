@@ -48,14 +48,14 @@
 (defmethod initialize-instance :after
     ((file-output-stream file-output-stream)
      &key
-       (stream-or-vector (error "Must supply :stream-or-vector."))
+       (output (error "Must supply :output stream or resizable vector."))
        (schema (error "Must provide avro :schema."))
        (codec "null")
        (sync nil syncp)
        (meta (make-hash-table :test #'equal)))
   "SCHEMA and CODEC override avro.schema and avro.codec values in META."
   (check-type codec (enum "null" "deflate" "snappy"))
-  (check-type stream-or-vector (or stream vector))
+  (check-type output (or stream vector))
   (unless syncp
     (setf sync (make-random-sync)))
   (assert-sync sync)
@@ -69,9 +69,9 @@
                                 :magic (coerce +magic+ 'vector)
                                 :meta meta
                                 :sync sync)
-          output-stream (if (typep stream-or-vector 'vector)
-                            (make-instance 'output-stream :bytes stream-or-vector)
-                            stream-or-vector))))
+          output-stream (if (typep output 'vector)
+                            (make-instance 'output-stream :bytes output)
+                            output))))
 
 (defmethod schema ((file-output-stream file-output-stream))
   (with-slots (header) file-output-stream

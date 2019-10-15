@@ -56,7 +56,7 @@
          with in = (make-instance 'avro:file-input-stream :input stream)
          with out = (make-instance 'avro:file-output-stream
                                    :schema (avro:schema in)
-                                   :stream-or-vector bytes)
+                                   :output bytes)
          for block = (avro:read-block in)
          until (eq block :eof)
          do (avro:write-block out block)))
