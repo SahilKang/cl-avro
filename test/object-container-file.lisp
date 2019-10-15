@@ -35,7 +35,7 @@
           (actual (loop
                      with records = nil
                      with stream = (make-instance 'avro:file-input-stream
-                                                  :stream-or-seq stream)
+                                                  :input stream)
                      for block = (avro:read-block stream)
                      until (eq block :eof)
                      do (setf records (concatenate 'list records block))
@@ -53,10 +53,10 @@
                            :fill-pointer 0)))
     (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
       (loop
-         with in = (make-instance 'avro:file-input-stream :stream-or-seq stream)
+         with in = (make-instance 'avro:file-input-stream :input stream)
          with out = (make-instance 'avro:file-output-stream
                                    :schema (avro:schema in)
-                                   :stream-or-vector bytes)
+                                   :output bytes)
          for block = (avro:read-block in)
          until (eq block :eof)
          do (avro:write-block out block)))
@@ -68,7 +68,7 @@
           (actual (loop
                      with records = nil
                      with stream = (make-instance 'avro:file-input-stream
-                                                  :stream-or-seq bytes)
+                                                  :input bytes)
                      for block = (avro:read-block stream)
                      until (eq block :eof)
                      do (setf records (concatenate 'list records block))
@@ -81,7 +81,7 @@
 
 (test skip-block
   (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
-    (let ((stream (make-instance 'avro:file-input-stream :stream-or-seq stream)))
+    (let ((stream (make-instance 'avro:file-input-stream :input stream)))
       (is (avro:skip-block stream))
       (is (null (avro:skip-block stream)))
       (is (eq :eof (avro:read-block stream))))))

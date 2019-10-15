@@ -112,13 +112,13 @@
 
 (defmethod initialize-instance :after
     ((file-input-stream file-input-stream)
-     &key (stream-or-seq (error "Must supply :stream-or-seq.")))
-  (check-type stream-or-seq (or stream sequence))
+     &key (input (error "Must supply :input stream or sequence.")))
+  (check-type input (or stream sequence))
   (with-slots (file-block input-stream header) file-input-stream
-    (setf input-stream (if (typep stream-or-seq 'sequence)
+    (setf input-stream (if (typep input 'sequence)
                            (make-instance 'input-stream
-                                          :bytes (coerce stream-or-seq 'vector))
-                           stream-or-seq)
+                                          :bytes (coerce input 'vector))
+                           input)
           header (read-header input-stream)
           file-block (get-next-file-block input-stream header))))
 
