@@ -21,14 +21,12 @@
   (:documentation
    "Determine if OBJECT is valid according to avro SCHEMA."))
 
-(defgeneric deserialize (stream-or-seq reader-schema &optional writer-schema)
+(defgeneric deserialize (input reader-schema &optional writer-schema)
   (:documentation
-   "Deserialize next object from STREAM-OR-SEQ according to READER-SCHEMA.
+   "Deserialize next object from INPUT according to READER-SCHEMA.
 
 If WRITER-SCHEMA is non-nil, then deserialization is performed after schema
-resolution.
-
-:EOF is returned if STREAM-OR-SEQ is empty."))
+resolution."))
 
 (defgeneric serialize (output-stream schema object)
   (:documentation

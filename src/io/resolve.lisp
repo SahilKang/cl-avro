@@ -60,9 +60,9 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
     (declare (special *reader-namespace* *writer-namespace*))
     (call-next-method)))
 
-(defmethod deserialize :around (stream-or-seq schema &optional writer-schema)
+(defmethod deserialize :around (input schema &optional writer-schema)
   (if writer-schema
-      (call-next-method stream-or-seq (resolve schema writer-schema))
+      (call-next-method input (resolve schema writer-schema))
       (call-next-method)))
 
 
