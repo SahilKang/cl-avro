@@ -83,7 +83,7 @@ parsing."
      finally (return (make-instance 'union-schema
                                     :schemas (coerce schemas 'vector)))))
 
-(defun parse-jso (jso)
+(defun %parse-jso (jso)
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
       (list (parse-union type))
@@ -96,6 +96,23 @@ parsing."
          ((string= type "map") (parse-map jso))
          ((string= type "fixed") (parse-fixed jso))
          (t (parse-string type)))))))
+
+(defun parse-logical (logical-type jso)
+  (declare (string logical-type)
+           (st-json:jso jso))
+  (let ((underlying-schema (parse-schema (st-json:getjso "type" jso))))
+    (handler-case
+        (cond
+          ((string= logical-type "decimal") (parse-decimal underlying-schema jso))
+          (t underlying-schema))
+      (error ()
+        underlying-schema))))
+
+(defun parse-jso (jso)
+  (let ((logical-type (st-json:getjso "logicalType" jso)))
+    (if (stringp logical-type)
+        (parse-logical logical-type jso)
+        (%parse-jso jso))))
 
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
@@ -305,3 +322,9 @@ parsing."
     (bytes-schema
      (check-type default string)
      (babel:string-to-octets default :encoding :latin-1))))
+
+(defun parse-decimal (underlying-schema jso)
+  (with-fields (precision scale) jso
+    (apply #'make-instance
+           'decimal-schema
+           (make-kwargs (precision scale) underlying-schema))))

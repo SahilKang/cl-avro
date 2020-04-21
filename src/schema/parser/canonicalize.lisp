@@ -87,3 +87,10 @@
    'field-schema
    :name (name schema)
    :field-type (canonicalize (field-type schema))))
+
+(defmethod canonicalize ((schema decimal-schema))
+  (make-instance
+   'decimal-schema
+   :scale (scale schema)
+   :precision (precision schema)
+   :underlying-schema (canonicalize (underlying-schema schema))))

@@ -267,6 +267,14 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
   (resolve writer-schema reader-schema))
 
 
+(defmethod matchp ((reader-schema decimal-schema) (writer-schema decimal-schema))
+  (and (= (scale reader-schema) (scale writer-schema))
+       (= (precision reader-schema) (precision writer-schema))))
+
+(defmethod resolve ((reader-schema decimal-schema) (writer-schema decimal-schema))
+  reader-schema)
+
+
 ;; specialize matchp and resolve methods for primitive avro types:
 
 (defmethods-for-primitives matchp nil (reader-schema writer-schema)

@@ -56,6 +56,11 @@
    #:order
    #:field-schemas
 
+   ;; logical avro schemas
+   #:decimal-schema
+   #:scale
+   #:precision
+
    ;; io
    #:validp
    #:serialize

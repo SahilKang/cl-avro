@@ -194,3 +194,11 @@ in the avro spec."
 
     (bytes-schema
      (babel:octets-to-string default :encoding :latin-1))))
+
+(defmethod %write-schema ((schema decimal-schema))
+  (st-json:jso
+   "type" (st-json:read-json
+           (%write-schema (underlying-schema schema)))
+   "logicalType" "decimal"
+   "precision" (precision schema)
+   "scale" (scale schema)))
