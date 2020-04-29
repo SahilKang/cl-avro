@@ -134,13 +134,13 @@ parsing."
        ,@mvb-forms
        ,@body)))
 
-(defmacro make-kwargs ((&rest always-included) &rest included-only-when-non-nil)
-  "Expects p-suffixed symbols of INCLUDED-ONLY-WHEN-NON-NIL to also exist."
+(defmacro make-kwargs ((&rest from-jso) &rest not-from-jso)
+  "Expects p-suffixed symbols of FROM-JSO to also exist."
   (flet ((->keyword (symbol)
            (intern (symbol-name symbol) 'keyword)))
     (let* ((args (gensym))
            (initial-args (loop
-                            for symbol in always-included
+                            for symbol in not-from-jso
                             collect (->keyword symbol)
                             collect symbol))
            (when-forms (mapcar
@@ -148,7 +148,7 @@ parsing."
                           `(when ,(+p symbol)
                              (push ,symbol ,args)
                              (push ,(->keyword symbol) ,args)))
-                        included-only-when-non-nil)))
+                        from-jso)))
       `(let ((,args (list ,@initial-args)))
          ,@when-forms
          ,args))))
@@ -158,14 +158,14 @@ parsing."
     (register-named-schema
      (apply #'make-instance
             'enum-schema
-            (make-kwargs (name symbols default) namespace aliases doc)))))
+            (make-kwargs (name symbols default namespace aliases doc))))))
 
 (defun parse-fixed (jso)
   (with-fields (name namespace aliases size) jso
     (register-named-schema
      (apply #'make-instance
             'fixed-schema
-            (make-kwargs (name size) namespace aliases)))))
+            (make-kwargs (name size namespace aliases))))))
 
 (defun parse-array (jso)
   (with-fields (items) jso
@@ -190,7 +190,7 @@ parsing."
            (record (apply
                     #'make-instance
                     'record-schema
-                    (make-kwargs (name field-schemas) namespace doc aliases))))
+                    (make-kwargs (name namespace doc aliases) field-schemas))))
       (let ((*namespace* (deduce-namespace name namespace *namespace*)))
         (declare (special *namespace*))
         (register-named-schema record)
