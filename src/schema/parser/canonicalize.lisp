@@ -100,3 +100,6 @@
 
 (defmethod canonicalize ((schema (eql 'date-schema)))
   (canonicalize 'int-schema))
+
+(defmethod canonicalize ((schema (eql 'time-millis-schema)))
+  (canonicalize 'int-schema))

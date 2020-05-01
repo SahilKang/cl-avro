@@ -288,7 +288,8 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
           (defmethod resolve (reader-schema (writer-schema (eql ',logical-schema)))
             (resolve reader-schema ',underlying-schema)))))
   (defmethods uuid-schema string-schema)
-  (defmethods date-schema int-schema))
+  (defmethods date-schema int-schema)
+  (defmethods time-millis-schema int-schema))
 
 
 ;; specialize matchp and resolve methods for primitive avro types:
