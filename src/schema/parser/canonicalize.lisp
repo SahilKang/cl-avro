@@ -97,3 +97,6 @@
 
 (defmethod canonicalize ((schema (eql 'uuid-schema)))
   (canonicalize 'string-schema))
+
+(defmethod canonicalize ((schema (eql 'date-schema)))
+  (canonicalize 'int-schema))

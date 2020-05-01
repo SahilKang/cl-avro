@@ -207,3 +207,8 @@ in the avro spec."
   (st-json:jso
    "type" "string"
    "logicalType" "uuid"))
+
+(defmethod %write-schema ((schema (eql 'date-schema)))
+  (st-json:jso
+   "type" "int"
+   "logicalType" "date"))

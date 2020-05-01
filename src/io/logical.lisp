@@ -104,3 +104,18 @@
                       (schema (eql 'uuid-schema))
                       (object string))
   (serialize stream 'string-schema object))
+
+
+(defmethod validp ((schema (eql 'date-schema)) object)
+  (typep object schema))
+
+(defmethod deserialize ((stream stream)
+                        (schema (eql 'date-schema))
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
+  (deserialize stream 'int-schema))
+
+(defmethod serialize ((stream stream)
+                      (schema (eql 'date-schema))
+                      (object integer))
+  (serialize stream 'int-schema object))

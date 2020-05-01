@@ -275,17 +275,20 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
   reader-schema)
 
 
-(defmethod matchp ((reader-schema (eql 'uuid-schema)) writer-schema)
-  (matchp 'string-schema writer-schema))
+(macrolet
+    ((defmethods (logical-schema underlying-schema)
+       `(progn
+          (defmethod matchp ((reader-schema (eql ',logical-schema)) writer-schema)
+            (matchp ',underlying-schema writer-schema))
+          (defmethod matchp (reader-schema (writer-schema (eql ',logical-schema)))
+            (matchp reader-schema ',underlying-schema))
 
-(defmethod matchp (reader-schema (writer-schema (eql 'uuid-schema)))
-  (matchp reader-schema 'string-schema))
-
-(defmethod resolve ((reader-schema (eql 'uuid-schema)) writer-schema)
-  (resolve 'string-schema writer-schema))
-
-(defmethod resolve (reader-schema (writer-schema (eql 'uuid-schema)))
-  (resolve reader-schema 'string-schema))
+          (defmethod resolve ((reader-schema (eql ',logical-schema)) writer-schema)
+            (resolve ',underlying-schema writer-schema))
+          (defmethod resolve (reader-schema (writer-schema (eql ',logical-schema)))
+            (resolve reader-schema ',underlying-schema)))))
+  (defmethods uuid-schema string-schema)
+  (defmethods date-schema int-schema))
 
 
 ;; specialize matchp and resolve methods for primitive avro types:

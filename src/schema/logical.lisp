@@ -110,3 +110,8 @@
 (deftype uuid-schema ()
   "Represents the avro uuid schema."
   '(satisfies uuid-schema-p))
+
+
+(deftype date-schema ()
+  "Represents the avro date schema."
+  'int-schema)

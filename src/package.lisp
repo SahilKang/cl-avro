@@ -62,6 +62,7 @@
    #:precision
 
    #:uuid-schema
+   #:date-schema
 
    ;; io
    #:validp
