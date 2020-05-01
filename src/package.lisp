@@ -61,6 +61,8 @@
    #:scale
    #:precision
 
+   #:uuid-schema
+
    ;; io
    #:validp
    #:serialize

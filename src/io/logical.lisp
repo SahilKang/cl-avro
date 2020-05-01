@@ -84,3 +84,23 @@
                                :adjustable nil)))
     (write-twos-complement object byte-buf)
     (serialize stream (underlying-schema schema) byte-buf)))
+
+
+(defmethod validp ((schema (eql 'uuid-schema)) object)
+  (typep object schema))
+
+(defmethod deserialize ((stream stream)
+                        (schema (eql 'uuid-schema))
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
+  (let ((string (deserialize stream 'string-schema)))
+    (unless (validp schema string)
+      (cerror "Return ~S anyway."
+              "~S is not a valid UUID according to RFC-4122"
+              string))
+    string))
+
+(defmethod serialize ((stream stream)
+                      (schema (eql 'uuid-schema))
+                      (object string))
+  (serialize stream 'string-schema object))

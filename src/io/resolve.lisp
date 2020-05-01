@@ -275,6 +275,19 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
   reader-schema)
 
 
+(defmethod matchp ((reader-schema (eql 'uuid-schema)) writer-schema)
+  (matchp 'string-schema writer-schema))
+
+(defmethod matchp (reader-schema (writer-schema (eql 'uuid-schema)))
+  (matchp reader-schema 'string-schema))
+
+(defmethod resolve ((reader-schema (eql 'uuid-schema)) writer-schema)
+  (resolve 'string-schema writer-schema))
+
+(defmethod resolve (reader-schema (writer-schema (eql 'uuid-schema)))
+  (resolve reader-schema 'string-schema))
+
+
 ;; specialize matchp and resolve methods for primitive avro types:
 
 (defmethods-for-primitives matchp nil (reader-schema writer-schema)

@@ -202,3 +202,8 @@ in the avro spec."
    "logicalType" "decimal"
    "precision" (precision schema)
    "scale" (scale schema)))
+
+(defmethod %write-schema ((schema (eql 'uuid-schema)))
+  (st-json:jso
+   "type" "string"
+   "logicalType" "uuid"))

@@ -68,3 +68,45 @@
     (setf us underlying-schema
           s scale
           p precision)))
+
+
+(declaim (inline hexp))
+(defun hexp (char)
+  (declare (character char)
+           (optimize (speed 3) (safety 0))
+           (inline digit-p))
+  "Determine if CHAR conforms to /[0-9a-z-A-Z]/"
+  (let ((char-code (char-code char)))
+    (or (digit-p char-code)
+        (in-range-p char-code #\a #\f)
+        (in-range-p char-code #\A #\F))))
+(declaim (notinline hexp))
+
+(declaim (inline rfc-4122-uuid-p))
+(defun rfc-4122-uuid-p (string)
+  (declare (string-schema string)
+           (optimize (speed 3) (safety 0))
+           (inline hexp))
+  "Determine if STRING conforms to RFC-4122."
+  (and (= 36 (length string))
+       (char= #\-
+              (schar string 8)
+              (schar string 13)
+              (schar string 18)
+              (schar string 23))
+       (loop for i from 00 below 08 always (hexp (schar string i)))
+       (loop for i from 09 below 13 always (hexp (schar string i)))
+       (loop for i from 14 below 18 always (hexp (schar string i)))
+       (loop for i from 19 below 23 always (hexp (schar string i)))
+       (loop for i from 24 below 36 always (hexp (schar string i)))))
+(declaim (notinline rfc-4122-uuid-p))
+
+(defun uuid-schema-p (string)
+  (declare (optimize (speed 3) (safety 0))
+           (inline rfc-4122-uuid-p))
+  (and (typep string 'string-schema)
+       (rfc-4122-uuid-p string)))
+
+(deftype uuid-schema ()
+  "Represents the avro uuid schema."
+  '(satisfies uuid-schema-p))

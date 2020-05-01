@@ -125,3 +125,22 @@
       (is (= expected-precision (avro:precision schema)))
       (is (= 0 (avro:scale schema)))
       (is (= expected-size (avro:size (avro::underlying-schema schema)))))))
+
+
+(test uuid
+  (let ((schema (avro:json->schema "{type: \"string\", logicalType: \"uuid\"}"))
+        (expected "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
+    (is (eq 'avro:uuid-schema schema))
+    (is (string= expected (avro:deserialize
+                           (avro:serialize nil schema expected)
+                           schema)))
+    (signals error
+      (avro:serialize nil schema "abc"))
+    (signals error
+      (avro:serialize nil schema ""))
+    (signals error
+      (avro:serialize nil schema 123))
+    (signals error
+      (avro:serialize nil schema nil)))
+  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"uuid\"}")))
+    (is (eq 'avro:bytes-schema schema))))

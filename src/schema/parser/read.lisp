@@ -103,7 +103,11 @@ parsing."
   (let ((underlying-schema (parse-schema (st-json:getjso "type" jso))))
     (handler-case
         (cond
-          ((string= logical-type "decimal") (parse-decimal underlying-schema jso))
+          ((string= logical-type "decimal")
+           (parse-decimal underlying-schema jso))
+          ((and (string= logical-type "uuid")
+                (eq underlying-schema 'string-schema))
+           'uuid-schema)
           (t underlying-schema))
       (error ()
         underlying-schema))))

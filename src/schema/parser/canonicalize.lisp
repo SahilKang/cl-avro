@@ -94,3 +94,6 @@
    :scale (scale schema)
    :precision (precision schema)
    :underlying-schema (canonicalize (underlying-schema schema))))
+
+(defmethod canonicalize ((schema (eql 'uuid-schema)))
+  (canonicalize 'string-schema))
