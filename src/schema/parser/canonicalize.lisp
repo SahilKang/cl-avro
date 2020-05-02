@@ -103,3 +103,6 @@
 
 (defmethod canonicalize ((schema (eql 'time-millis-schema)))
   (canonicalize 'int-schema))
+
+(defmethod canonicalize ((schema (eql 'time-micros-schema)))
+  (canonicalize 'long-schema))

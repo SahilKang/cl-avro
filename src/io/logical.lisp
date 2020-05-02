@@ -139,3 +139,23 @@
                       (schema (eql 'time-millis-schema))
                       (object integer))
   (serialize stream 'int-schema object))
+
+
+(defmethod validp ((schema (eql 'time-micros-schema)) object)
+  (typep object schema))
+
+(defmethod deserialize ((stream stream)
+                        (schema (eql 'time-micros-schema))
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
+  (let ((long (deserialize stream 'long-schema)))
+    (unless (validp schema long)
+      (cerror "Return ~S anyway."
+              "~S is not a valid number of microseconds after midnight"
+              long))
+    long))
+
+(defmethod serialize ((stream stream)
+                      (schema (eql 'time-micros-schema))
+                      (object integer))
+  (serialize stream 'long-schema object))

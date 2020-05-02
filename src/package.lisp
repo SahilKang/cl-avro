@@ -64,6 +64,7 @@
    #:uuid-schema
    #:date-schema
    #:time-millis-schema
+   #:time-micros-schema
 
    ;; io
    #:validp

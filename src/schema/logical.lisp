@@ -120,3 +120,8 @@
 (deftype time-millis-schema ()
   "Represents the avro time-millis schema."
   '(integer 0 #.(1- (expt 2 31))))
+
+
+(deftype time-micros-schema ()
+  "Represents the avro time-micros schema."
+  '(integer 0 #.(1- (expt 2 63))))
