@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -87,3 +87,33 @@
    'field-schema
    :name (name schema)
    :field-type (canonicalize (field-type schema))))
+
+(defmethod canonicalize ((schema decimal-schema))
+  (make-instance
+   'decimal-schema
+   :scale (scale schema)
+   :precision (precision schema)
+   :underlying-schema (canonicalize (underlying-schema schema))))
+
+(defmethod canonicalize ((schema (eql 'uuid-schema)))
+  (canonicalize 'string-schema))
+
+(defmethod canonicalize ((schema (eql 'date-schema)))
+  (canonicalize 'int-schema))
+
+(defmethod canonicalize ((schema (eql 'time-millis-schema)))
+  (canonicalize 'int-schema))
+
+(defmethod canonicalize ((schema (eql 'time-micros-schema)))
+  (canonicalize 'long-schema))
+
+(defmethod canonicalize ((schema (eql 'timestamp-millis-schema)))
+  (canonicalize 'long-schema))
+
+(defmethod canonicalize ((schema (eql 'timestamp-micros-schema)))
+  (canonicalize 'long-schema))
+
+(defmethod canonicalize ((schema duration-schema))
+  (make-instance
+   'duration-schema
+   :underlying-schema (canonicalize (underlying-schema schema))))

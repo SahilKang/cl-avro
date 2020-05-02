@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -265,6 +265,51 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
 
 (defmethod resolve (reader-schema (writer-schema union-schema))
   (resolve writer-schema reader-schema))
+
+
+(defmethod matchp ((reader-schema decimal-schema) (writer-schema decimal-schema))
+  (and (= (scale reader-schema) (scale writer-schema))
+       (= (precision reader-schema) (precision writer-schema))))
+
+(defmethod resolve ((reader-schema decimal-schema) (writer-schema decimal-schema))
+  reader-schema)
+
+
+(macrolet
+    ((defmethods (logical-schema underlying-schema)
+       `(progn
+          (defmethod matchp ((reader-schema (eql ',logical-schema)) writer-schema)
+            (matchp ',underlying-schema writer-schema))
+          (defmethod matchp (reader-schema (writer-schema (eql ',logical-schema)))
+            (matchp reader-schema ',underlying-schema))
+
+          (defmethod resolve ((reader-schema (eql ',logical-schema)) writer-schema)
+            (resolve ',underlying-schema writer-schema))
+          (defmethod resolve (reader-schema (writer-schema (eql ',logical-schema)))
+            (resolve reader-schema ',underlying-schema)))))
+  (defmethods uuid-schema string-schema)
+  (defmethods date-schema int-schema)
+  (defmethods time-millis-schema int-schema)
+  (defmethods time-micros-schema long-schema)
+  (defmethods timestamp-millis-schema long-schema)
+  (defmethods timestamp-micros-schema long-schema))
+
+
+(defmethod matchp ((reader-schema duration-schema) (writer-schema duration-schema))
+  t)
+
+(defmethod matchp ((reader-schema duration-schema) (writer-schema fixed-schema))
+  (= (size (underlying-schema reader-schema))
+     (size writer-schema)))
+
+(defmethod matchp ((reader-schema fixed-schema) (writer-schema duration-schema))
+  (matchp writer-schema reader-schema))
+
+(defmethod resolve ((reader-schema duration-schema) writer-schema)
+  reader-schema)
+
+(defmethod resolve (reader-schema (writer-schema duration-schema))
+  reader-schema)
 
 
 ;; specialize matchp and resolve methods for primitive avro types:

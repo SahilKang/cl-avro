@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -83,7 +83,7 @@ parsing."
      finally (return (make-instance 'union-schema
                                     :schemas (coerce schemas 'vector)))))
 
-(defun parse-jso (jso)
+(defun %parse-jso (jso)
   (let ((type (st-json:getjso "type" jso)))
     (etypecase type
       (list (parse-union type))
@@ -96,6 +96,44 @@ parsing."
          ((string= type "map") (parse-map jso))
          ((string= type "fixed") (parse-fixed jso))
          (t (parse-string type)))))))
+
+(defun parse-logical (logical-type jso)
+  (declare (string logical-type)
+           (st-json:jso jso))
+  (let ((underlying-schema (parse-schema (st-json:getjso "type" jso))))
+    (handler-case
+        (cond
+          ((string= logical-type "decimal")
+           (parse-decimal underlying-schema jso))
+          ((and (string= logical-type "uuid")
+                (eq underlying-schema 'string-schema))
+           'uuid-schema)
+          ((and (string= logical-type "date")
+                (eq underlying-schema 'int-schema))
+           'date-schema)
+          ((and (string= logical-type "time-millis")
+                (eq underlying-schema 'int-schema))
+           'time-millis-schema)
+          ((and (string= logical-type "time-micros")
+                (eq underlying-schema 'long-schema))
+           'time-micros-schema)
+          ((and (string= logical-type "timestamp-millis")
+                (eq underlying-schema 'long-schema))
+           'timestamp-millis-schema)
+          ((and (string= logical-type "timestamp-micros")
+                (eq underlying-schema 'long-schema))
+           'timestamp-micros-schema)
+          ((string= logical-type "duration")
+           (make-instance 'duration-schema :underlying-schema underlying-schema))
+          (t underlying-schema))
+      (error ()
+        underlying-schema))))
+
+(defun parse-jso (jso)
+  (let ((logical-type (st-json:getjso "logicalType" jso)))
+    (if (stringp logical-type)
+        (parse-logical logical-type jso)
+        (%parse-jso jso))))
 
 ;; some schema objects have name but not namespace
 ;; this prevents a NO-APPLICABLE-METHOD-ERROR
@@ -134,13 +172,13 @@ parsing."
        ,@mvb-forms
        ,@body)))
 
-(defmacro make-kwargs ((&rest always-included) &rest included-only-when-non-nil)
-  "Expects p-suffixed symbols of INCLUDED-ONLY-WHEN-NON-NIL to also exist."
+(defmacro make-kwargs ((&rest from-jso) &rest not-from-jso)
+  "Expects p-suffixed symbols of FROM-JSO to also exist."
   (flet ((->keyword (symbol)
            (intern (symbol-name symbol) 'keyword)))
     (let* ((args (gensym))
            (initial-args (loop
-                            for symbol in always-included
+                            for symbol in not-from-jso
                             collect (->keyword symbol)
                             collect symbol))
            (when-forms (mapcar
@@ -148,7 +186,7 @@ parsing."
                           `(when ,(+p symbol)
                              (push ,symbol ,args)
                              (push ,(->keyword symbol) ,args)))
-                        included-only-when-non-nil)))
+                        from-jso)))
       `(let ((,args (list ,@initial-args)))
          ,@when-forms
          ,args))))
@@ -158,14 +196,14 @@ parsing."
     (register-named-schema
      (apply #'make-instance
             'enum-schema
-            (make-kwargs (name symbols default) namespace aliases doc)))))
+            (make-kwargs (name symbols default namespace aliases doc))))))
 
 (defun parse-fixed (jso)
   (with-fields (name namespace aliases size) jso
     (register-named-schema
      (apply #'make-instance
             'fixed-schema
-            (make-kwargs (name size) namespace aliases)))))
+            (make-kwargs (name size namespace aliases))))))
 
 (defun parse-array (jso)
   (with-fields (items) jso
@@ -190,7 +228,7 @@ parsing."
            (record (apply
                     #'make-instance
                     'record-schema
-                    (make-kwargs (name field-schemas) namespace doc aliases))))
+                    (make-kwargs (name namespace doc aliases) field-schemas))))
       (let ((*namespace* (deduce-namespace name namespace *namespace*)))
         (declare (special *namespace*))
         (register-named-schema record)
@@ -305,3 +343,9 @@ parsing."
     (bytes-schema
      (check-type default string)
      (babel:string-to-octets default :encoding :latin-1))))
+
+(defun parse-decimal (underlying-schema jso)
+  (with-fields (precision scale) jso
+    (apply #'make-instance
+           'decimal-schema
+           (make-kwargs (precision scale) underlying-schema))))

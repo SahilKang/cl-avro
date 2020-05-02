@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -55,6 +55,19 @@
    #:field-type
    #:order
    #:field-schemas
+
+   ;; logical avro schemas
+   #:decimal-schema
+   #:scale
+   #:precision
+
+   #:uuid-schema
+   #:date-schema
+   #:time-millis-schema
+   #:time-micros-schema
+   #:timestamp-millis-schema
+   #:timestamp-micros-schema
+   #:duration-schema
 
    ;; io
    #:validp

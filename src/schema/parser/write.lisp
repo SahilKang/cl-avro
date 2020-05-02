@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -194,3 +194,47 @@ in the avro spec."
 
     (bytes-schema
      (babel:octets-to-string default :encoding :latin-1))))
+
+(defmethod %write-schema ((schema decimal-schema))
+  (st-json:jso
+   "type" (st-json:read-json
+           (%write-schema (underlying-schema schema)))
+   "logicalType" "decimal"
+   "precision" (precision schema)
+   "scale" (scale schema)))
+
+(defmethod %write-schema ((schema (eql 'uuid-schema)))
+  (st-json:jso
+   "type" "string"
+   "logicalType" "uuid"))
+
+(defmethod %write-schema ((schema (eql 'date-schema)))
+  (st-json:jso
+   "type" "int"
+   "logicalType" "date"))
+
+(defmethod %write-schema ((schema (eql 'time-millis-schema)))
+  (st-json:jso
+   "type" "int"
+   "logicalType" "time-millis"))
+
+(defmethod %write-schema ((schema (eql 'time-micros-schema)))
+  (st-json:jso
+   "type" "long"
+   "logicalType" "time-micros"))
+
+(defmethod %write-schema ((schema (eql 'timestamp-millis-schema)))
+  (st-json:jso
+   "type" "long"
+   "logicalType" "timestamp-millis"))
+
+(defmethod %write-schema ((schema (eql 'timestamp-micros-schema)))
+  (st-json:jso
+   "type" "long"
+   "logicalType" "timestamp-micros"))
+
+(defmethod %write-schema ((schema duration-schema))
+  (st-json:jso
+   "type" (st-json:read-json
+           (%write-schema (underlying-schema schema)))
+   "logicalType" "duration"))

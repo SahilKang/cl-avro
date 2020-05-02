@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -38,6 +38,7 @@
             :components
             ((:file "primitive")
              (:file "complex" :depends-on ("primitive"))
+             (:file "logical" :depends-on ("complex"))
              (:module "parser"
                       :depends-on ("complex")
                       :components
@@ -51,6 +52,7 @@
             ((:file "primitive")
              (:file "stream" :depends-on ("primitive"))
              (:file "complex" :depends-on ("stream"))
+             (:file "logical" :depends-on ("complex"))
              (:file "resolve" :depends-on ("primitive"))))
    (:module "object-container-file"
             :depends-on ("io")
@@ -74,4 +76,5 @@
    (:file "parser")
    (:file "resolve")
    (:file "fingerprint")
-   (:file "single-object-encoding")))
+   (:file "single-object-encoding")
+   (:file "logical")))
