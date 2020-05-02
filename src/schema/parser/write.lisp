@@ -222,3 +222,8 @@ in the avro spec."
   (st-json:jso
    "type" "long"
    "logicalType" "time-micros"))
+
+(defmethod %write-schema ((schema (eql 'timestamp-millis-schema)))
+  (st-json:jso
+   "type" "long"
+   "logicalType" "timestamp-millis"))

@@ -65,6 +65,7 @@
    #:date-schema
    #:time-millis-schema
    #:time-micros-schema
+   #:timestamp-millis-schema
 
    ;; io
    #:validp

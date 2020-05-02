@@ -290,7 +290,8 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
   (defmethods uuid-schema string-schema)
   (defmethods date-schema int-schema)
   (defmethods time-millis-schema int-schema)
-  (defmethods time-micros-schema long-schema))
+  (defmethods time-micros-schema long-schema)
+  (defmethods timestamp-millis-schema long-schema))
 
 
 ;; specialize matchp and resolve methods for primitive avro types:

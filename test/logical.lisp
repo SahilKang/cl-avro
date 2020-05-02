@@ -189,3 +189,18 @@
       (avro:serialize nil schema nil)))
   (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"time-micros\"}")))
     (is (eq 'avro:bytes-schema schema))))
+
+
+(test timestamp-millis
+  (let ((schema (avro:json->schema "{type: \"long\", logicalType: \"timestamp-millis\"}"))
+        (expected 123))
+    (is (eq 'avro:timestamp-millis-schema schema))
+    (is (= expected (avro:deserialize
+                     (avro:serialize nil schema expected)
+                     schema)))
+    (signals error
+      (avro:serialize nil schema "abc"))
+    (signals error
+      (avro:serialize nil schema nil)))
+  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"timestamp-millis\"}")))
+    (is (eq 'avro:bytes-schema schema))))
