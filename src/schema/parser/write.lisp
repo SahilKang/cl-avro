@@ -232,3 +232,9 @@ in the avro spec."
   (st-json:jso
    "type" "long"
    "logicalType" "timestamp-micros"))
+
+(defmethod %write-schema ((schema duration-schema))
+  (st-json:jso
+   "type" (st-json:read-json
+           (%write-schema (underlying-schema schema)))
+   "logicalType" "duration"))

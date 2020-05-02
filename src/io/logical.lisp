@@ -189,3 +189,38 @@
                       (schema (eql 'timestamp-micros-schema))
                       (object integer))
   (serialize stream 'long-schema object))
+
+
+(defmethod validp ((schema duration-schema) object)
+  (and (typep object '(typed-vector (unsigned-byte 32)))
+       (= 3 (length object))))
+
+(defmethod deserialize ((stream stream)
+                        (schema duration-schema)
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
+  (loop
+     with out-buf = (make-array 3 :element-type '(unsigned-byte 32) :fill-pointer 0)
+     with in-buf = (deserialize stream (underlying-schema schema))
+
+     ;; in-buf is length 12
+     for i below 12 by 4
+     for num = (read-little-endian (subseq in-buf i (+ i 4)))
+     do (vector-push num out-buf)
+
+     finally (return out-buf)))
+
+(defmethod serialize ((stream stream)
+                      (schema duration-schema)
+                      (object vector))
+  (loop
+     with bytes = (make-array 12 :element-type '(unsigned-byte 8) :fill-pointer 0)
+     with buf = (make-array 4 :element-type '(unsigned-byte 8))
+
+     ;; object is length 3
+     for i below 3
+     do
+       (write-little-endian (elt object i) buf)
+       (loop for byte across buf do (vector-push byte bytes))
+
+     finally (serialize stream (underlying-schema schema) bytes)))

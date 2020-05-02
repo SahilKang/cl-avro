@@ -123,6 +123,8 @@ parsing."
           ((and (string= logical-type "timestamp-micros")
                 (eq underlying-schema 'long-schema))
            'timestamp-micros-schema)
+          ((string= logical-type "duration")
+           (make-instance 'duration-schema :underlying-schema underlying-schema))
           (t underlying-schema))
       (error ()
         underlying-schema))))

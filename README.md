@@ -16,9 +16,6 @@ is not supported.
 * [Avro RPC](https://avro.apache.org/docs/1.9.0/spec.html#Protocol+Declaration)
 is not implemented.
 
-* [Logical Types](https://avro.apache.org/docs/1.9.0/spec.html#Logical+Types)
-are not supported.
-
 # Examples
 
 ```lisp

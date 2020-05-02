@@ -135,3 +135,19 @@
 (deftype timestamp-micros-schema ()
   "Represents the avro timestamp-micros schema."
   'long-schema)
+
+
+(defclass duration-schema (logical-schema)
+  ((underlying-schema
+    :type fixed-schema))
+  (:documentation
+   "Represents an avro duration schema."))
+
+(defmethod initialize-instance :after
+    ((duration-schema duration-schema)
+     &key (underlying-schema (error "Must supply :underlying-schema")))
+  (check-type underlying-schema fixed-schema)
+  (unless (= 12 (size underlying-schema))
+    (error "Size of fixed-schema must be 12, not ~S" (size underlying-schema)))
+  (with-slots ((us underlying-schema)) duration-schema
+    (setf us underlying-schema)))

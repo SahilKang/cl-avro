@@ -295,6 +295,23 @@ Resolution is determined by the Schema Resolution rules in the avro spec."))
   (defmethods timestamp-micros-schema long-schema))
 
 
+(defmethod matchp ((reader-schema duration-schema) (writer-schema duration-schema))
+  t)
+
+(defmethod matchp ((reader-schema duration-schema) (writer-schema fixed-schema))
+  (= (size (underlying-schema reader-schema))
+     (size writer-schema)))
+
+(defmethod matchp ((reader-schema fixed-schema) (writer-schema duration-schema))
+  (matchp writer-schema reader-schema))
+
+(defmethod resolve ((reader-schema duration-schema) writer-schema)
+  reader-schema)
+
+(defmethod resolve (reader-schema (writer-schema duration-schema))
+  reader-schema)
+
+
 ;; specialize matchp and resolve methods for primitive avro types:
 
 (defmethods-for-primitives matchp nil (reader-schema writer-schema)

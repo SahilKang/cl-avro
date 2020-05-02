@@ -112,3 +112,8 @@
 
 (defmethod canonicalize ((schema (eql 'timestamp-micros-schema)))
   (canonicalize 'long-schema))
+
+(defmethod canonicalize ((schema duration-schema))
+  (make-instance
+   'duration-schema
+   :underlying-schema (canonicalize (underlying-schema schema))))

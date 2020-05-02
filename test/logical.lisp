@@ -219,3 +219,29 @@
       (avro:serialize nil schema nil)))
   (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"timestamp-micros\"}")))
     (is (eq 'avro:bytes-schema schema))))
+
+
+(test duration
+  (flet ((make-json (size)
+           (format nil
+                   "{type: {type: \"fixed\", name: \"foo\", size: ~A},
+                     logicalType: \"duration\"}"
+                   size)))
+    (let* ((size 12)
+           (schema (avro:json->schema (make-json size)))
+           (expected #(2 4 6)))
+      (is (eq 'avro:duration-schema (type-of schema)))
+      (is (= size (avro:size (avro::underlying-schema schema))))
+      (is (equalp expected (avro:deserialize
+                            (avro:serialize nil schema expected)
+                            schema)))
+      (signals error
+        (avro:serialize nil schema #()))
+      (signals error
+        (avro:serialize nil schema nil))
+      (signals error
+        (avro:serialize nil schema #(2 4 #.(expt 2 32)))))
+    (let* ((size 11)
+           (schema (avro:json->schema (make-json size))))
+      (is (eq 'avro:fixed-schema (type-of schema)))
+      (is (= size (avro:size schema))))))
