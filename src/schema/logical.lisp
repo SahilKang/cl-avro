@@ -130,3 +130,8 @@
 (deftype timestamp-millis-schema ()
   "Represents the avro timestamp-millis schema."
   'long-schema)
+
+
+(deftype timestamp-micros-schema ()
+  "Represents the avro timestamp-micros schema."
+  'long-schema)

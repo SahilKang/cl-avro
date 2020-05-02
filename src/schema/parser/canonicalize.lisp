@@ -109,3 +109,6 @@
 
 (defmethod canonicalize ((schema (eql 'timestamp-millis-schema)))
   (canonicalize 'long-schema))
+
+(defmethod canonicalize ((schema (eql 'timestamp-micros-schema)))
+  (canonicalize 'long-schema))

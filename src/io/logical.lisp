@@ -174,3 +174,18 @@
                       (schema (eql 'timestamp-millis-schema))
                       (object integer))
   (serialize stream 'long-schema object))
+
+
+(defmethod validp ((schema (eql 'timestamp-micros-schema)) object)
+  (typep object schema))
+
+(defmethod deserialize ((stream stream)
+                        (schema (eql 'timestamp-micros-schema))
+                        &optional writer-schema)
+  (declare (ignore writer-schema))
+  (deserialize stream 'long-schema))
+
+(defmethod serialize ((stream stream)
+                      (schema (eql 'timestamp-micros-schema))
+                      (object integer))
+  (serialize stream 'long-schema object))
