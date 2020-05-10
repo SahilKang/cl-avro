@@ -10,9 +10,6 @@ This was written against the
 [Avro 1.9.0 spec](https://avro.apache.org/docs/1.9.0/spec.html)
 and there are a few TODOS:
 
-* [sort order](https://avro.apache.org/docs/1.9.0/spec.html#order)
-is not supported.
-
 * [Avro RPC](https://avro.apache.org/docs/1.9.0/spec.html#Protocol+Declaration)
 is not implemented.
 
