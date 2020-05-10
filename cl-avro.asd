@@ -53,7 +53,8 @@
              (:file "stream" :depends-on ("primitive"))
              (:file "complex" :depends-on ("stream"))
              (:file "logical" :depends-on ("complex"))
-             (:file "resolve" :depends-on ("primitive"))))
+             (:file "resolve" :depends-on ("primitive"))
+             (:file "compare" :depends-on ("stream"))))
    (:module "object-container-file"
             :depends-on ("io")
             :components
@@ -77,4 +78,5 @@
    (:file "resolve")
    (:file "fingerprint")
    (:file "single-object-encoding")
-   (:file "logical")))
+   (:file "logical")
+   (:file "compare")))

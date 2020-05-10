@@ -75,6 +75,7 @@
    #:deserialize
    #:json->schema
    #:schema->json
+   #:compare
 
    ;; avro object container files
    #:file-input-stream
