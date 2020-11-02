@@ -17,321 +17,542 @@
 
 (in-package #:cl-avro)
 
-(defgeneric validp (schema object)
-  (:documentation
-   "Determine if OBJECT is valid according to avro SCHEMA."))
+;; TODO this should return a second value: number of bytes read
+(defgeneric deserialize (reader-schema input &optional writer-schema)
+  (:method (reader-schema (bytes simple-vector) &optional writer-schema)
+    (declare (ignore writer-schema)
+             (optimize (speed 3) (safety 0)))
+    (let ((stream (make-instance 'byte-vector-input-stream :bytes bytes)))
+      (deserialize reader-schema stream)))
 
-(defgeneric deserialize (input reader-schema &optional writer-schema)
   (:documentation
    "Deserialize next object from INPUT according to READER-SCHEMA.
 
-If WRITER-SCHEMA is non-nil, then deserialization is performed after schema
-resolution."))
+If WRITER-SCHEMA is non-nil, then schema resolution is performed
+before deserialization."))
 
-(defgeneric serialize (output-stream schema object)
+;; TODO this should return a second value: number of bytes written
+;; when stream is nil, then it should return only bytes written
+(defgeneric serialize (schema object &optional stream)
+  (:method :before (schema object &optional stream)
+    (declare (ignore stream)
+             (optimize (speed 3) (safety 0)))
+    (assert-valid schema object))
+
+  (:method :around (schema object &optional stream)
+    (declare (inline to-simple-vector)
+             (optimize (speed 3) (safety 0)))
+    (if stream
+        (call-next-method)
+        (let ((stream (make-instance 'byte-vector-output-stream)))
+          (call-next-method schema object stream)
+          (to-simple-vector stream))))
+
   (:documentation
-   "Serialize OBJECT into OUTPUT-STREAM according to avro SCHEMA.
+   "Serialize OBJECT into STREAM according to avro SCHEMA.
 
-If OUTPUT-STREAM is nil, then the serialized bytes are returned as a vector."))
+If STREAM is nil, then the serialized bytes are returned as a vector."))
 
+;;; avro primitive schemas
 
-;; specialize validp methods for primitive avro types:
-(macrolet
-    ((make-validp-methods ()
-       (let ((defmethods (mapcar
-                          (lambda (schema)
-                            `(defmethod validp ((schema (eql ',schema)) object)
-                               (typep object schema)))
-                          +primitive-schemas+)))
-         `(progn
-            ,@defmethods))))
-  (make-validp-methods))
+;; null-schema
 
-(defmethod serialize :before (output-stream schema object)
-  (unless (validp schema object)
-    (error "~&Object ~A does not match schema ~A" object schema)))
-
-
-(defclass input-stream (fundamental-binary-input-stream)
-  ((bytes
-    :initform (error "Must supply :bytes")
-    :initarg :bytes
-    :type (typed-vector (unsigned-byte 8)))
-   (position
-    :initform 0
-    :type (integer 0)))
-  (:documentation
-   "A binary input stream backed by a vector of bytes."))
-
-(defmethod stream-read-byte ((stream input-stream))
-  (with-slots (bytes position) stream
-    (if (= position (length bytes))
-        :eof
-        (prog1 (elt bytes position)
-          (incf position)))))
-
-(defmethod stream-element-type ((stream input-stream))
-  '(unsigned-byte 8))
-
-(defclass output-stream (fundamental-binary-output-stream)
-  ((bytes
-    :initform (make-array 0
-                          :element-type '(unsigned-byte 8)
-                          :adjustable t
-                          :fill-pointer 0)
-    :initarg :bytes
-    :type (typed-vector (unsigned-byte 8))
-    :reader bytes))
-  (:documentation
-   "A binary output stream backed by a vector of bytes."))
-
-(defmethod stream-write-byte ((stream output-stream) (byte integer))
-  (check-type byte (unsigned-byte 8))
-  (with-slots (bytes) stream
-    (vector-push-extend byte bytes))
-  byte)
-
-(defmethod stream-element-type ((stream output-stream))
-  '(unsigned-byte 8))
-
-
-(defmethod deserialize ((bytes sequence) schema &optional writer-schema)
-  (declare (ignore writer-schema))
-  (let ((input-stream (make-instance 'input-stream :bytes (coerce bytes 'vector))))
-    (deserialize input-stream schema)))
-
-(defmethod serialize ((nada null) schema object)
-  "Return a vector of bytes instead of serializing to a stream."
-  (declare (ignore nada))
-  (let ((output-stream (make-instance 'output-stream)))
-    (serialize output-stream schema object)
-    (bytes output-stream)))
-
-
-;;; null-schema
-
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'null-schema))
+(defmethod deserialize ((schema (eql 'null-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as zero bytes."
-  (declare (ignore writer-schema))
+  "Read zero bytes from STREAM and return nil."
+  (declare (ignore schema stream writer-schema)
+           (optimize (speed 3) (safety 0)))
   nil)
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'null-schema))
-                      object)
-  "Written as zero bytes."
+(defmethod serialize ((schema (eql 'null-schema))
+                      (nada null)
+                      &optional stream)
+  "Write zero bytes to STREAM."
+  (declare (ignore schema nada stream)
+           (optimize (speed 3) (safety 0)))
   nil)
 
-;;; boolean-schema
+;; boolean-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'boolean-schema))
+(defmethod deserialize ((schema (eql 'boolean-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as a single byte whose value is either 0 (false) or 1 (true)."
-  (declare (ignore writer-schema))
-  (let ((byte (read-byte stream nil :eof)))
-    (elt '(nil t) byte)))
+  "Read a byte from STREAM and return nil if it's 0 or t if it's 1."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (ecase (read-byte stream)
+    (0 nil)
+    (1 t)))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'boolean-schema))
-                      object)
-  "Written as a single byte whose value is either 0 (false) or 1 (true)."
-  (write-byte (if object 1 0) stream))
+(defmethod serialize ((schema (eql 'boolean-schema))
+                      boolean
+                      &optional stream)
+  "Write byte 1 to STREAM if BOOLEAN is non-nil; otherwise, write byte 0."
+  (declare (ignore schema)
+           (boolean-schema boolean)
+           (optimize (speed 3) (safety 0)))
+  (write-byte (if boolean 1 0) stream))
 
-;;; int-schema
+;; int-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'int-schema))
+(defmacro read-zig-zag (n)
+  (let ((nn (gensym)))
+    `(let ((,nn ,n))
+       (logxor (ash ,nn -1) (- (logand ,nn 1))))))
+
+(defmacro write-zig-zag (n)
+  (let ((nn (gensym)))
+    `(let ((,nn ,n))
+       (logxor (ash ,nn 1) (ash ,nn -63)))))
+
+(defmacro read-variable-length-number (stream bits)
+  (declare (symbol stream)
+           ((member 32 64) bits))
+  (let* ((max-bytes (truncate bits 7))
+         (error-message
+           (format nil "Too many bytes for number, expected ~S bytes max" max-bytes)))
+    `(loop
+       with value of-type (unsigned-byte ,bits) = 0
+
+       for offset of-type fixnum below ,max-bytes
+
+       for byte of-type (unsigned-byte 8) = (read-byte ,stream)
+       do (setf value (logior value (ash (logand byte #x7f)
+                                         (* 7 offset))))
+
+       when (zerop (logand byte #x80))
+         return value
+
+       finally (error ,error-message))))
+
+(defmacro write-variable-length-number (stream number)
+  (declare (symbol stream))
+  `(loop
+     for number = ,number then (ash number -7)
+     until (zerop (logand number (lognot #x7f)))
+     for byte = (logior (logand number #x7f) #x80)
+
+     do (write-byte byte ,stream)
+
+     finally (write-byte (logand number #xff) ,stream)))
+
+(defmethod deserialize ((schema (eql 'int-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as variable-length zig-zag."
-  (declare (ignore writer-schema))
-  (read-number stream 32))
+  "Read a 32-bit variable-length zig-zag integer from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (read-zig-zag (read-variable-length-number stream 32)))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'int-schema))
-                      object)
-  "Written as variable-length zig-zag."
-  (write-number stream object 32))
+(defmethod serialize ((schema (eql 'int-schema))
+                      (integer integer)
+                      &optional stream)
+  "Write 32-bit variable-length zig-zag INTEGER to STREAM."
+  (declare (ignore schema)
+           (int-schema integer)
+           (optimize (speed 3) (safety 0)))
+  (write-variable-length-number stream (write-zig-zag integer)))
 
-;;; long-schema
+;; long-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'long-schema))
+(defmethod deserialize ((schema (eql 'long-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as variable-length zig-zag."
-  (declare (ignore writer-schema))
-  (read-number stream 64))
+  "Read a 64-bit variable-length zig-zag integer from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (read-zig-zag (read-variable-length-number stream 64)))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'long-schema))
-                      object)
-  "Written as variable-length zig-zag."
-  (write-number stream object 64))
+(defmethod serialize ((schema (eql 'long-schema))
+                      (integer integer)
+                      &optional stream)
+  "Write 64-bit variable-length zig-zag INTEGER to STREAM."
+  (declare (ignore schema)
+           (long-schema integer)
+           (optimize (speed 3) (safety 0)))
+  (write-variable-length-number stream (write-zig-zag integer)))
 
-;;; float-schema
+;; float-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'float-schema))
+(defmacro read-little-endian (bytes bits &optional (start 0))
+  "Read from BYTES starting at START."
+  (declare (symbol bytes)
+           ((member 32 64) bits)
+           ((or int-schema symbol) start))
+  (let ((type `(unsigned-byte ,bits)))
+    `(loop
+       with value of-type ,type = 0
+
+       for offset below ,(truncate bits 8)
+       ;; TODO should use gensyms for loop variables
+       for index = ,start then (1+ index)
+       for byte of-type (unsigned-byte 8) = (svref ,bytes index)
+
+       do (setf value (logior value (ash byte (* offset 8))))
+
+       finally (return value))))
+
+(defmacro write-little-endian (number bits bytes &optional (start 0))
+  "Write into BYTES starting at START and return BYTES."
+  (declare (symbol bytes)
+           ((member 32 64) bits)
+           ((or int-schema symbol) start)
+           ((or int-schema symbol cons) number))
+  (let ((num (gensym)))
+    `(loop
+       with ,num = ,number
+
+       for offset below ,(truncate bits 8)
+
+       for byte = (logand #xff (ash ,num (* offset -8)))
+       ;; TODO should use gensyms for loop variables
+       for index = ,start then (1+ index)
+       do (setf (svref ,bytes index) byte)
+
+       finally (return ,bytes))))
+
+(defunc ieee-function (encode/decode bits)
+  (declare ((member encode decode) encode/decode)
+           ((member 32 64) bits))
+  (let ((name (format nil "~S-FLOAT~S" encode/decode bits)))
+    (multiple-value-bind (function status)
+        (find-symbol name 'ieee-floats)
+      (unless (eq status :external)
+        (error "~S is not external in package ~S" name 'ieee-floats))
+      (unless (fboundp function)
+        (error "~S:~S is not a function" 'ieee-floats name))
+      function)))
+
+(defmacro read-floating-point (stream bits)
+  (declare (symbol stream)
+           ((member 32 64) bits))
+  (let ((decode-float (ieee-function 'decode bits))
+        (size (truncate bits 8))
+        (buf (gensym)))
+    `(let ((,buf (make-array ,size)))
+       (unless (= (read-sequence ,buf ,stream) ,size)
+         (error 'end-of-file :stream *error-output*))
+       (,decode-float (read-little-endian ,buf ,bits)))))
+
+(defmacro write-floating-point (stream float bits)
+  (declare (symbol stream float)
+           ((member 32 64) bits))
+  (let ((encode-float (ieee-function 'encode bits))
+        (size (truncate bits 8))
+        (number (gensym))
+        (buf (gensym)))
+    `(let ((,number (,encode-float ,float))
+           (,buf (make-array ,size)))
+       (write-little-endian ,number ,bits ,buf)
+       (write-sequence ,buf ,stream))))
+
+(defmethod deserialize ((schema (eql 'float-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as 4 bytes: 32-bit little-endian ieee-754."
-  (declare (ignore writer-schema))
-  ;; might have to guarantee that this is a byte-stream
-  (read-float stream))
+  "Read a 32-bit float from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (read-floating-point stream 32))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'float-schema))
-                      object)
-  "Written as 4 bytes: 32-bit little-endian ieee-754."
-  (write-float stream object))
+(defmethod serialize ((schema (eql 'float-schema))
+                      (float single-float)
+                      &optional stream)
+  "Write 32-bit FLOAT to STREAM."
+  (declare (ignore schema)
+           (float-schema float))
+  (write-floating-point stream float 32))
 
-;;; double-schema
+;; double-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'double-schema))
+(defmethod deserialize ((schema (eql 'double-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as 8 bytes: 64-bit little-endian ieee-754."
-  (declare (ignore writer-schema))
-  (read-double stream))
+  "Read a 64-bit float from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (read-floating-point stream 64))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'double-schema))
-                      object)
-  "Written as 8 bytes: 64-bit little-endian ieee-754."
-  (write-double stream object))
+(defmethod serialize ((schema (eql 'double-schema))
+                      (double double-float)
+                      &optional stream)
+  "Write 64-bit DOUBLE to STREAM."
+  (declare (ignore schema)
+           (double-schema double))
+  (write-floating-point stream double 64))
 
-;;; bytes-schema
+;; bytes-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'bytes-schema))
+(defmethod deserialize ((schema (eql 'bytes-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as a long followed by that many bytes."
-  (declare (ignore writer-schema))
-  (let* ((size (deserialize stream 'long-schema))
-         (buf (make-array size :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence buf stream) (array-dimension buf 0))
+  "Read a vector of bytes from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((size (deserialize 'long-schema stream))
+         (buf (make-array size)))
+    (unless (= (read-sequence buf stream) size)
       (error 'end-of-file :stream *error-output*))
     buf))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'bytes-schema))
-                      (object sequence))
-  "Written as a long followed by that many bytes."
-  (serialize stream 'long-schema (length object))
-  (write-sequence object stream))
+(defmethod serialize ((schema (eql 'bytes-schema))
+                      (bytes simple-vector)
+                      &optional stream)
+  "Write BYTES to STREAM."
+  (declare (ignore schema)
+           (optimize (speed 3) (safety 0)))
+  (serialize 'long-schema (length bytes) stream)
+  (write-sequence bytes stream))
 
-;;; string-schema
+;; string-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema (eql 'string-schema))
+(defmethod deserialize ((schema (eql 'string-schema))
+                        (stream stream)
                         &optional writer-schema)
-  "Read as a long followed by that many utf-8 bytes."
-  (declare (ignore writer-schema))
-  (let ((bytes (deserialize stream 'bytes-schema)))
+  "Read a string from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((bytes (deserialize 'bytes-schema stream)))
     (babel:octets-to-string bytes :encoding :utf-8)))
 
-(defmethod serialize ((stream stream)
-                      (schema (eql 'string-schema))
-                      (object string))
-  "Written as a long followed by that many utf-8 bytes."
-  (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
-    (serialize stream 'bytes-schema bytes)))
+(defmethod serialize ((schema (eql 'string-schema))
+                      (string simple-string)
+                      &optional stream)
+  "Write STRING to STREAM."
+  (declare (ignore schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((bytes (babel:string-to-octets string :encoding :utf-8)))
+    (serialize 'bytes-schema bytes stream)))
 
+;;; avro logical schemas aliasing primitives
 
-;;; int/long utils
+;; uuid-schema
 
-(defun write-zig-zag (n)
-  (logxor (ash n 1) (ash n -63)))
+(defmethod deserialize ((schema (eql 'uuid-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a uuid string from STREAM."
+  (declare (ignore schema writer-schema)
+           (inline rfc-4122-uuid-p)
+           (optimize (speed 3) (safety 0)))
+  (let ((uuid (deserialize 'string-schema stream)))
+    (unless (rfc-4122-uuid-p uuid)
+      (cerror "Return ~S anyway."
+              "~S is not a valid UUID according to RFC-4122"
+              uuid))
+    uuid))
 
-(defun read-zig-zag (n)
-  (logxor (ash n -1) (- (logand n 1))))
+(defmethod serialize ((schema (eql 'uuid-schema))
+                      (uuid simple-string)
+                      &optional stream)
+  "Write UUID to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (serialize 'string-schema uuid stream))
 
-(defun read-variable-length-number (byte-stream bits)
-  (let ((value 0))
-    (loop
-       with max-bytes = (floor bits 7)
+;; date-schema
 
-       for byte = (read-byte byte-stream nil :eof)
-       for offset from 0
+(defmethod deserialize ((schema (eql 'date-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a date local-time:timestamp from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((days (deserialize 'int-schema stream)))
+    (declare (date-schema days))
+    (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+      (offset :day days))))
 
-       if (eq byte :eof)
-       do (error 'end-of-file :stream *error-output*)
+(defmethod serialize ((schema (eql 'date-schema))
+                      (date local-time:timestamp)
+                      &optional stream)
+  "Write DATE to STREAM."
+  (declare (ignore schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((days (truncate (the integer (local-time:timestamp-to-unix date))
+                        #.(* 60 60 24))))
+    (declare (date-schema days))
+    (serialize 'int-schema days stream)))
 
-       else if (> offset max-bytes)
-       do (error "~&Too many bytes for number, expected: ~A bytes max" max-bytes)
+;; time-millis-schema
 
-       else do (setf value (logior value (ash (logand byte #x7f)
-                                              (* 7 offset))))
+(defmethod deserialize ((schema (eql 'time-millis-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a time-of-day local-time:timestamp from STREAM."
+  (declare (ignore schema writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((milliseconds-after-midnight (deserialize 'int-schema stream))
+         (hour (multiple-value-bind (hour remainder)
+                   (truncate milliseconds-after-midnight #.(* 60 60 1000))
+                 (setf milliseconds-after-midnight remainder)
+                 hour))
+         (minute (multiple-value-bind (minute remainder)
+                     (truncate milliseconds-after-midnight #.(* 60 1000))
+                   (setf milliseconds-after-midnight remainder)
+                   minute))
+         (second (multiple-value-bind (second remainder)
+                     (truncate milliseconds-after-midnight 1000)
+                   (setf milliseconds-after-midnight remainder)
+                   second))
+         (nanosecond (* milliseconds-after-midnight 1000 1000)))
+    (declare (time-millis-schema milliseconds-after-midnight))
+    (local-time:encode-timestamp nanosecond second minute hour 1 1 1970)))
 
-       until (zerop (logand byte #x80)))
-    value))
+(defmethod serialize ((schema (eql 'time-millis-schema))
+                      (time-of-day local-time:timestamp)
+                      &optional stream)
+  "Write TIME-OF-DAY to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (local-time:with-decoded-timestamp
+      (:hour hour :minute minute :sec second :nsec nanosecond)
+      time-of-day
+    (let ((milliseconds-after-midnight (+ (* hour 60 60 1000)
+                                          (* minute 60 1000)
+                                          (* second 1000)
+                                          (truncate nanosecond #.(* 1000 1000)))))
+      (declare (time-millis-schema milliseconds-after-midnight))
+      (serialize 'int-schema milliseconds-after-midnight stream))))
 
-(defun write-variable-length-number (byte-stream number)
-  (loop
-     until (zerop (logand number (lognot #x7f)))
-     for byte = (logior (logand number #x7f) #x80)
-     do
-       (write-byte byte byte-stream)
-       (setf number (ash number -7)))
-  (write-byte (logand number #xff) byte-stream))
+;; time-micros-schema
 
-(defun get-range (bits)
-  (let* ((max (1- (expt 2 (1- bits))))
-         (min (- (1+ max))))
-    (list min max)))
+(defmethod deserialize ((schema (eql 'time-micros-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a time-of-day local-time:timestamp from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((microseconds-after-midnight (deserialize 'long-schema stream))
+         (hour (multiple-value-bind (hour remainder)
+                   (truncate microseconds-after-midnight #.(* 60 60 1000 1000))
+                 (setf microseconds-after-midnight remainder)
+                 hour))
+         (minute (multiple-value-bind (minute remainder)
+                     (truncate microseconds-after-midnight #.(* 60 1000 1000))
+                   (setf microseconds-after-midnight remainder)
+                   minute))
+         (second (multiple-value-bind (second remainder)
+                     (truncate microseconds-after-midnight #.(* 1000 1000))
+                   (setf microseconds-after-midnight remainder)
+                   second))
+         (nanosecond (* microseconds-after-midnight 1000)))
+    (declare (time-micros-schema microseconds-after-midnight))
+    (local-time:encode-timestamp nanosecond second minute hour 1 1 1970)))
 
-(defun assert-range (number bits)
-  (destructuring-bind (min max) (get-range bits)
-    (when (or (> number max) (< number min))
-      (error "~&Number ~A out-of-range for ~A-bit values" number bits))))
+(defmethod serialize ((schema (eql 'time-micros-schema))
+                      (time-of-day local-time:timestamp)
+                      &optional stream)
+  "Write TIME-OF-DAY to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (local-time:with-decoded-timestamp
+      (:hour hour :minute minute :sec second :nsec nanosecond)
+      time-of-day
+    (let ((microseconds-after-midnight (+ (* hour 60 60 1000 1000)
+                                          (* minute 60 1000 1000)
+                                          (* second 1000 1000)
+                                          (truncate nanosecond 1000))))
+      (declare (time-micros-schema microseconds-after-midnight))
+      (serialize 'long-schema microseconds-after-midnight stream))))
 
-(defun read-number (byte-stream bits)
-  (let ((number (read-zig-zag (read-variable-length-number byte-stream bits))))
-    (assert-range number bits)
-    number))
+;; timestamp-millis-schema
 
-(defun write-number (byte-stream number bits)
-  (assert-range number bits)
-  (write-variable-length-number byte-stream (write-zig-zag number)))
+(defmethod deserialize ((schema (eql 'timestamp-millis-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a timestamp local-time:timestamp from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((milliseconds-from-unix-epoch (deserialize 'long-schema stream))
+         (nanoseconds-from-unix-epoch (* milliseconds-from-unix-epoch 1000 1000))
+         (unix-epoch (local-time:unix-to-timestamp 0)))
+    (declare (timestamp-millis-schema milliseconds-from-unix-epoch))
+    (local-time:adjust-timestamp! unix-epoch
+      (offset :nsec nanoseconds-from-unix-epoch))))
 
+(defmethod serialize ((schema (eql 'timestamp-millis-schema))
+                      (timestamp local-time:timestamp)
+                      &optional stream)
+  "Write TIMESTAMP to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((milliseconds-from-unix-epoch
+          (+ (* 1000 (local-time:timestamp-to-unix timestamp))
+             (truncate (local-time:nsec-of timestamp) #.(* 1000 1000)))))
+    (declare (timestamp-millis-schema milliseconds-from-unix-epoch))
+    (serialize 'long-schema milliseconds-from-unix-epoch stream)))
 
-;;; float/double utils
+;; timestamp-micros-schema
 
-(defun read-little-endian (byte-buf)
-  (reduce (let ((offset -1))
-            (lambda (acc byte)
-              (incf offset)
-              (logior acc (ash byte (* offset 8)))))
-          byte-buf
-          :initial-value 0))
+(defmethod deserialize ((schema (eql 'timestamp-micros-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a timestamp local-time:timestamp from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((microseconds-from-unix-epoch (deserialize 'long-schema stream))
+         (nanoseconds-from-unix-epoch (* microseconds-from-unix-epoch 1000))
+         (unix-epoch (local-time:unix-to-timestamp 0)))
+    (declare (timestamp-micros-schema microseconds-from-unix-epoch))
+    (local-time:adjust-timestamp! unix-epoch
+      (offset :nsec nanoseconds-from-unix-epoch))))
 
-(defun write-little-endian (number byte-buf)
-  (loop
-     for offset below (length byte-buf)
-     for byte = (logand #xff (ash number (* offset -8)))
-     do (setf (elt byte-buf offset) byte))
-  byte-buf)
+(defmethod serialize ((schema (eql 'timestamp-micros-schema))
+                      (timestamp local-time:timestamp)
+                      &optional stream)
+  "Write TIMESTAMP to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((microseconds-from-unix-epoch
+          (+ (* 1000 1000 (local-time:timestamp-to-unix timestamp))
+             (truncate (local-time:nsec-of timestamp) 1000))))
+    (declare (timestamp-micros-schema microseconds-from-unix-epoch))
+    (serialize 'long-schema microseconds-from-unix-epoch stream)))
 
-(defun read-float (byte-stream)
-  (let ((buf (make-array 4 :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence buf byte-stream) (array-dimension buf 0))
-      (error 'end-of-file :stream *error-output*))
-    (ieee-floats:decode-float32 (read-little-endian buf))))
+;; local-timestamp-millis-schema
 
-(defun read-double (byte-stream)
-  (let ((buf (make-array 8 :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence buf byte-stream) (array-dimension buf 0))
-      (error 'end-of-file :stream *error-output*))
-    (ieee-floats:decode-float64 (read-little-endian buf))))
+(defmethod deserialize ((schema (eql 'local-timestamp-millis-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a timestamp local-time:timestamp from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((milliseconds-from-epoch (deserialize 'long-schema stream))
+         (nanoseconds-from-epoch (* milliseconds-from-epoch 1000 1000))
+         (epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970)))
+    (declare (local-timestamp-millis-schema milliseconds-from-epoch))
+    (local-time:adjust-timestamp! epoch
+      (offset :nsec nanoseconds-from-epoch))))
 
-(defun write-float (byte-stream float)
-  (let ((number (ieee-floats:encode-float32 float))
-        (buf (make-array 4 :element-type '(unsigned-byte 8))))
-    (write-little-endian number buf)
-    (write-sequence buf byte-stream)))
+(defmethod serialize ((schema (eql 'local-timestamp-millis-schema))
+                      (timestamp local-time:timestamp)
+                      &optional stream)
+  "Write TIMESTAMP to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+         (seconds-from-epoch (local-time:timestamp-difference epoch timestamp))
+         (milliseconds-from-epoch (truncate (* 1000 seconds-from-epoch))))
+    (declare (local-timestamp-millis-schema milliseconds-from-epoch))
+    (serialize 'long-schema milliseconds-from-epoch stream)))
 
-(defun write-double (byte-stream double)
-  (let ((number (ieee-floats:encode-float64 double))
-        (buf (make-array 8 :element-type '(unsigned-byte 8))))
-    (write-little-endian number buf)
-    (write-sequence buf byte-stream)))
+;; local-timestamp-micros-schema
+
+(defmethod deserialize ((schema (eql 'local-timestamp-micros-schema))
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a timestamp local-time:timestamp from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((microseconds-from-epoch (deserialize 'long-schema stream))
+         (nanoseconds-from-epoch (* microseconds-from-epoch 1000))
+         (epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970)))
+    (declare (local-timestamp-micros-schema microseconds-from-epoch))
+    (local-time:adjust-timestamp! epoch
+      (offset :nsec nanoseconds-from-epoch))))
+
+(defmethod serialize ((schema (eql 'local-timestamp-micros-schema))
+                      (timestamp local-time:timestamp)
+                      &optional stream)
+  "Write TIMESTAMP to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+         (seconds-from-epoch (local-time:timestamp-difference epoch timestamp))
+         (microseconds-from-epoch (truncate (* 1000 1000 seconds-from-epoch))))
+    (declare (local-timestamp-micros-schema microseconds-from-epoch))
+    (serialize 'long-schema microseconds-from-epoch stream)))

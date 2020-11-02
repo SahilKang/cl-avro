@@ -17,39 +17,39 @@
 
 (in-package #:cl-avro)
 
-(defparameter +empty+ #xc15d213aa4d7a795)
+(declaim ((unsigned-byte 64) +empty+))
+#.(defparameter +empty+ #xc15d213aa4d7a795)
 
-(defun make-fingerprint-table ()
-  (map 'vector
-       (lambda (i)
-         (reduce (lambda (i _)
-                   (declare (ignore _))
-                   (logxor (ash i -1)
-                           (logand +empty+
-                                   (- (logand i 1)))))
-                 (loop for i below 8 collect i)
-                 :initial-value i))
-       (loop for i below 256 collect i)))
+(declaim ((simple-vector 256) +table+))
+(defparameter +table+
+  #.(map 'simple-vector
+         (lambda (i)
+           (loop
+             repeat 8
+             do (setf i (logxor (ash i -1)
+                                (logand +empty+
+                                        (- (logand i 1)))))
+             finally (return i)))
+         (loop for i below 256 collect i)))
 
-(defparameter +table+ (make-fingerprint-table))
-
-(defun avro-64bit-crc (bytes)
+(defun+ avro-64bit-crc (bytes)
+    ((vector[byte]) (unsigned-byte 64))
   (reduce (lambda (fp byte)
-            (logxor (ash fp -8)
-                    (elt +table+ (logand #xff
-                                         (logxor fp byte)))))
+            (declare ((unsigned-byte 64) fp)
+                     ((unsigned-byte 8) byte))
+            (let ((table-ref (svref +table+ (logand #xff (logxor fp byte)))))
+              (declare ((unsigned-byte 64) table-ref))
+              (logxor (ash fp -8) table-ref)))
           bytes
           :initial-value +empty+))
 
 (defparameter *default-fingerprint-algorithm* #'avro-64bit-crc
-  "Default function used by FINGERPRINT to convert a byte-vector to an integer.")
+  "Default function used by FINGERPRINT.")
 
-(defun fingerprint (schema &optional (algorithm *default-fingerprint-algorithm*))
-  "Returns the fingerprint of the avro SCHEMA object.
-
-The fingerprinting ALGORITHM should accept a byte-vector and return an
-integer."
-  (check-type schema avro-schema)
+(defun* fingerprint (schema &optional (algorithm *default-fingerprint-algorithm*))
+    ((avro-schema &optional (function (vector[byte]) (unsigned-byte 64))) (unsigned-byte 64))
+  "Return the fingerprint of avro SCHEMA under ALGORITHM."
+  (declare ((function (vector[byte]) (unsigned-byte 64)) algorithm))
   (let* ((string (schema->json schema t))
          (bytes (babel:string-to-octets string :encoding :utf-8)))
     (funcall algorithm bytes)))

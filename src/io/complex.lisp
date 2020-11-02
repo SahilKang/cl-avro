@@ -17,223 +17,292 @@
 
 (in-package #:cl-avro)
 
-;;; fixed-schema
+;;; avro complex schemas
 
-(defmethod validp ((schema fixed-schema) object)
-  (and (typep object '(typed-vector (unsigned-byte 8)))
-       (= (length object) (size schema))))
+;; fixed-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema fixed-schema)
+(defmethod deserialize ((schema fixed-schema)
+                        (stream stream)
                         &optional writer-schema)
-  "Read using the number of bytes declared in the schema."
-  (declare (ignore writer-schema))
-  (let ((buf (make-array (size schema) :element-type '(unsigned-byte 8))))
-    (loop
-       for i below (size schema)
-       do (setf (elt buf i) (read-byte stream nil :eof)))
+  "Read fixed number of bytes from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((size (fixed-schema-size schema))
+         (buf (make-array size)))
+    (unless (= size (read-sequence buf stream))
+      (error 'end-of-file :stream *error-output*))
     buf))
 
-(defmethod serialize ((stream stream)
-                      (schema fixed-schema)
-                      object)
+(defmethod serialize ((schema fixed-schema)
+                      (bytes simple-vector)
+                      &optional stream)
+  "Write BYTES to STREAM."
+  (declare (ignore schema)
+           (optimize (speed 3) (safety 0)))
+  (write-sequence bytes stream))
+
+;; union-schema
+
+(defmethod deserialize ((schema union-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a tagged-union from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((schemas (union-schema-schemas schema))
+         (position (deserialize 'long-schema stream))
+         (chosen-schema (svref schemas position))
+         (value (deserialize chosen-schema stream)))
+    (%make-tagged-union :value value :schema chosen-schema)))
+
+(defmethod serialize ((schema union-schema)
+                      (tagged-union tagged-union)
+                      &optional stream)
+  "Write TAGGED-UNION to STREAM."
+  (declare (inline schema-key)
+           (optimize (speed 3) (safety 0)))
+  (let* ((chosen-schema (tagged-union-schema tagged-union))
+         (value (tagged-union-value tagged-union))
+         (key (schema-key chosen-schema))
+         (schemas (union-schema-schemas schema))
+         (position (position key schemas :test #'equal :key #'schema-key)))
+    (serialize 'long-schema position stream)
+    (serialize chosen-schema value stream)))
+
+;; array-schema
+
+(defmethod deserialize ((schema array-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a vector from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
   (loop
-     for i below (length object)
-     do (write-byte (elt object i) stream)))
+    with array-stream = (make-instance 'array-input-stream
+                                       :schema (array-schema-items schema)
+                                       :stream stream)
 
-;;; union-schema
+    and vector = (make-array 0 :adjustable t :fill-pointer 0)
 
-(defclass union-value ()
-  ((value
-    :initform (error "Must supply :value")
-    :initarg :value
-    :reader value)
-   (position
-    :initform (error "Must supply :position")
-    :initarg :position
-    :type (integer 0))))
+    for item = (stream-read-item array-stream)
+    until (eq item :eof)
+    do (vector-push-extend item vector)
 
-(defmethod print-object ((union-value union-value) stream)
-  (with-slots (value) union-value
-    (format stream "~A" value)))
+    finally (return (coerce vector 'simple-vector))))
 
-(defmethod validp ((schema union-schema) object)
-  (some (lambda (s) (validp s object)) (schemas schema)))
+(defmethod serialize ((schema array-schema)
+                      (vector simple-vector)
+                      &optional stream)
+  "Write VECTOR to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((count (length vector))
+        (item-schema (array-schema-items schema)))
+    (unless (zerop count)
+      (serialize 'long-schema count stream)
+      (flet ((serialize (item)
+               (serialize item-schema item stream)))
+        (map nil #'serialize vector))))
+  (serialize 'long-schema 0 stream))
 
-(defmethod validp ((schema union-schema) (object union-value))
-  (with-slots (value position) object
-    (when (< position (length (schemas schema)))
-      (validp (elt (schemas schema) position) value))))
+;; map-schema
 
-(defmethod deserialize ((stream stream)
-                        (schema union-schema)
+(defmethod deserialize ((schema map-schema)
+                        (stream stream)
                         &optional writer-schema)
-  "Read with a long indicating the union type and then the value itself."
-  (declare (ignore writer-schema))
-  (let* ((pos (deserialize stream 'long-schema))
-         (val (deserialize stream (elt (schemas schema) pos))))
-    (make-instance 'union-value :value val :position pos)))
-
-(defmethod serialize ((stream stream)
-                      (schema union-schema)
-                      (object union-value))
-  (with-slots (value position) object
-    (serialize stream 'long-schema position)
-    (serialize stream (elt (schemas schema) position) value)))
-
-(defmethod serialize ((stream stream)
-                      (schema union-schema)
-                      object)
-  (let ((pos (loop
-                for schema across (schemas schema) and i from 0
-                when (validp schema object)
-                collect i)))
-    (cond
-      ((zerop (length pos))
-       (error "~&Object doesn't match any union schema: ~A" object))
-      ((> (length pos) 1)
-       (error "~&Object matches multiple union schemas: ~A" object))
-      (t
-       (let ((union-value (make-instance 'union-value
-                                         :value object
-                                         :position (first pos))))
-         (serialize stream schema union-value))))))
-
-;;; array-schema
-
-(defmethod validp ((schema array-schema) object)
-  (and (typep object 'sequence)
-       (every (lambda (elt) (validp (item-schema schema) elt)) object)))
-
-(defmethod deserialize ((stream stream)
-                        (schema array-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
+  "Read a hash-table from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
   (loop
-     with vector = (make-array 0 :adjustable t :fill-pointer 0)
-     with array-stream = (make-instance 'array-input-stream
-                                        :input-stream stream
-                                        :schema (item-schema schema))
+    with map-stream = (make-instance 'map-input-stream
+                                     :schema (map-schema-values schema)
+                                     :stream stream)
 
-     for item = (stream-read-item array-stream)
-     until (eq item :eof)
-     do (vector-push-extend item vector)
+    and hash-table = (make-hash-table :test #'equal)
 
-     finally (return vector)))
+    for pair = (stream-read-item map-stream)
+    until (eq pair :eof)
+    for (key . value) = pair
+    do (setf (gethash key hash-table) value)
 
-(defmethod serialize ((stream stream)
-                      (schema array-schema)
-                      (object sequence))
-  (let ((block-count (length object)))
-    (unless (zerop block-count)
-      (serialize stream 'long-schema block-count)
-      (loop
-         with schema = (item-schema schema)
-         for i below block-count
-         do (serialize stream schema (elt object i)))))
-  (serialize stream 'long-schema 0))
+    finally (return hash-table)))
 
-;;; map-schema
+(defmethod serialize ((schema map-schema)
+                      (hash-table hash-table)
+                      &optional stream)
+  "Write HASH-TABLE to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((count (hash-table-count hash-table))
+        (value-schema (map-schema-values schema)))
+    (unless (zerop count)
+      (serialize 'long-schema count stream)
+      (flet ((serialize (key value)
+               (serialize 'string-schema key stream)
+               (serialize value-schema value stream)))
+        (maphash #'serialize hash-table))))
+  (serialize 'long-schema 0 stream))
 
-(defmethod validp ((schema map-schema) object)
-  (and (hash-table-p object)
-       (eq (hash-table-test object) 'equal)
-       (loop
-          with value-schema = (value-schema schema)
+;; enum-schema
 
-          for key being the hash-keys of object using (hash-value value)
-
-          always (and (validp 'string-schema key)
-                      (validp value-schema value)))))
-
-(defmethod deserialize ((stream stream)
-                        (schema map-schema)
+(defmethod deserialize ((schema enum-schema)
+                        (stream stream)
                         &optional writer-schema)
-  (declare (ignore writer-schema))
+  "Read a string from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((symbols (enum-schema-symbols schema))
+        (position (deserialize 'int-schema stream)))
+    (svref symbols position)))
+
+(defmethod serialize ((schema enum-schema)
+                      (string simple-string)
+                      &optional stream)
+  "Write STRING to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((symbols (enum-schema-symbols schema))
+         (position (position string symbols :test #'string=)))
+    (serialize 'int-schema position stream)))
+
+;; record-schema
+
+(defmethod deserialize ((schema record-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a hash-table from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
   (loop
-     with hash-table = (make-hash-table :test #'equal)
-     with map-stream = (make-instance 'map-input-stream
-                                      :input-stream stream
-                                      :schema (value-schema schema))
+    with fields = (record-schema-fields schema)
+    with hash-table = (make-hash-table :test #'equal :size (length fields))
 
-     for pair = (stream-read-item map-stream)
-     until (eq pair :eof)
-     for (key val) = pair
-     do (setf (gethash key hash-table) val)
+    for field across fields
+    for name = (field-schema-name field)
+    for type = (field-schema-type field)
 
-     finally (return hash-table)))
+    for value = (deserialize type stream)
+    do (setf (gethash name hash-table) value)
 
-(defmethod serialize ((stream stream)
-                      (schema map-schema)
-                      (object hash-table))
-  (let ((block-count (hash-table-count object))
-        (value-schema (value-schema schema)))
-    (unless (zerop block-count)
-      (serialize stream 'long-schema block-count)
-      (maphash (lambda (k v)
-                 (serialize stream 'string-schema k)
-                 (serialize stream value-schema v))
-               object)))
-  (serialize stream 'long-schema 0))
+    finally (return hash-table)))
 
-;;; enum-schema
-
-(defmethod validp ((schema enum-schema) object)
-  (and (typep object 'avro-name)
-       (not (null (position object (symbols schema) :test #'string=)))))
-
-(defmethod deserialize ((stream stream)
-                        (schema enum-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (let ((pos (deserialize stream 'int-schema)))
-    (elt (symbols schema) pos)))
-
-(defmethod serialize ((stream stream)
-                      (schema enum-schema)
-                      (object string))
-  (let ((pos (position object (symbols schema) :test #'string=)))
-    (when (null pos)
-      (error "~&String not in enum: ~A" object))
-    (serialize stream 'int-schema pos)))
-
-;;; record-schema
-
-(defmethod validp ((schema record-schema) object)
-  (and (typep object 'sequence)
-       (= (length (field-schemas schema)) (length object))
-       (every #'validp (field-schemas schema) object)))
-
-(defmethod validp ((schema field-schema) object)
-  (validp (field-type schema) object))
-
-(defmethod deserialize ((stream stream)
-                        (schema record-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (let* ((field-schemas (field-schemas schema))
-         (fields (make-array (length field-schemas))))
-    (loop
-       for schema across field-schemas and i from 0
-       for value = (deserialize stream schema)
-       do (setf (elt fields i) value))
-    fields))
-
-(defmethod deserialize ((stream stream)
-                        (schema field-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (deserialize stream (field-type schema)))
-
-(defmethod serialize ((stream stream)
-                      (schema record-schema)
-                      object)
+(defmethod serialize ((schema record-schema)
+                      (hash-table hash-table)
+                      &optional stream)
+  "Write HASH-TABLE to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
   (loop
-     for schema across (field-schemas schema) and i from 0
-     for field = (elt object i)
-     do (serialize stream schema field)))
+    with fields = (record-schema-fields schema)
 
-(defmethod serialize ((stream stream)
-                      (schema field-schema)
-                      object)
-  (serialize stream (field-type schema) object))
+    for field across fields
+    for name = (field-schema-name field)
+    for type = (field-schema-type field)
+
+    for value = (gethash name hash-table)
+    do (serialize type value stream)))
+
+;;; avro logical schemas
+
+;; duration-schema
+
+(defmethod deserialize ((schema duration-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  "Read a duration from STREAM."
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let* ((fixed-schema (duration-schema-underlying-schema schema))
+         (bytes (deserialize fixed-schema stream)))
+    (%make-duration
+     :months (read-little-endian bytes 32 0)
+     :days (read-little-endian bytes 32 4)
+     :milliseconds (read-little-endian bytes 32 8))))
+
+(defmethod serialize ((schema duration-schema)
+                      (duration duration)
+                      &optional stream)
+  "Write DURATION to STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((fixed-schema (duration-schema-underlying-schema schema))
+        (bytes (make-array 12)))
+    (write-little-endian (duration-months duration) 32 bytes 0)
+    (write-little-endian (duration-days duration) 32 bytes 4)
+    (write-little-endian (duration-milliseconds duration) 32 bytes 8)
+    (serialize fixed-schema bytes stream)))
+
+;; decimal-schema
+
+(defun! read-big-endian (bytes)
+    ((vector[byte]) integer)
+  (loop
+    with value = 0
+
+    for offset from (1- (length bytes)) downto 0
+    for byte of-type (unsigned-byte 8) = (svref bytes offset)
+    for bits = (* offset 8)
+
+    do (setf value (logior value (ash byte bits)))
+
+    finally (return value)))
+
+(defun! write-big-endian (integer bytes)
+    ((integer vector[byte]) vector[byte])
+  (loop
+    for offset from (1- (length bytes)) downto 0
+    for bits = (* offset 8)
+    for byte of-type (unsigned-byte 8) = (logand #xff (ash integer (- bits)))
+
+    do (setf (svref bytes offset) byte)
+
+    finally (return bytes)))
+
+(defun! read-twos-complement (bytes)
+    ((vector[byte]) integer)
+  (declare (inline read-big-endian))
+  (let* ((bits (* 8 (length bytes)))
+         (mask (ash 2 (1- bits)))
+         (value (read-big-endian bytes)))
+    (+ (- (logand value mask))
+       (logand value (lognot mask)))))
+
+(defun! write-twos-complement (integer bytes)
+    ((integer vector[byte]) vector[byte])
+  (declare (inline write-big-endian))
+  (let ((twos-complement (if (minusp integer)
+                             (1+ (lognot (abs integer)))
+                             integer)))
+    (write-big-endian twos-complement bytes)))
+
+(defmethod deserialize ((schema decimal-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  "Read the unscaled decimal value from STREAM."
+  (declare (ignore writer-schema)
+           (inline read-twos-complement)
+           (optimize (speed 3) (safety 0)))
+  (let* ((fixed-or-bytes-schema (decimal-schema-underlying-schema schema))
+         (bytes (deserialize fixed-or-bytes-schema stream))
+         (unscaled (read-twos-complement bytes)))
+    (handler-case
+        (assert-valid schema unscaled)
+      (error ()
+        (cerror "Return ~S anyway."
+                "~S is too large for precision ~S"
+                unscaled
+                (decimal-schema-precision schema))))
+    unscaled))
+
+(defun! get-min-buf-length (integer schema)
+    ((integer (or (eql bytes-schema) fixed-schema)) (integer 0))
+  (if (fixed-schema-p schema)
+      (fixed-schema-size schema)
+      (ceiling (1+ (integer-length integer)) 8)))
+
+(defmethod serialize ((schema decimal-schema)
+                      (unscaled integer)
+                      &optional stream)
+  "Write UNSCALED to STREAM."
+  (declare (inline get-min-buf-length write-twos-complement)
+           (optimize (speed 3) (safety 0)))
+  (let* ((fixed-or-bytes-schema (decimal-schema-underlying-schema schema))
+         (min-length (get-min-buf-length unscaled fixed-or-bytes-schema))
+         (bytes (make-array min-length)))
+    (write-twos-complement unscaled bytes)
+    (serialize fixed-or-bytes-schema bytes stream)))

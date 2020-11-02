@@ -17,6 +17,8 @@
 
 (in-package #:cl-avro)
 
+(make-enum-type codec "null" "deflate" "snappy" "bzip2" "xz" "zstandard")
+
 (defgeneric schema (file-stream)
   (:documentation
    "Return avro schema used in FILE-STREAM."))

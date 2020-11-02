@@ -20,137 +20,107 @@
 ;;; good old-fashioned, gmo-free, grass-fed recursive-descent parser
 ;;; handcrafted with love in San Francisco
 
-(defun json->schema (json)
+(defmacro defun* (name (&rest args) ((&rest arg-types) result-type) &body body)
+  (declare (symbol name))
+  (let ((declarations (rip-out-declarations body)))
+    (push '(optimize (speed 3) (safety 3)) declarations)
+    `(defun+ ,name ,args
+         (,arg-types ,result-type)
+       (declare ,@declarations)
+       ,@body)))
+
+(defmacro make-fullname->schema ()
+  (let ((hash-table (gensym)))
+    `(let ((,hash-table (make-hash-table :test #'equal)))
+       (setf ,@(mapcan
+                (lambda (schema)
+                  `((gethash ,(schema->name schema) ,hash-table) ',schema))
+                *primitives*))
+       ,hash-table)))
+
+(defun* json->schema (json)
+    (((or simple-string stream)) avro-schema)
   "Return an avro schema according to JSON. JSON is a string or stream."
-  (let ((*fullname->schema* (make-schema-hash-table))
-        (*namespace* ""))
+  (let ((*fullname->schema* (make-fullname->schema))
+        (*namespace* nil))
     (declare (special *fullname->schema* *namespace*))
     (parse-schema (st-json:read-json json))))
 
-
-(defun make-schema-hash-table ()
-  "Return a hash-table mapping avro primitive type names to schemas.
-
-This hash-table is meant to be added to during the course of schema
-parsing."
-  (loop
-     with hash-table = (make-hash-table :test #'equal)
-
-     for schema in +primitive-schemas+
-     for name = (schema->name schema)
-     do (setf (gethash name hash-table) schema)
-
-     finally (return hash-table)))
-
-(defun parse-schema (json)
+(defun* parse-schema (json)
+    (((or list simple-string st-json:jso)) avro-schema)
   (etypecase json
     (list (parse-union json))
-    (string (parse-string json))
+    (simple-string (parse-string json))
     (st-json:jso (parse-jso json))))
 
-(defun parse-string (fullname)
+(defun+ parse-string (fullname)
+    ((simple-string) avro-schema)
   (declare (special *fullname->schema* *namespace*))
   (or (gethash fullname *fullname->schema*)
       (gethash (deduce-fullname fullname nil *namespace*) *fullname->schema*)
-      (error "~&Unknown schema with fullname: ~A" fullname)))
+      (error "Unknown schema with fullname: ~S" fullname)))
 
-(defun parse-union (union-list)
-  (loop
-     with seen-array-p = nil
-     with seen-map-p = nil
+(defun+ parse-union (union)
+    ((list) union-schema)
+  (make-union-schema :schemas (map 'simple-vector #'parse-schema union)))
 
-     for elem in union-list
+(defmacro string-case (key &body cases)
+  (declare (symbol key))
+  (flet ((make-clause (case)
+           (destructuring-bind (pattern &rest body)
+               case
+             (if (simple-string-p pattern)
+                 `((string= ,key ,pattern) ,@body)
+                 case))))
+    (let ((clauses (mapcar #'make-clause cases)))
+      `(cond
+         ,@clauses))))
 
-     if (typep elem 'list)
-     do (error "~&Union ~A contains an immediate union: ~A" union-list elem)
-
-     else if (typep elem 'string)
-     collect (parse-string elem) into schemas
-
-     else if (typep elem 'st-json:jso)
-     collect (let ((type (st-json:getjso "type" elem)))
-               (cond
-                 ((equal type "array")
-                  (if seen-array-p
-                      (error "~&Union ~A has more than one array" union-list)
-                      (setf seen-array-p t)))
-                 ((equal type "map")
-                  (if seen-map-p
-                      (error "~&Union ~A has more than one map" union-list)
-                      (setf seen-map-p t))))
-               (parse-jso elem)) into schemas
-
-     finally (return (make-instance 'union-schema
-                                    :schemas (coerce schemas 'vector)))))
-
-(defun %parse-jso (jso)
+(defun+ %parse-jso (jso)
+    ((st-json:jso) avro-schema)
   (let ((type (st-json:getjso "type" jso)))
-    (etypecase type
-      (list (parse-union type))
-      (st-json:jso (parse-jso type)) ; TODO does this recurse properly?
-      (string
-       (cond
-         ((string= type "record") (parse-record jso))
-         ((string= type "enum") (parse-enum jso))
-         ((string= type "array") (parse-array jso))
-         ((string= type "map") (parse-map jso))
-         ((string= type "fixed") (parse-fixed jso))
-         (t (parse-string type)))))))
+    (check-type type simple-string)
+    (string-case type
+      ("record" (parse-record jso))
+      ("enum" (parse-enum jso))
+      ("array" (parse-array jso))
+      ("map" (parse-map jso))
+      ("fixed" (parse-fixed jso))
+      (t (parse-string type)))))
 
-(defun parse-logical (logical-type jso)
-  (declare (string logical-type)
-           (st-json:jso jso))
+(defmacro logical-case (logical-type underlying-schema &body cases)
+  (declare (symbol logical-type underlying-schema))
+  (flet ((make-clause (case)
+           (destructuring-bind (pattern &rest body)
+               case
+             (typecase pattern
+               (simple-string `((string= ,logical-type ,pattern) ,@body))
+               (cons `((and (string= ,logical-type ,(first pattern))
+                            (eq ,underlying-schema ',(second pattern)))
+                       ,@body))
+               (t case)))))
+    (let ((clauses (mapcar #'make-clause cases)))
+      `(cond
+         ,@clauses))))
+
+(defun+ parse-logical (logical-type jso)
+    ((simple-string st-json:jso) avro-schema)
   (let ((underlying-schema (parse-schema (st-json:getjso "type" jso))))
     (handler-case
-        (cond
-          ((string= logical-type "decimal")
-           (parse-decimal underlying-schema jso))
-          ((and (string= logical-type "uuid")
-                (eq underlying-schema 'string-schema))
-           'uuid-schema)
-          ((and (string= logical-type "date")
-                (eq underlying-schema 'int-schema))
-           'date-schema)
-          ((and (string= logical-type "time-millis")
-                (eq underlying-schema 'int-schema))
-           'time-millis-schema)
-          ((and (string= logical-type "time-micros")
-                (eq underlying-schema 'long-schema))
-           'time-micros-schema)
-          ((and (string= logical-type "timestamp-millis")
-                (eq underlying-schema 'long-schema))
-           'timestamp-millis-schema)
-          ((and (string= logical-type "timestamp-micros")
-                (eq underlying-schema 'long-schema))
-           'timestamp-micros-schema)
-          ((string= logical-type "duration")
-           (make-instance 'duration-schema :underlying-schema underlying-schema))
+        (logical-case logical-type underlying-schema
+          ("decimal" (parse-decimal underlying-schema jso))
+          ("duration" (make-duration-schema :underlying-schema underlying-schema))
+          (("uuid" string-schema) 'uuid-schema)
+          (("date" int-schema) 'date-schema)
+          (("time-millis" int-schema) 'time-millis-schema)
+          (("time-micros" long-schema) 'time-micros-schema)
+          (("timestamp-millis" long-schema) 'timestamp-millis-schema)
+          (("timestamp-micros" long-schema) 'timestamp-micros-schema)
+          (("local-timestamp-millis" long-schema) 'local-timestamp-millis-schema)
+          (("local-timestamp-micros" long-schema) 'local-timestamp-micros-schema)
           (t underlying-schema))
       (error ()
         underlying-schema))))
-
-(defun parse-jso (jso)
-  (let ((logical-type (st-json:getjso "logicalType" jso)))
-    (if (stringp logical-type)
-        (parse-logical logical-type jso)
-        (%parse-jso jso))))
-
-;; some schema objects have name but not namespace
-;; this prevents a NO-APPLICABLE-METHOD-ERROR
-(defmethod namespace (schema)
-  (values "" nil))
-
-(defun register-named-schema (schema)
-  (declare (special *fullname->schema* *namespace*))
-  (let ((fullname (deduce-fullname (name schema) (namespace schema) *namespace*)))
-    (declare (special *namespace*))
-    (when (nth-value 1 (gethash fullname *fullname->schema*))
-      (error "~&Name is already taken: ~A" fullname))
-    (setf (gethash fullname *fullname->schema*) schema)))
-
-(defmacro +p (symbol)
-  "Returns SYMBOL with a 'p' appended to it."
-  `(read-from-string (format nil "~Sp" ,symbol)))
 
 (defmacro with-fields ((&rest fields) jso &body body)
   "Binds FIELDS as well as its elements suffixed with 'p'."
@@ -169,183 +139,151 @@ parsing."
     `(let ((,j ,jso)
            ,@fields
            ,@fieldsp)
+       (declare (st-json:jso ,j))
        ,@mvb-forms
        ,@body)))
 
-(defmacro make-kwargs ((&rest from-jso) &rest not-from-jso)
-  "Expects p-suffixed symbols of FROM-JSO to also exist."
+(defmacro make-kwargs (&rest symbols)
+  "Each symbol should exactly match with field/slot, and p suffixes should exist."
   (flet ((->keyword (symbol)
            (intern (symbol-name symbol) 'keyword)))
     (let* ((args (gensym))
-           (initial-args (loop
-                            for symbol in not-from-jso
-                            collect (->keyword symbol)
-                            collect symbol))
            (when-forms (mapcar
                         (lambda (symbol)
                           `(when ,(+p symbol)
+                             (setf ,symbol (convert-from-st-json ,symbol))
                              (push ,symbol ,args)
                              (push ,(->keyword symbol) ,args)))
-                        from-jso)))
-      `(let ((,args (list ,@initial-args)))
+                        symbols)))
+      `(let (,args)
          ,@when-forms
          ,args))))
 
-(defun parse-enum (jso)
-  (with-fields (name namespace aliases doc symbols default) jso
-    (register-named-schema
-     (apply #'make-instance
-            'enum-schema
-            (make-kwargs (name symbols default namespace aliases doc))))))
+(defun+ parse-decimal (underlying-schema jso)
+    ((avro-schema st-json:jso) decimal-schema)
+  (with-fields (precision scale) jso
+    (let ((args (make-kwargs precision scale)))
+      (push underlying-schema args)
+      (push :underlying-schema args)
+      (apply #'make-decimal-schema args))))
 
-(defun parse-fixed (jso)
-  (with-fields (name namespace aliases size) jso
-    (register-named-schema
-     (apply #'make-instance
-            'fixed-schema
-            (make-kwargs (name size namespace aliases))))))
+(defun+ parse-jso (jso)
+    ((st-json:jso) avro-schema)
+  (let ((logical-type (st-json:getjso "logicalType" jso)))
+    (if (simple-string-p logical-type)
+        (parse-logical logical-type jso)
+        (%parse-jso jso))))
 
-(defun parse-array (jso)
+(defgeneric convert-from-st-json (value)
+  (:method (value)
+    (declare (optimize (speed 3) (safety 0)))
+    value)
+
+  (:method ((value (eql :null)))
+    (declare (ignore value)
+             (optimize (speed 3) (safety 0)))
+    nil)
+
+  (:method ((value (eql :true)))
+    (declare (ignore value)
+             (optimize (speed 3) (safety 0)))
+    t)
+
+  (:method ((value (eql :false)))
+    (declare (ignore value)
+             (optimize (speed 3) (safety 0)))
+    nil)
+
+  (:method ((list list))
+    (declare (optimize (speed 3) (safety 0)))
+    (map 'simple-vector #'convert-from-st-json list))
+
+  (:method ((jso st-json:jso))
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((hash-table (make-hash-table :test #'equal)))
+      (flet ((convert (key value)
+               (setf (gethash key hash-table)
+                     (convert-from-st-json value))))
+        (st-json:mapjso #'convert jso))
+      hash-table)))
+
+(defmacro with-args ((&rest symbols) jso &body body)
+  "Binds an ARGS symbol for use in BODY."
+  `(with-fields (,@symbols) ,jso
+     (let ((args (make-kwargs ,@symbols)))
+       ,@body)))
+
+(defun* %register-named-schema (name namespace constructor args)
+    ((avro-fullname avro-namespace function list) (values))
+  (declare (special *fullname->schema* *namespace*))
+  (let ((fullname (deduce-fullname name namespace *namespace*)))
+    (when (nth-value 1 (gethash fullname *fullname->schema*))
+      (error "Name ~S is already taken" fullname))
+    (setf (gethash fullname *fullname->schema*)
+          (apply constructor args))))
+
+(defmacro register-named-schema (schema-type)
+  (declare (symbol schema-type))
+  (multiple-value-bind (constructor status)
+      (find-symbol (format nil "MAKE-~S" schema-type))
+    (unless (eq status :external)
+      (error "Constructor for ~S is not external" schema-type))
+    `(%register-named-schema name namespace #',constructor args)))
+
+(defun+ parse-enum (jso)
+    ((st-json:jso) enum-schema)
+  (with-args (name namespace aliases doc symbols default) jso
+    (register-named-schema enum-schema)))
+
+(defun+ parse-fixed (jso)
+    ((st-json:jso) fixed-schema)
+  (with-args (name namespace aliases size) jso
+    (register-named-schema fixed-schema)))
+
+(defun+ parse-array (jso)
+    ((st-json:jso) array-schema)
   (with-fields (items) jso
-    (make-instance 'array-schema
-                   :item-schema (parse-schema items))))
+    (make-array-schema :items (parse-schema items))))
 
-(defun parse-map (jso)
+(defun+ parse-map (jso)
+    ((st-json:jso) map-schema)
   (with-fields (values) jso
-    (make-instance 'map-schema
-                   :value-schema (parse-schema values))))
+    (make-map-schema :values (parse-schema values))))
 
-(defun parse-record (jso)
+(defun+ parse-record (jso)
+    ((st-json:jso) record-schema)
   (declare (special *namespace*))
   (with-fields (name namespace doc aliases fields) jso
     ;; record schemas can be recursive (fields can refer to the record
     ;; type), so let's register the record schema and then mutate the
     ;; fields vector
-    (let* ((field-schemas (make-array (length fields)
-                                      :element-type 'avro-schema
-                                      :initial-element 'null-schema
-                                      :fill-pointer 0))
-           (record (apply
-                    #'make-instance
-                    'record-schema
-                    (make-kwargs (name namespace doc aliases) field-schemas))))
-      (let ((*namespace* (deduce-namespace name namespace *namespace*)))
+    (let ((args (make-kwargs name namespace doc aliases))
+          (field-schemas (map 'simple-vector
+                              (lambda (jso)
+                                (%make-field-schema
+                                 :name (st-json:getjso "name" jso)
+                                 :type 'null-schema))
+                              fields)))
+      (push field-schemas args)
+      (push :fields args)
+      (let ((record (register-named-schema record-schema))
+            (*namespace* (deduce-namespace name namespace *namespace*)))
         (declare (special *namespace*))
-        (register-named-schema record)
         (loop
-           for field-jso in fields
-           for schema = (parse-field field-jso)
-           do (vector-push schema field-schemas))
-        record))))
+          for i below (length field-schemas)
+          for field = (parse-field (pop fields))
+          do (setf (svref field-schemas i) field)
 
-(defun parse-field (jso)
+          finally (return record))))))
+
+(defun* parse-field (jso)
+     ((st-json:jso) (values field-schema &optional))
   (with-fields (name doc type order aliases default) jso
-    (let* ((schema (parse-schema type))
-           (args (list :name name
-                       :field-type schema)))
-      (when order
-        (push order args)
-        (push :order args))
-      (when aliases
-        (push aliases args)
-        (push :aliases args))
-      (when doc
-        (push doc args)
-        (push :doc args))
-      (when default
-        (push (parse-default schema default) args)
+    (let ((args (make-kwargs name doc order aliases))
+          (type (parse-schema type)))
+      (push type args)
+      (push :type args)
+      (when defaultp
+        (push (convert-from-st-json default) args)
         (push :default args))
-      (apply #'make-instance 'field-schema args))))
-
-(defun parse-default (schema default)
-  (etypecase schema
-
-    (symbol
-     (parse-primitive-default schema default))
-
-    (enum-schema
-     (if (validp schema default)
-         default
-         (error "~&Bad default value ~S for ~S" default (type-of schema))))
-
-    (array-schema
-     (let ((default (mapcar (lambda (x)
-                              (parse-default (item-schema schema) x))
-                            default)))
-       (if (validp schema default)
-           default
-           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
-
-    (map-schema
-     (let ((default (make-hash-table :test #'equal)))
-       (st-json:mapjso (lambda (k v)
-                         (setf (gethash k default)
-                               (parse-default (value-schema schema) v)))
-                       default)
-       (if (validp schema default)
-           default
-           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
-
-    (fixed-schema
-     (check-type default string)
-     (babel:string-to-octets default :encoding :latin-1))
-
-    (union-schema
-     (let ((default (parse-default (elt (schemas schema) 0) default)))
-       (if (validp (elt (schemas schema) 0) default)
-           default
-           (error "~&Bad default value ~S for ~S" default (type-of schema)))))
-
-    (record-schema
-     (check-type default st-json:jso)
-     (let ((hash-table (make-hash-table :test #'equal))
-           (fields (field-schemas schema)))
-       (st-json:mapjso (lambda (k v) (setf (gethash k hash-table) v)) default)
-       (unless (= (length fields) (hash-table-count hash-table))
-         (error "~&Bad default value ~S for ~S" default (type-of schema)))
-       (loop
-          with vector = (make-array (length fields) :fill-pointer 0)
-
-          for field across fields
-
-          for type = (field-type field)
-          for name = (name field)
-          for (value valuep) = (multiple-value-list (gethash name hash-table))
-
-          if (not valuep)
-          do (error "~&Field ~S does not exist in default value" name)
-          else do (vector-push (parse-default type value) vector)
-
-          finally (return vector))))))
-
-(defun parse-primitive-default (schema default)
-  (ecase schema
-
-    (null-schema
-     (if (eq default :null)
-         nil
-         (error "~&Bad default value ~S for ~S" default schema)))
-
-    (boolean-schema
-     (st-json:from-json-bool default))
-
-    ((int-schema long-schema string-schema)
-     (if (validp schema default)
-         default
-         (error "~&Bad default value ~S for ~S" default schema)))
-
-    (float-schema
-     (coerce default 'single-float))
-
-    (double-schema
-     (coerce default 'double-float))
-
-    (bytes-schema
-     (check-type default string)
-     (babel:string-to-octets default :encoding :latin-1))))
-
-(defun parse-decimal (underlying-schema jso)
-  (with-fields (precision scale) jso
-    (apply #'make-instance
-           'decimal-schema
-           (make-kwargs (precision scale) underlying-schema))))
+      (apply #'make-field-schema args))))

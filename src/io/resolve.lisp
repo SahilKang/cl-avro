@@ -17,355 +17,490 @@
 
 (in-package #:cl-avro)
 
-(defun same-name-p (reader-schema writer-schema)
-  (declare (special *reader-namespace* *writer-namespace*))
-  (let* ((rnamespace (namespace reader-schema))
-         (rname (deduce-fullname (name reader-schema)
-                                 rnamespace
-                                 *reader-namespace*))
-         (wname (deduce-fullname (name writer-schema)
-                                 (namespace writer-schema)
-                                 *writer-namespace*)))
-    (if (string= rname wname)
-        t
-        (loop
-           for name across (aliases reader-schema)
-           for fullname = (deduce-fullname name rnamespace *reader-namespace*)
-           when (string= fullname wname)
-           do (return-from same-name-p t)))))
+;; TODO break out into separate files
 
+;;; assert-match
 
-(defgeneric resolve (reader-schema writer-schema)
+(defgeneric assert-match (reader writer)
+  (:method (reader writer)
+    (declare (optimize (speed 3) (safety 0)))
+    (error "Reader schema ~S does not match writer schema ~S" reader writer))
+
   (:documentation
-   "Return an avro schema that resolves the differences between the inputs.
+   "Asserts that schemas match for schema resolution."))
 
-Resolution is determined by the Schema Resolution rules in the avro spec."))
+(defun! matching-names-p (reader writer)
+    ((named-schema named-schema) boolean)
+  (declare (inline unqualified-name))
+  (let ((reader-name (unqualified-name (named-schema-name reader)))
+        (writer-name (unqualified-name (named-schema-name writer))))
+    (or (string= reader-name writer-name)
+        (some (lambda (reader-alias)
+                (string= (unqualified-name reader-alias) writer-name))
+              (named-schema-aliases reader)))))
 
-(defgeneric matchp (reader-schema writer-schema)
+(defun! assert-matching-names (reader writer)
+    ((named-schema named-schema) (values))
+  (declare (inline matching-names-p))
+  (unless (matching-names-p reader writer)
+    (error "Names don't match between reader schema ~S and writer schema ~S"
+           reader
+           writer)))
+
+;; avro primitive schemas
+
+(macrolet
+    ((defprimitives ()
+       (flet ((make-defmethod (schema)
+                `(defmethod assert-match ((reader (eql ',schema))
+                                          (writer (eql ',schema)))
+                   (declare (ignore reader writer)
+                            (optimize (speed 3) (safety 0))))))
+         `(progn
+            ,@(mapcar #'make-defmethod *primitives*)))))
+  (defprimitives))
+
+;; array-schema
+
+(defmethod assert-match ((reader array-schema)
+                         (writer array-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((reader-items (array-schema-items reader))
+        (writer-items (array-schema-items writer)))
+    (assert-match reader-items writer-items)))
+
+;; map-schema
+
+(defmethod assert-match ((reader map-schema)
+                         (writer map-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((reader-values (map-schema-values reader))
+        (writer-values (map-schema-values writer)))
+    (assert-match reader-values writer-values)))
+
+;; enum-schema
+
+(defmethod assert-match ((reader enum-schema)
+                         (writer enum-schema))
+  (declare (inline assert-matching-names)
+           (optimize (speed 3) (safety 0)))
+  (assert-matching-names reader writer))
+
+;; fixed-schema
+
+(defmethod assert-match ((reader fixed-schema)
+                         (writer fixed-schema))
+  (declare (inline assert-matching-names)
+           (optimize (speed 3) (safety 0)))
+  (let ((reader-size (fixed-schema-size reader))
+        (writer-size (fixed-schema-size writer)))
+    (unless (= reader-size writer-size)
+      (error "Reader and writer fixed schemas have different sizes: ~S and ~S"
+             reader-size
+             writer-size)))
+  (assert-matching-names reader writer))
+
+;; record-schema
+
+(defmethod assert-match ((reader record-schema)
+                         (writer record-schema))
+  (declare (inline assert-matching-names)
+           (optimize (speed 3) (safety 0)))
+  (assert-matching-names reader writer))
+
+;; union-schema
+
+(defmethod assert-match ((reader union-schema)
+                         writer)
+  (declare (ignore reader writer)
+           (optimize (speed 3) (safety 0))))
+
+(defmethod assert-match (reader
+                         (writer union-schema))
+  (declare (ignore reader writer)
+           (optimize (speed 3) (safety 0))))
+
+;; logical schemas
+
+(macrolet
+    ((defaliases ()
+       (flet ((make-defmethod (cons)
+                (destructuring-bind (logical . underlying)
+                    cons
+                  `((defmethod assert-match ((reader (eql ',logical))
+                                             writer)
+                      (declare (ignore reader)
+                               (optimize (speed 3) (safety 0)))
+                      (assert-match ',underlying writer))
+                    (defmethod assert-match (reader
+                                             (writer (eql ',logical)))
+                      (declare (ignore writer)
+                               (optimize (speed 3) (safety 0)))
+                      (assert-match reader ',underlying))))))
+         `(progn
+            ,@(mapcan #'make-defmethod *logical-aliases*)))))
+
+  (defaliases)
+
+  (defmethod assert-match ((reader logical-schema)
+                           writer)
+    (declare (optimize (speed 3) (safety 0)))
+    (assert-match (logical-schema-underlying-schema reader) writer))
+
+  (defmethod assert-match (reader
+                           (writer logical-schema))
+    (declare (optimize (speed 3) (safety 0)))
+    (assert-match reader (logical-schema-underlying-schema writer))))
+
+;; decimal-schema
+
+(defmethod assert-match ((reader decimal-schema)
+                         (writer decimal-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((reader-scale (decimal-schema-scale reader))
+        (reader-precision (decimal-schema-precision reader))
+        (writer-scale (decimal-schema-scale writer))
+        (writer-precision (decimal-schema-precision writer)))
+    (unless (= reader-scale writer-scale)
+      (error "Reader and writer's decimal scales don't match: ~S and ~S"
+             reader-scale
+             writer-scale))
+    (unless (= reader-precision writer-precision)
+      (error "Reader and writer's decimal precisions don't match: ~S and ~S"
+             reader-precision
+             writer-precision))))
+
+;; duration-schema
+
+;; TODO make sure this is okay (this ignores the name of the
+;; underlying fixed schema)
+(defmethod assert-match ((reader duration-schema)
+                         (writer duration-schema))
+  (declare (ignore reader writer)
+           (optimize (speed 3) (safety 0))))
+
+;;; resolve
+
+(defgeneric resolve (reader writer)
+  (:method :before (reader writer)
+    (declare (optimize (speed 3) (safety 0)))
+    (assert-match reader writer))
+
+  (:method resolve (reader writer)
+    (declare (ignore writer)
+             (optimize (speed 3) (safety 0)))
+    reader)
+
   (:documentation
-   "Determine if schemas match for schema resolution.")
-  (:method (reader-schema writer-schema)
-    nil))
+   "Return a schema that resolves the differences between the inputs."))
 
-
-(defmethod resolve :before (reader-schema writer-schema)
-  (unless (matchp reader-schema writer-schema)
-    (error "Schemas don't match")))
-
-(defmethod resolve :around (reader-schema writer-schema)
-  (let ((*reader-namespace* (when (boundp '*reader-namespace*)
-                              (symbol-value '*reader-namespace*)))
-        (*writer-namespace* (when (boundp '*writer-namespace*)
-                              (symbol-value '*writer-namespace*))))
-    (declare (special *reader-namespace* *writer-namespace*))
-    (call-next-method)))
-
-(defmethod deserialize :around (input schema &optional writer-schema)
+(defmethod deserialize :around (reader-schema input &optional writer-schema)
+  (declare (optimize (speed 3) (safety 0)))
   (if writer-schema
-      (call-next-method input (resolve schema writer-schema))
+      (call-next-method (resolve reader-schema writer-schema) input)
       (call-next-method)))
 
+;; array-schema
 
-(defmethod matchp ((reader-schema array-schema) (writer-schema array-schema))
-  (let ((reader-schema (item-schema reader-schema))
-        (writer-schema (item-schema writer-schema)))
-    (eq (type-of reader-schema) (type-of writer-schema))))
+(defmethod resolve ((reader array-schema)
+                    (writer array-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((reader-items (array-schema-items reader))
+        (writer-items (array-schema-items writer)))
+    (%make-array-schema :items (resolve reader-items writer-items))))
 
-(defmethod resolve ((reader-schema array-schema) (writer-schema array-schema))
-  (make-instance 'array-schema
-                 :item-schema (resolve reader-schema writer-schema)))
+;; map-schema
 
+(defmethod resolve ((reader map-schema)
+                    (writer map-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((reader-values (map-schema-values reader))
+        (writer-values (map-schema-values writer)))
+    (%make-map-schema :values (resolve reader-values writer-values))))
 
-(defmethod matchp ((reader-schema map-schema) (writer-schema map-schema))
-  (let ((reader-schema (value-schema reader-schema))
-        (writer-schema (value-schema writer-schema)))
-    (eq (type-of reader-schema) (type-of writer-schema))))
+;; enum-schema
 
-(defmethod resolve ((reader-schema map-schema) (writer-schema map-schema))
-  (make-instance 'map-schema
-                 :value-schema (resolve reader-schema writer-schema)))
+(defstruct (resolved-enum-schema
+            (:include enum-schema
+             (default (error "Must supply DEFAULT") :type avro-name :read-only t))
+            (:copier nil)
+            (:predicate nil))
+  (known-symbols (error "Must supply KNOWN-SYMBOLS") :type hash-table :read-only t))
 
-
-(defmethod matchp ((reader-schema enum-schema) (writer-schema enum-schema))
-  (same-name-p reader-schema writer-schema))
-
-(defclass resolved-enum-schema (enum-schema)
-  ((reader-symbols
-    :initarg :reader-symbols
-    :initform (error "Must supply :reader-symbols")
-    :type (typed-vector avro-name)
-    :documentation "Enum symbols known to the reader")))
-
-(defmethod deserialize :around ((stream stream)
-                                (schema resolved-enum-schema)
-                                &optional writer-schema)
-  (declare (ignore writer-schema))
-  (with-slots (reader-symbols) schema
-    (let ((string (call-next-method)))
-      (if (position string reader-symbols :test #'string=)
-          string
-          (nth-value 0 (default schema))))))
-
-(defmethod resolve ((reader-schema enum-schema) (writer-schema enum-schema))
-  ;; from the spec:
-  ;; if the writer's symbol is not present in the reader's enum and
-  ;; the reader has a default value, then that value is used,
-  ;; otherwise an error is signalled.
-  (unless (set-difference (coerce (symbols writer-schema) 'list)
-                          (coerce (symbols reader-schema) 'list)
-                          :test #'string=)
-    (return-from resolve reader-schema))
-
-  (unless (default reader-schema)
-    (error "~&Reader enum has no default value for unknown writer symbols"))
-
-  (make-instance 'resolved-enum-schema
-                 :name (name reader-schema)
-                 :default (default reader-schema)
-                 :symbols (symbols writer-schema)
-                 :reader-symbols (symbols reader-schema)))
-
-
-(defmethod matchp ((reader-schema fixed-schema) (writer-schema fixed-schema))
-  (let ((rsize (size reader-schema))
-        (wsize (size writer-schema)))
-    (and (same-name-p reader-schema writer-schema) (= rsize wsize))))
-
-(defmethod resolve ((reader-schema fixed-schema) (writer-schema fixed-schema))
-  reader-schema)
-
-
-(defmethod matchp ((reader-schema record-schema) (writer-schema record-schema))
-  (same-name-p reader-schema writer-schema))
-
-(defclass resolved-record-schema (record-schema)
-  ((windex->rindex
-    :initarg :windex->rindex
-    :initform (error "Must supply :windex->rindex hash-table")
-    :type hash-table
-    :documentation "Maps the writer's index to the reader's index.")
-   (rindex->default
-    :initarg :rindex->default
-    :initform (error "Must supply :rindex->default hash-table")
-    :type hash-table
-    :documentation
-    "Indicates which indices should be filled with reader defaults.")))
-
-(defmethod deserialize :around ((stream stream)
-                                (schema resolved-record-schema)
-                                &optional writer-schema)
-  (declare (ignore writer-schema))
-  (with-slots (windex->rindex rindex->default) schema
-    (let ((rfields (make-array (+ (hash-table-count windex->rindex)
-                                  (hash-table-count rindex->default))))
-          (wfields (call-next-method)))
-      (maphash (lambda (windex rindex)
-                 (setf (elt rfields rindex) (elt wfields windex)))
-               windex->rindex)
-      (maphash (lambda (rindex default)
-                 (setf (elt rfields rindex) default))
-               rindex->default)
-      rfields)))
-
-(defmethod resolve ((reader-schema record-schema) (writer-schema record-schema))
-  (declare (special *reader-namespace* *writer-namespace*))
-  (let ((windex->rindex (make-hash-table :test #'eql))
-        (rindex->default (make-hash-table :test #'eql))
-        (new-fields (copy-seq (field-schemas writer-schema)))
-        (*reader-namespace* (deduce-namespace (name reader-schema)
-                                              (namespace reader-schema)
-                                              *reader-namespace*))
-        (*writer-namespace* (deduce-namespace (name writer-schema)
-                                              (namespace writer-schema)
-                                              *writer-namespace*)))
-    (declare (special *reader-namespace* *writer-namespace*))
-    ;; from the spec:
-    ;; * the ordering of fields may be different: fields are matched by name.
-    ;; * schemas for fields with the same name in both records are resolved
-    ;;   recursively.
-    ;; * if the writer's record contains a field with a name not present in
-    ;;   the reader's record, the writer's value for that field is ignored.
-    ;; * if the reader's record schema has a field that contains a default
-    ;;   value, and writer's schema does not have a field with the same name,
-    ;;   then the reader should use the default value from its field.
-    ;; * if the reader's record schema has a field with no default value,
-    ;;   and writer's schema does not have a field with the same name,
-    ;;   an error is signalled.
-    (loop
-       with wfields = (field-schemas writer-schema)
-       with rfields = (field-schemas reader-schema)
-
-       for wfield across wfields and windex from 0
-       for rindex = (position-if (lambda (rfield)
-                                   (same-name-p rfield wfield))
-                                 rfields)
-
-       when rindex
-       do (let* ((rfield (elt rfields rindex))
-                 (*reader-namespace* (deduce-namespace (name rfield)
-                                                       nil
-                                                       *reader-namespace*))
-                 (*writer-namespace* (deduce-namespace (name wfield)
-                                                       nil
-                                                       *writer-namespace*)))
-            (declare (special *reader-namespace* *writer-namespace*))
-            (setf (gethash windex windex->rindex) rindex
-                  (elt new-fields windex) (make-instance
-                                           'field-schema
-                                           :name (name rfield)
-                                           :field-type (resolve
-                                                        (field-type rfield)
-                                                        (field-type wfield))))))
-    (loop
-       with rfields = (field-schemas reader-schema)
-       with accounted-for = (loop
-                               for v being the hash-values of windex->rindex
-                               collect v)
-       with unaccounted-for = (set-difference (loop
-                                                 for i below (length rfields)
-                                                 collect i)
-                                              accounted-for)
-
-       for rindex in unaccounted-for
-       for rfield = (elt rfields rindex)
-       for (default defaultp) = (multiple-value-list (default rfield))
-
-       if defaultp
-       do (setf (gethash rindex rindex->default) default)
-       else do (error "~&No default reader field for unknown writer field."))
-    (make-instance 'resolved-record-schema
-                   :name (name reader-schema)
-                   :field-schemas new-fields
-                   :windex->rindex windex->rindex
-                   :rindex->default rindex->default)))
-
-
-(defmethod matchp ((reader-schema union-schema) writer-schema)
-  t)
-
-(defmethod matchp (reader-schema (writer-schema union-schema))
-  t)
-
-(defmethod resolve ((reader-schema union-schema) (writer-schema union-schema))
+(defun! get-known-symbols (reader)
+    ((enum-schema) hash-table)
   (loop
-     with wschemas = (schemas writer-schema)
+    with symbols = (enum-schema-symbols reader)
+    with known-symbols = (make-hash-table :test #'equal :size (length symbols))
 
-     for rschema across (schemas reader-schema)
-     for match = (find-if (lambda (x) (matchp rschema x)) wschemas)
-     when match
-     do (return-from resolve (resolve rschema match)))
-  (error "~&Union schemas don't match"))
+    for symbol across symbols
+    do (setf (gethash symbol known-symbols) t)
 
-(defmethod resolve ((reader-schema union-schema) writer-schema)
+    finally (return known-symbols)))
+
+(defun! all-known-symbols-p (known-symbols writer)
+    ((hash-table enum-schema) boolean)
+  (every (lambda (writer-symbol)
+           (gethash writer-symbol known-symbols))
+         (enum-schema-symbols writer)))
+
+(defmethod resolve ((reader enum-schema)
+                    (writer enum-schema))
+  (declare (inline get-known-symbols all-known-symbols-p)
+           (optimize (speed 3) (safety 0)))
+  (let ((known-symbols (get-known-symbols reader)))
+    (if (all-known-symbols-p known-symbols writer)
+        reader
+        (let ((default (enum-schema-default reader)))
+          (unless default
+            (error "Reader enum has no default for unknown writer symbols"))
+          (make-resolved-enum-schema
+           :name (enum-schema-name reader)
+           :symbols (enum-schema-symbols writer)
+           :known-symbols known-symbols
+           :default default)))))
+
+(defmethod deserialize ((schema resolved-enum-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((known-symbols (resolved-enum-schema-known-symbols schema))
+        (default (resolved-enum-schema-default schema))
+        (symbol (call-next-method)))
+    (if (gethash symbol known-symbols)
+        symbol
+        default)))
+
+;; record-schema
+
+(defvec avro-name)
+
+(defstruct (resolved-record-schema
+            (:include record-schema)
+            (:copier nil)
+            (:predicate nil))
+  (unknown-fields (error "Must supply UNKNOWN-FIELDS") :type vector[avro-name] :read-only t)
+  (field->default (error "Must supply FIELD->DEFAULT") :type hash-table :read-only t))
+
+(defun! make-name->field (schema)
+    ((record-schema) hash-table)
   (loop
-     for rschema across (schemas reader-schema)
-     when (matchp rschema writer-schema)
-     do (return-from resolve (resolve rschema writer-schema)))
-  (error "~&Union reader schema does not match writer-schema."))
+    with fields = (record-schema-fields schema)
+    with name->field = (make-hash-table :test #'equal :size (length fields))
 
-(defmethod resolve (reader-schema (writer-schema union-schema))
-  (resolve writer-schema reader-schema))
+    for field across fields
+    for name = (field-schema-name field)
+    do (setf (gethash name name->field) field)
 
+    finally (return name->field)))
 
-(defmethod matchp ((reader-schema decimal-schema) (writer-schema decimal-schema))
-  (and (= (scale reader-schema) (scale writer-schema))
-       (= (precision reader-schema) (precision writer-schema))))
+(defun! make-field->default (name->reader-field writer)
+    ((hash-table record-schema) hash-table)
+  (declare (inline make-name->field))
+  (let ((field->default (make-hash-table :test #'equal))
+        (name->writer-field (make-name->field writer)))
+    (maphash (lambda (name reader-field)
+               (unless (gethash name name->writer-field)
+                 (unless (field-schema-defaultp reader-field)
+                   (error "Writer field ~S does not exist and reader has no default" name))
+                 (let ((default (field-schema-default reader-field)))
+                   (setf (gethash name field->default) default))))
+             name->reader-field)
+    field->default))
 
-(defmethod resolve ((reader-schema decimal-schema) (writer-schema decimal-schema))
-  reader-schema)
+(defmethod resolve ((reader record-schema)
+                    (writer record-schema))
+  (declare (inline make-name->field make-field->default)
+           (optimize (speed 3) (safety 0)))
+  (loop
+    with name->reader-field = (make-name->field reader)
+    and writer-fields = (record-schema-fields writer)
+    with field->default = (make-field->default name->reader-field writer)
+    and resolved-fields = (make-array (length writer-fields))
+    and unknown-fields = (make-array 0 :element-type 'avro-name :adjustable t :fill-pointer 0)
 
+    for writer-field across writer-fields
+    for i = 0 then (1+ i)
+    for name = (field-schema-name writer-field)
+    for reader-field = (gethash name name->reader-field)
 
-(macrolet
-    ((defmethods (logical-schema underlying-schema)
-       `(progn
-          (defmethod matchp ((reader-schema (eql ',logical-schema)) writer-schema)
-            (matchp ',underlying-schema writer-schema))
-          (defmethod matchp (reader-schema (writer-schema (eql ',logical-schema)))
-            (matchp reader-schema ',underlying-schema))
+    if reader-field do
+      (let* ((reader-type (field-schema-type reader-field))
+             (writer-type (field-schema-type writer-field))
+             (resolved-field (%make-field-schema
+                              :name name
+                              :type (resolve reader-type writer-type))))
+        (setf (svref resolved-fields i) resolved-field))
 
-          (defmethod resolve ((reader-schema (eql ',logical-schema)) writer-schema)
-            (resolve ',underlying-schema writer-schema))
-          (defmethod resolve (reader-schema (writer-schema (eql ',logical-schema)))
-            (resolve reader-schema ',underlying-schema)))))
-  (defmethods uuid-schema string-schema)
-  (defmethods date-schema int-schema)
-  (defmethods time-millis-schema int-schema)
-  (defmethods time-micros-schema long-schema)
-  (defmethods timestamp-millis-schema long-schema)
-  (defmethods timestamp-micros-schema long-schema))
+    else do
+      (setf (svref resolved-fields i) writer-field)
+      (vector-push-extend name unknown-fields)
 
+    finally
+       (return (make-resolved-record-schema
+                :name (record-schema-name reader)
+                :fields resolved-fields
+                :field->default field->default
+                :unknown-fields (coerce unknown-fields 'simple-vector)))))
 
-(defmethod matchp ((reader-schema duration-schema) (writer-schema duration-schema))
-  t)
+(defmethod deserialize ((schema resolved-record-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  (declare (ignore writer-schema)
+           (optimize (speed 3) (safety 0)))
+  (let ((unknown-fields (resolved-record-schema-unknown-fields schema))
+        (field->default (resolved-record-schema-field->default schema))
+        (record (call-next-method)))
+    (flet ((remove-field (field)
+             (declare (avro-name field)
+                      (optimize (speed 3) (safety 0)))
+             (remhash field record))
+           (put-default (field default)
+             (declare (avro-name field)
+                      (optimize (speed 3) (safety 0)))
+             (setf (gethash field record) default)))
+      (map nil #'remove-field unknown-fields)
+      (maphash #'put-default field->default))
+    record))
 
-(defmethod matchp ((reader-schema duration-schema) (writer-schema fixed-schema))
-  (= (size (underlying-schema reader-schema))
-     (size writer-schema)))
+;; union-schema
 
-(defmethod matchp ((reader-schema fixed-schema) (writer-schema duration-schema))
-  (matchp writer-schema reader-schema))
+(defstruct (resolved-union-schema
+            (:include union-schema)
+            (:copier nil)
+            (:predicate nil))
+  (known-schemas (error "Must supply KNOWN-SCHEMAS") :type vector[avro-schema] :read-only t))
 
-(defmethod resolve ((reader-schema duration-schema) writer-schema)
-  reader-schema)
+(defmethod resolve ((reader union-schema)
+                    (writer union-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (make-resolved-union-schema
+   :schemas (union-schema-schemas writer)
+   :known-schemas (union-schema-schemas reader)))
 
-(defmethod resolve (reader-schema (writer-schema duration-schema))
-  reader-schema)
+(defun! matchp (reader writer)
+    ((t t) boolean)
+  (handler-case
+      (progn
+        (assert-match reader writer)
+        t)
+    (error ()
+      nil)))
 
+(defmethod resolve ((reader union-schema)
+                    writer)
+  (declare (inline matchp)
+           (optimize (speed 3) (safety 0)))
+  (let* ((reader-schemas (union-schema-schemas reader))
+         (first-match (find-if (lambda (reader-schema)
+                                 (matchp reader-schema writer))
+                               reader-schemas)))
+    (unless first-match
+      (error "None of the reader union's schemas match the writer schema"))
+    (resolve first-match writer)))
 
-;; specialize matchp and resolve methods for primitive avro types:
+(defmethod resolve (reader
+                    (writer union-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (make-resolved-union-schema
+   :schemas (union-schema-schemas writer)
+   :known-schemas (vector reader)))
 
-(defmethods-for-primitives matchp nil (reader-schema writer-schema)
-  t)
+(defmethod deserialize ((schema resolved-union-schema)
+                        (stream stream)
+                        &optional writer-schema)
+  (declare (ignore writer-schema)
+           (inline matchp)
+           (optimize (speed 3) (safety 0)))
+  (let* ((writer-schema (svref (resolved-union-schema-schemas schema)
+                               (deserialize 'long-schema stream)))
+         (reader-schemas (resolved-union-schema-known-schemas schema))
+         (first-match (find-if (lambda (reader-schema)
+                                 (matchp reader-schema writer-schema))
+                               reader-schemas)))
+    (unless first-match
+      (deserialize writer-schema stream) ; consume stream
+      (error "None of the reader's schemas match the writer's"))
+    (let ((resolved-schema (resolve first-match writer-schema)))
+      (deserialize resolved-schema stream))))
 
-(defmethods-for-primitives resolve nil (reader-schema writer-schema)
-  reader-schema)
+;; promoted schemas
 
+(defunc schema-suffix-p (name)
+  (declare (simple-string name))
+  (let ((last-hyphen-position (position #\- name :test #'char= :from-end t)))
+    (when last-hyphen-position
+      (string= "-SCHEMA" (subseq name last-hyphen-position)))))
 
-;; TODO need to coerce the output type appropriately
-;; should move bytes/string outside of this macrolet since they're different
+(defunc schema-name (schema-symbol)
+  (declare (symbol schema-symbol))
+  (let ((name (symbol-name schema-symbol)))
+    (if (schema-suffix-p name)
+        name
+        (format nil "~A-SCHEMA" name))))
 
-;; specialize matchp and resolve methods to promote writer's schema
-(macrolet
-    ((promote ((&rest readers) writer)
-       (let* ((->schema (lambda (symbol)
-                          (read-from-string (format nil "~A-schema" symbol))))
-              (reader-schemas (loop
-                                 for symbol in readers
-                                 for schema = (find-if
-                                               (lambda (s)
-                                                 (eq s (funcall ->schema symbol)))
-                                               +primitive-schemas+)
-                                 when schema
-                                 collect schema))
-              (writer-schema (loop
-                                with writer-schema = (funcall ->schema writer)
-                                for symbol in +primitive-schemas+
-                                when (eq symbol writer-schema)
-                                return writer-schema)))
-         (unless (= (length reader-schemas) (length readers))
-           (error "~&Not all reader-schemas were found"))
-         (unless writer-schema
-           (error "~&writer-schema was not found"))
-         `(progn
-            ,@(loop
-                 for reader-schema in reader-schemas
-                 collect `(defmethod matchp
-                              ((reader-schema (eql ',reader-schema))
-                               (writer-schema (eql ',writer-schema)))
-                            t)
-                 collect `(defmethod resolve
-                              ((reader-schema (eql ',reader-schema))
-                               (writer-schema (eql ',writer-schema)))
-                            writer-schema))))))
-  ;; from the spec:
-  ;; the writer's schema may be promoted to the reader's as follows:
-  ;;   * int is promotable to long, float, or double
-  ;;   * long is promotable to float or double
-  ;;   * float is promotable to double
-  ;;   * string is promotable to bytes
-  ;;   * bytes is promotable to string
-  (promote (long float double) int)
-  (promote (float double) long)
-  (promote (double) float)
-  (promote (bytes) string)
-  (promote (string) bytes))
+(defunc find-schema (schema-symbol)
+  (declare (symbol schema-symbol))
+  (let ((schema-name (schema-name schema-symbol)))
+    (multiple-value-bind (schema status)
+        (find-symbol schema-name)
+      (unless (eq status :external)
+        (error "~S does not name an external symbol" schema-name))
+      schema)))
+
+(defunc to-method-specifier (schema)
+  (declare (symbol schema))
+  (if (typep schema 'primitive-schema)
+      `(eql ',schema)
+      schema))
+
+(defmacro defpromoted ((from to) &body body)
+  (declare (symbol from to))
+  (let ((promoted-symbol (intern (format nil "~S->~S" from to)))
+        (from (to-method-specifier (find-schema from)))
+        (to (to-method-specifier (find-schema to))))
+    `(progn
+       (defmethod assert-match ((reader ,to)
+                                (writer ,from))
+         (declare (ignore reader writer)
+                  (optimize (speed 3) (safety 0))))
+
+       (defmethod resolve ((reader ,to)
+                           (writer ,from))
+         (declare (ignore reader writer)
+                  (optimize (speed 3) (safety 0)))
+         ',promoted-symbol)
+
+       (defmethod deserialize ((schema (eql ',promoted-symbol))
+                               (stream stream)
+                               &optional writer-schema)
+         (declare (ignore writer-schema)
+                  (optimize (speed 3) (safety 0)))
+         ,@body))))
+
+(defmacro promote (from (&rest tos))
+  (declare (symbol from))
+  (setf from (find-schema from)
+        tos (mapcar #'find-schema tos))
+  (flet ((make-defpromoted (to)
+           (declare (symbol to))
+           (let ((deserialized (gensym)))
+             `(defpromoted (,from ,to)
+                (let ((,deserialized (deserialize ',from stream)))
+                  (declare (,from ,deserialized))
+                  (coerce ,deserialized ',to))))))
+    `(progn
+       ,@(mapcar #'make-defpromoted tos))))
+
+(promote int (long float double))
+
+(promote long (float double))
+
+(promote float (double))
+
+(defpromoted (string bytes)
+  (deserialize 'bytes-schema stream))
+
+(defpromoted (bytes string)
+  (deserialize 'string-schema stream))

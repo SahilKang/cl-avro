@@ -17,224 +17,265 @@
 
 (in-package #:cl-avro)
 
-(defun schema->json (schema &optional canonical-form)
+(defun* schema->json (schema &optional canonical-form)
+    ((avro-schema &optional boolean) (values simple-string &optional))
   "Return the json string representation of avro SCHEMA.
 
 If CANONICAL-FORM is true, then return the Canonical Form as defined
 in the avro spec."
   (let ((*schema->name* (make-hash-table :test #'eq))
+        (*namespace* nil)
         (st-json:*output-literal-unicode*
-         (or canonical-form
-             st-json:*output-literal-unicode*)))
-    (declare (special *schema->name*))
-    (%write-schema (if canonical-form
+          (or canonical-form
+              st-json:*output-literal-unicode*)))
+    (declare (special *schema->name* *namespace*))
+    (st-json:write-json-to-string
+     (%schema->jso (if canonical-form
                        (canonicalize schema)
-                       schema))))
+                       schema)))))
 
 
-(defgeneric %write-schema (schema))
+(defgeneric %schema->jso (schema)
+  (:method :before ((schema named-schema))
+    (declare (special *namespace*)
+             (optimize (speed 3) (safety 0)))
+    (let ((fullname (fullname schema *namespace*)))
+      (declare (special *schema->name*))
+      (setf (gethash schema *schema->name*) fullname)))
 
-;; these :before and :around methods prevent infinite recursion when
-;; writing a recursive schema
+  ;; to prevent infinite recursion when writing recursive schemas
+  (:method :around (schema)
+    (declare (special *schema->name*)
+             (optimize (speed 3) (safety 0)))
+    (let ((fullname (gethash schema *schema->name*)))
+      (or fullname (call-next-method)))))
 
-(defmethod %write-schema :before ((schema named-type))
-  (declare (special *schema->name*))
-  (setf (gethash schema *schema->name*) (name schema)))
+(macrolet
+    ((defprimitives ()
+       (flet ((make-defmethod (schema)
+                `(defmethod %schema->jso ((schema (eql ',schema)))
+                   (declare (ignore schema)
+                            (optimize (speed 3) (safety 0)))
+                   ,(schema->name schema))))
+         `(progn
+            ,@(mapcar #'make-defmethod *primitives*))))
+     (defaliases ()
+       (flet ((make-defmethod (cons)
+                (destructuring-bind (logical . underlying)
+                    cons
+                  `(defmethod %schema->jso ((schema (eql ',logical)))
+                     (declare (ignore schema)
+                              (optimize (speed 3) (safety 0)))
+                     (st-json:jso
+                      "type" ,(schema->name underlying)
+                      "logicalType" ,(schema->name logical))))))
+         `(progn
+            ,@(mapcar #'make-defmethod *logical-aliases*)))))
+  (defprimitives)
+  (defaliases))
 
-(defmethod %write-schema :around (schema)
-  (declare (special *schema->name*))
-  (let ((name (gethash schema *schema->name*)))
-    (if name
-        (format nil "~S" name)
-        (st-json:write-json-to-string
-         (call-next-method)))))
+(defunc fields->readers (schema-type fields)
+  (declare (symbol schema-type))
+  (unless (every #'symbolp fields)
+    (error "Expected only symbols: ~S" fields))
+  (flet ((make-reader (field)
+           (intern (format nil "~S-~S" schema-type field))))
+    (mapcar #'make-reader fields)))
 
-;; specialize %write-schema methods for primitive avro types:
-(defmethods-for-primitives %write-schema schema-name (schema)
-  schema-name)
+(defmacro namespace->st-json (reader-form)
+  (declare (cons reader-form))
+  (let ((namespace (gensym)))
+    `(let ((,namespace ,reader-form))
+       (or ,namespace :null))))
 
-(defmacro append-optionals (schema args &rest symbols)
-  "Append optional fields to ARGS when they're non-nil and return ARGS."
-  (let ((mvb-forms (mapcar
-                    (lambda (symbol)
-                      (let ((value (gensym))
-                            (valuep (gensym))
-                            (field (downcase-symbol symbol)))
-                        `(multiple-value-bind (,value ,valuep)
-                             (,symbol ,schema)
-                           (when ,valuep
-                             (setf ,args
-                                   (nconc ,args (list ,field ,value)))))))
-                    symbols)))
+(defmacro append-optionals (schema-type schema args &rest fields)
+  "Append optional FIELDS to ARGS according to the corresponding predicate."
+  (declare (symbol schema-type schema args))
+  (let* ((readers (fields->readers schema-type fields))
+         (predicates (mapcar #'+p readers))
+         (json-fields (mapcar #'downcase-symbol fields))
+         (when-forms (mapcar
+                      (lambda (field reader predicate)
+                        (let ((value (if (string= field "namespace")
+                                         `(namespace->st-json (,reader ,schema))
+                                         `(,reader ,schema))))
+                          `(when (,predicate ,schema)
+                             ;; need to maintain order for canonical form
+                             (setf ,args (nconc ,args (list ,field ,value))))))
+                      json-fields
+                      readers
+                      predicates)))
     `(progn
-       ,@mvb-forms
-       ,args)))
+       ,@when-forms)))
 
-(defmacro make-fields (schema (&rest required-fields) &rest optional-fields)
-  (let ((fields (gensym))
-        (initial (apply #'nconc
-                        (mapcar
-                         (lambda (s)
-                           (declare ((or string symbol) s))
-                           (if (stringp s)
-                               (list "type" s)
-                               (list (downcase-symbol s) (list s schema))))
-                         required-fields))))
-    `(let ((,fields (list ,@initial)))
-       (append-optionals ,schema ,fields ,@optional-fields))))
+;; order of required-fields matters for canonical form
+(defmacro make-fields (schema-type schema (&rest required-fields) &rest optional-fields)
+  (declare (symbol schema-type schema))
+  (let* ((readers (fields->readers schema-type required-fields))
+         (json-fields (mapcar #'downcase-symbol required-fields))
+         (initial-fields (mapcan
+                          (lambda (field reader)
+                            `(,field (,reader ,schema)))
+                          json-fields
+                          readers))
+         (type (list "type" (schema->name schema-type)))
+         (fields (gensym)))
+    ;; in canonical form: if name exists, then type is second
+    ;; otherwise it's first
+    (setf initial-fields
+          (if (eq 'name (first required-fields))
+              (nconc (subseq initial-fields 0 2) type (subseq initial-fields 2))
+              (nconc type initial-fields)))
+    `(let ((,fields (list ,@initial-fields)))
+       (append-optionals ,schema-type ,schema ,fields ,@optional-fields)
+       ,fields)))
 
-(defmethod st-json:write-json-element ((element vector) stream)
-  (st-json:write-json-element (coerce element 'list) stream))
+(defmethod st-json:write-json-element ((vector simple-vector) stream)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((length (length vector)))
+    (cond
+      ((= 0 length)
+       (write-string "[]" stream))
+      ((= 1 length)
+       (write-char #\[ stream)
+       (st-json:write-json-element (svref vector 0) stream)
+       (write-char #\] stream))
+      (t
+       (write-char #\[ stream)
+       (st-json:write-json-element (svref vector 0) stream)
+       (loop
+         for i from 1 below length
+         for elt = (svref vector i)
+         do
+            (write-char #\, stream)
+            (st-json:write-json-element elt stream))
+       (write-char #\] stream)))))
 
-(defmethod %write-schema ((schema fixed-schema))
-  (apply #'st-json:jso
-         (make-fields schema (name "fixed" size) namespace aliases)))
+(defmethod %schema->jso ((schema fixed-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (apply #'st-json:jso (make-fields fixed-schema schema (name size) namespace aliases)))
 
-(defmethod %write-schema ((schema union-schema))
-  (map 'list
-       (lambda (schema)
-         (st-json:read-json (%write-schema schema)))
-       (schemas schema)))
+(defmethod %schema->jso ((schema union-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (map 'simple-vector #'%schema->jso (union-schema-schemas schema)))
 
-(defmethod %write-schema ((schema array-schema))
+(defmethod %schema->jso ((schema array-schema))
+  (declare (optimize (speed 3) (safety 0)))
   (st-json:jso
    "type" "array"
-   "items" (st-json:read-json
-            (%write-schema (item-schema schema)))))
+   "items" (%schema->jso (array-schema-items schema))))
 
-(defmethod %write-schema ((schema map-schema))
+(defmethod %schema->jso ((schema map-schema))
+  (declare (optimize (speed 3) (safety 0)))
   (st-json:jso
    "type" "map"
-   "values" (st-json:read-json
-             (%write-schema (value-schema schema)))))
+   "values" (%schema->jso (map-schema-values schema))))
 
-(defmethod %write-schema ((schema enum-schema))
-  (apply
-   #'st-json:jso
-   (make-fields schema (name "enum" symbols) default namespace aliases doc)))
-
-(defmethod %write-schema ((schema record-schema))
-  (let ((args (make-fields schema (name "record") namespace aliases doc))
-        (fields (map 'list
-                     (lambda (field)
-                       (st-json:read-json
-                        (%write-schema field)))
-                     (field-schemas schema))))
-    ;; field order only matters when we're writing to canonical form
-    ;; and since CANONICALIZE sets the optional namespace, aliases,
-    ;; and doc fields to nil in these cases, we can append fields to
-    ;; args safely
-    (apply #'st-json:jso (nconc args (list "fields" fields)))))
-
-(defmethod %write-schema ((schema field-schema))
-  (let ((args (list "name" (name schema)
-                    "type" (st-json:read-json
-                            (%write-schema (field-type schema))))))
-    (append-optionals schema args aliases doc order)
-    (multiple-value-bind (default defaultp)
-        (default schema)
-      (when defaultp
-        (let ((default (write-default (field-type schema) default)))
-          (setf args (nconc args (list "default" default))))))
+(defmethod %schema->jso ((schema enum-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((args (make-fields enum-schema schema (name symbols) namespace aliases doc))
+        (default (enum-schema-default schema)))
+    (when default
+      (setf args (nconc args (list "default" default))))
     (apply #'st-json:jso args)))
 
-(defun write-default (schema default)
-  (etypecase schema
+(defmethod %schema->jso ((schema record-schema))
+  (declare (special *namespace*)
+           (optimize (speed 3) (safety 0)))
+  (let ((args (make-fields record-schema schema (name) namespace aliases doc))
+        (fields (let ((*namespace* (deduce-namespace (record-schema-name schema)
+                                                     (record-schema-namespace schema)
+                                                     *namespace*)))
+                  (declare (special *namespace*))
+                  (map 'simple-vector #'%field->jso (record-schema-fields schema)))))
+    ;; fields come last in canonical form
+    (apply #'st-json:jso (nconc args (list "fields" fields)))))
 
-    (symbol
-     (get-primitive-default schema default))
+(defun+ %field->jso (schema)
+    ((field-schema) st-json:jso)
+  (let* ((type (field-schema-type schema))
+         (args (list "name" (field-schema-name schema)
+                     "type" (%schema->jso type)))
+         (default (field-schema-default schema))
+         (defaultp (field-schema-defaultp schema)))
+    (append-optionals field-schema schema args aliases doc order)
+    (when defaultp
+      (let ((default (convert-to-st-json type default)))
+        (setf args (nconc args (list "default" default)))))
+    (apply #'st-json:jso args)))
 
-    (enum-schema
-     default)
-
-    (array-schema
-     (map 'list
-          (lambda (x)
-            (write-default (item-schema schema) x))
-          default))
-
-    (map-schema
-     (let ((hash-table (make-hash-table :test #'equal)))
-       (maphash (lambda (k v)
-                  (setf (gethash k hash-table)
-                        (write-default (value-schema schema) v)))
-                default)
-       hash-table))
-
-    (fixed-schema
-     (babel:octets-to-string default :encoding :latin-1))
-
-    (union-schema
-     (write-default (elt (schemas schema) 0) default))
-
-    (record-schema
-     (loop
-        with hash-table = (make-hash-table :test #'equal)
-        for field across (field-schemas schema)
-        for value across default
-
-        for type = (field-type field)
-        for name = (name field)
-
-        do (setf (gethash name hash-table) (write-default type value))
-
-        finally (return hash-table)))))
-
-(defun get-primitive-default (schema default)
-  (ecase schema
-
-    (null-schema
-     :null)
-
-    (boolean-schema
-     (st-json:from-json-bool default))
-
-    ((or int-schema long-schema string-schema float-schema double-schema)
-     default)
-
-    (bytes-schema
-     (babel:octets-to-string default :encoding :latin-1))))
-
-(defmethod %write-schema ((schema decimal-schema))
+(defmethod %schema->jso ((schema decimal-schema))
+  (declare (optimize (speed 3) (safety 0)))
   (st-json:jso
-   "type" (st-json:read-json
-           (%write-schema (underlying-schema schema)))
+   "type" (%schema->jso (decimal-schema-underlying-schema schema))
    "logicalType" "decimal"
-   "precision" (precision schema)
-   "scale" (scale schema)))
+   "precision" (decimal-schema-precision schema)
+   "scale" (decimal-schema-scale schema)))
 
-(defmethod %write-schema ((schema (eql 'uuid-schema)))
+(defmethod %schema->jso ((schema duration-schema))
+  (declare (optimize (speed 3) (safety 0)))
   (st-json:jso
-   "type" "string"
-   "logicalType" "uuid"))
-
-(defmethod %write-schema ((schema (eql 'date-schema)))
-  (st-json:jso
-   "type" "int"
-   "logicalType" "date"))
-
-(defmethod %write-schema ((schema (eql 'time-millis-schema)))
-  (st-json:jso
-   "type" "int"
-   "logicalType" "time-millis"))
-
-(defmethod %write-schema ((schema (eql 'time-micros-schema)))
-  (st-json:jso
-   "type" "long"
-   "logicalType" "time-micros"))
-
-(defmethod %write-schema ((schema (eql 'timestamp-millis-schema)))
-  (st-json:jso
-   "type" "long"
-   "logicalType" "timestamp-millis"))
-
-(defmethod %write-schema ((schema (eql 'timestamp-micros-schema)))
-  (st-json:jso
-   "type" "long"
-   "logicalType" "timestamp-micros"))
-
-(defmethod %write-schema ((schema duration-schema))
-  (st-json:jso
-   "type" (st-json:read-json
-           (%write-schema (underlying-schema schema)))
+   "type" (%schema->jso (duration-schema-underlying-schema schema))
    "logicalType" "duration"))
+
+(defgeneric convert-to-st-json (schema value)
+  (:method (schema value)
+    (declare (ignore schema)
+             (optimize (speed 3) (safety 0)))
+    value)
+
+  (:method ((schema (eql 'null-schema)) value)
+    (declare (ignore schema value)
+             (optimize (speed 3) (safety 0)))
+    :null)
+
+  (:method ((schema (eql 'boolean-schema)) boolean)
+    (declare (ignore schema)
+             (optimize (speed 3) (safety 0)))
+    (st-json:as-json-bool boolean))
+
+  (:method ((schema (eql 'bytes-schema)) (bytes simple-vector))
+    (declare (ignore schema)
+             (optimize (speed 3) (safety 0)))
+    (babel:octets-to-string bytes :encoding :latin-1))
+
+  (:method ((schema fixed-schema) (bytes simple-vector))
+    (declare (ignore schema)
+             (optimize (speed 3) (safety 0)))
+    (babel:octets-to-string bytes :encoding :latin-1))
+
+  (:method ((schema array-schema) (array simple-vector))
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((item-schema (array-schema-items schema)))
+      (flet ((convert (elt)
+               (convert-to-st-json item-schema elt)))
+        (map 'simple-vector #'convert array))))
+
+  (:method ((schema map-schema) (map hash-table))
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((hash-table (make-hash-table :test #'equal :size (hash-table-size map)))
+          (value-schema (map-schema-values schema)))
+      (flet ((convert (key value)
+               (setf (gethash key hash-table)
+                     (convert-to-st-json value-schema value))))
+        (maphash #'convert map))
+      hash-table))
+
+  (:method ((schema record-schema) (record hash-table))
+    (declare (optimize (speed 3) (safety 0)))
+    (loop
+      with fields = (record-schema-fields schema)
+      with hash-table = (make-hash-table :test #'equal :size (length fields))
+
+      for field across fields
+      for name = (field-schema-name field)
+      for type = (field-schema-type field)
+      do (setf (gethash name hash-table)
+               (convert-to-st-json type (gethash name record)))
+
+      finally (return hash-table)))
+
+  (:method ((schema union-schema) value)
+    (declare (optimize (speed 3) (safety 0)))
+    (let ((first-schema (svref (union-schema-schemas schema) 0)))
+      (convert-to-st-json first-schema value))))

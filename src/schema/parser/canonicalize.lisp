@@ -17,103 +17,103 @@
 
 (in-package #:cl-avro)
 
-(defgeneric canonicalize (schema))
+(defgeneric canonicalize (schema)
+  (:method :before ((schema named-schema))
+    (declare (special *namespace*)
+             (optimize (speed 3) (safety 0)))
+    (let ((fullname (fullname schema *namespace*)))
+      (declare (special *schema->name*))
+      (setf (gethash schema *schema->name*) fullname)))
 
-
-(defmethod canonicalize :before ((schema named-type))
-  (declare (special *namespace* *schema->name*))
-  (let ((name (deduce-fullname (name schema) (namespace schema) *namespace*)))
-    (setf (gethash schema *schema->name*) name)))
-
-(defmethod canonicalize :around (schema)
-  (declare (special *schema->name*))
-  (let ((*namespace* (when (boundp '*namespace*)
-                       (symbol-value '*namespace*))))
-    (declare (special *namespace*))
-    ;; if schema's already been seen, then just keep the current one
-    ;; and let %write-schema replace it with its name.
+  ;; if schema's already been seen, then just keep the current one and
+  ;; let %schema->jso replace it with its name.
+  (:method :around (schema)
+    (declare (special *schema->name*)
+             (optimize (speed 3) (safety 0)))
     (if (nth-value 1 (gethash schema *schema->name*))
         schema
         (call-next-method))))
 
-;; specialize canonicalize methods for primitive avro types:
-(defmethods-for-primitives canonicalize nil (schema)
-  schema)
+(macrolet
+    ((defprimitives ()
+       (flet ((make-defmethod (schema)
+                `(defmethod canonicalize ((schema (eql ',schema)))
+                   (declare (ignore schema)
+                            (optimize (speed 3) (safety 0)))
+                   ',schema)))
+         `(progn
+            ,@(mapcar #'make-defmethod *primitives*))))
+     (defaliases ()
+       (flet ((make-defmethod (cons)
+                (destructuring-bind (logical . underlying)
+                    cons
+                  `(defmethod canonicalize ((schema (eql ',logical)))
+                     (declare (optimize (speed 3) (safety 0)))
+                     (canonicalize ',underlying)))))
+         `(progn
+            ,@(mapcar #'make-defmethod *logical-aliases*)))))
+  (defprimitives)
+  (defaliases))
 
 (defmethod canonicalize ((schema fixed-schema))
-  (declare (special *namespace*))
-  (make-instance 'fixed-schema
-                 :name (deduce-fullname (name schema)
-                                        (namespace schema)
-                                        *namespace*)
-                 :size (size schema)))
+  (declare (special *namespace*)
+           (optimize (speed 3) (safety 0)))
+  (let ((fullname (fullname schema *namespace*))
+        (size (fixed-schema-size schema)))
+    (%make-fixed-schema :name fullname :size size)))
 
 (defmethod canonicalize ((schema union-schema))
-  (make-instance 'union-schema
-                 :schemas (map 'vector #'canonicalize (schemas schema))))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((schemas (union-schema-schemas schema)))
+    (%make-union-schema :schemas (map 'simple-vector #'canonicalize schemas))))
 
 (defmethod canonicalize ((schema array-schema))
-  (make-instance 'array-schema
-                 :item-schema (canonicalize (item-schema schema))))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((items (array-schema-items schema)))
+    (%make-array-schema :items (canonicalize items))))
 
 (defmethod canonicalize ((schema map-schema))
-  (make-instance 'map-schema
-                 :value-schema (canonicalize (value-schema schema))))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((values (map-schema-values schema)))
+    (%make-map-schema :values (canonicalize values))))
 
 (defmethod canonicalize ((schema enum-schema))
-  (declare (special *namespace*))
-  (make-instance 'enum-schema
-                 :name (deduce-fullname (name schema)
-                                        (namespace schema)
-                                        *namespace*)
-                 :symbols (symbols schema)))
+  (declare (special *namespace*)
+           (optimize (speed 3) (safety 0)))
+  (let ((fullname (fullname schema *namespace*))
+        (symbols (enum-schema-symbols schema)))
+    (%make-enum-schema :name fullname :symbols symbols)))
 
 (defmethod canonicalize ((schema record-schema))
-  (declare (special *namespace*))
-  (let* ((name (deduce-fullname (name schema) (namespace schema) *namespace*))
-         (namespace (deduce-namespace name nil *namespace*)))
-    (make-instance
-     'record-schema
-     :name name
-     :field-schemas (let ((*namespace* namespace))
-                      (declare (special *namespace*))
-                      (map 'vector
-                           (lambda (field-schema)
-                             (canonicalize field-schema))
-                           (field-schemas schema))))))
+  (declare (special *namespace*)
+           (optimize (speed 3) (safety 0)))
+  (let ((fullname (fullname schema *namespace*))
+        (fields (record-schema-fields schema))
+        (namespace (deduce-namespace (record-schema-name schema)
+                                     (record-schema-namespace schema)
+                                     *namespace*)))
+    (%make-record-schema
+     :name fullname
+     :fields (let ((*namespace* namespace))
+               (declare (special *namespace*))
+               (map 'simple-vector #'canonicalize fields)))))
 
 (defmethod canonicalize ((schema field-schema))
-  (make-instance
-   'field-schema
-   :name (name schema)
-   :field-type (canonicalize (field-type schema))))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((name (field-schema-name schema))
+        (type (field-schema-type schema)))
+    (%make-field-schema :name name :type (canonicalize type))))
 
 (defmethod canonicalize ((schema decimal-schema))
-  (make-instance
-   'decimal-schema
-   :scale (scale schema)
-   :precision (precision schema)
-   :underlying-schema (canonicalize (underlying-schema schema))))
-
-(defmethod canonicalize ((schema (eql 'uuid-schema)))
-  (canonicalize 'string-schema))
-
-(defmethod canonicalize ((schema (eql 'date-schema)))
-  (canonicalize 'int-schema))
-
-(defmethod canonicalize ((schema (eql 'time-millis-schema)))
-  (canonicalize 'int-schema))
-
-(defmethod canonicalize ((schema (eql 'time-micros-schema)))
-  (canonicalize 'long-schema))
-
-(defmethod canonicalize ((schema (eql 'timestamp-millis-schema)))
-  (canonicalize 'long-schema))
-
-(defmethod canonicalize ((schema (eql 'timestamp-micros-schema)))
-  (canonicalize 'long-schema))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((scale (decimal-schema-scale schema))
+        (precision (decimal-schema-precision schema))
+        (underlying-schema (decimal-schema-underlying-schema schema)))
+    (%make-decimal-schema :scale scale
+                          :precision precision
+                          :underlying-schema (canonicalize underlying-schema))))
 
 (defmethod canonicalize ((schema duration-schema))
-  (make-instance
-   'duration-schema
-   :underlying-schema (canonicalize (underlying-schema schema))))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((underlying-schema (duration-schema-underlying-schema schema)))
+    (%make-duration-schema :underlying-schema (canonicalize underlying-schema))))

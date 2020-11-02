@@ -19,65 +19,23 @@
 
 (defpackage #:cl-avro
   (:nicknames #:avro)
-  (:use #:cl #:trivial-gray-streams)
+  (:use #:cl)
   (:export
 
-   ;; primitive avro schemas
-   #:null-schema
-   #:boolean-schema
-   #:int-schema
-   #:long-schema
-   #:float-schema
-   #:double-schema
-   #:bytes-schema
-   #:string-schema
-
-   ;; complex avro schemas
-   #:fixed-schema
-   #:union-schema
-   #:array-schema
-   #:map-schema
-   #:enum-schema
-   #:record-schema
-   #:field-schema
-
-   ;; methods on complex schemas
-   #:name
-   #:namespace
-   #:aliases
-   #:doc
-   #:size
-   #:schemas
-   #:item-schema
-   #:value-schema
-   #:symbols
-   #:default
-   #:field-type
-   #:order
-   #:field-schemas
-
-   ;; logical avro schemas
-   #:decimal-schema
-   #:scale
-   #:precision
-
-   #:uuid-schema
-   #:date-schema
-   #:time-millis-schema
-   #:time-micros-schema
-   #:timestamp-millis-schema
-   #:timestamp-micros-schema
-   #:duration-schema
-
-   ;; io
-   #:validp
    #:serialize
    #:deserialize
+
    #:json->schema
    #:schema->json
+
    #:compare
 
-   ;; avro object container files
+   #:fingerprint
+   #:avro-64bit-crc
+   #:*default-fingerprint-algorithm*
+
+   ;;; avro object container files
+
    #:file-input-stream
    #:file-output-stream
    #:schema
@@ -88,12 +46,128 @@
    #:write-block
    #:skip-block
 
-   ;; fingerprinting avro schemas
-   #:fingerprint
-   #:*default-fingerprint-algorithm*
-   #:avro-64bit-crc
+   ;;; avro single object encoding
 
-   ;; avro single object encoding
    #:single-object-p
    #:write-single-object
-   #:read-single-object))
+   #:read-single-object
+
+   ;;; primitive schemas
+
+   #:null-schema
+   #:boolean-schema
+   #:int-schema
+   #:long-schema
+   #:float-schema
+   #:double-schema
+   #:bytes-schema
+   #:string-schema
+
+   ;;; complex schemas
+
+   ;; fixed schema
+
+   #:fixed-schema
+   #:make-fixed-schema
+   #:fixed-schema-p
+
+   #:fixed-schema-name
+   #:fixed-schema-namespace
+   #:fixed-schema-aliases
+   #:fixed-schema-size
+
+   ;; union schema
+   
+   #:union-schema
+   #:make-union-schema
+   #:union-schema-p
+
+   #:union-schema-schemas
+
+   #:tagged-union
+   #:make-tagged-union
+   #:tagged-union-p
+
+   #:tagged-union-value
+   #:tagged-union-schema
+
+   ;; array schema
+
+   #:array-schema
+   #:make-array-schema
+   #:array-schema-p
+
+   #:array-schema-items
+
+   ;; map schema
+
+   #:map-schema
+   #:make-map-schema
+   #:map-schema-p
+
+   #:map-schema-values
+
+   ;; enum schema
+
+   #:enum-schema
+   #:make-enum-schema
+   #:enum-schema-p
+
+   #:enum-schema-name
+   #:enum-schema-namespace
+   #:enum-schema-aliases
+   #:enum-schema-doc
+   #:enum-schema-symbols
+   #:enum-schema-default
+
+   ;; record schema
+
+   #:record-schema
+   #:make-record-schema
+   #:record-schema-p
+
+   #:record-schema-name
+   #:record-schema-namespace
+   #:record-schema-aliases
+   #:record-schema-doc
+   #:record-schema-fields
+
+   #:field-schema
+   #:make-field-schema
+   #:field-schema-p
+
+   #:field-schema-name
+   #:field-schema-aliases
+   #:field-schema-doc
+   #:field-schema-type
+   #:field-schema-order
+   #:field-schema-default
+
+   ;;; logical schemas
+
+   #:uuid-schema
+   #:date-schema
+   #:time-millis-schema
+   #:time-micros-schema
+   #:timestamp-millis-schema
+   #:timestamp-micros-schema
+   #:local-timestamp-millis-schema
+   #:local-timestamp-micros-schema
+
+   ;; decimal schema
+
+   #:decimal-schema
+   #:make-decimal-schema
+   #:decimal-schema-p
+
+   #:decimal-schema-underlying-schema
+   #:decimal-schema-precision
+   #:decimal-schema-scale
+
+   ;; duration schema
+
+   #:duration-schema
+   #:make-duration-schema
+   #:duration-schema-p
+
+   #:duration-schema-underlying-schema))

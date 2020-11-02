@@ -17,176 +17,231 @@
 
 (in-package #:cl-avro)
 
-;;; avro primitive types
+;;; avro primitive schemas
 
-(deftype null-schema ()
-  "Represents the avro null schema."
-  'null)
+(eval-when (:compile-toplevel :execute)
+  (defparameter *primitives* nil
+    "List of primitive schemas."))
 
-(deftype boolean-schema ()
-  "Represents the avro boolean schema."
-  'boolean)
+(defmacro defprimitive (name base &body docstring)
+  "Define a primitive schema NAME based on BASE."
+  (declare (symbol name)
+           ((or symbol cons) base))
+  (pushnew name *primitives* :test #'eq)
+  `(deftype ,name ()
+     ,@docstring
+     ',base))
 
-(defmacro get-signed-range (bits)
-  (let* ((max (1- (expt 2 (1- bits))))
-         (min (- (1+ max))))
-    `'(,min ,max)))
+(defgeneric assert-valid (schema object)
+  (:method (schema object)
+    (declare (optimize (speed 3) (safety 0))))
 
-(deftype int-schema ()
-  "Represents the avro int schema."
-  (let ((min-max (get-signed-range 32))
-        (signed-32-bit-p (intern-gensym)))
-    (setf (symbol-function signed-32-bit-p)
-          (lambda (int)
-            (and (typep int 'integer)
-                 (>= int (first min-max))
-                 (<= int (second min-max)))))
-    `(satisfies ,signed-32-bit-p)))
+  (:documentation
+   "Signal a condition if OBJECT is not valid according to SCHEMA."))
 
-(deftype long-schema ()
-  "Represents the avro long schema."
-  (let ((min-max (get-signed-range 64))
-        (signed-64-bit-p (intern-gensym)))
-    (setf (symbol-function signed-64-bit-p)
-          (lambda (long)
-            (and (typep long 'integer)
-                 (>= long (first min-max))
-                 (<= long (second min-max)))))
-    `(satisfies ,signed-64-bit-p)))
+;; null-schema
 
-(deftype float-schema ()
-  "Represents the avro float schema."
-  (let ((32-bit-float-p (intern-gensym)))
-    (setf (symbol-function 32-bit-float-p)
-          (lambda (float)
-            (or (typep float 'integer)
-                (and (typep float 'float)
-                     (or (= 0.0 float)
-                         (= 24 (float-precision float)))))))
-    `(satisfies ,32-bit-float-p)))
+(defprimitive null-schema null
+  "Represents the avro null schema.")
 
-(deftype double-schema ()
-  "Represents the avro double schema."
-  (let ((64-bit-float-p (intern-gensym)))
-    (setf (symbol-function 64-bit-float-p)
-          (lambda (float)
-            (or (typep float 'integer)
-                (and (typep float 'float)
-                     (or (= 0.0 float)
-                         (= 53 (float-precision float)))))))
-    `(satisfies ,64-bit-float-p)))
+;; boolean-schema
 
-(deftype bytes-schema ()
-  "Represents the avro bytes schema."
-  '(typed-vector (unsigned-byte 8)))
+(defprimitive boolean-schema boolean
+  "Represents the avro boolean schema.")
 
-(deftype string-schema ()
-  "Represents the avro string schema."
-  'string)
+;; int-schema
 
-;;; avro-name
+(defprimitive int-schema (signed-byte 32)
+  "Represents the avro int schema.")
 
-(deftype avro-name () '(satisfies avro-name-p))
-
-(deftype avro-fullname () '(satisfies avro-fullname-p))
-
-(defmacro in-range-p (char-code start-char &optional end-char)
-  "True if CHAR-CODE is between the char-code given by START-CHAR and END-CHAR.
-
-If END-CHAR is nil, then determine if CHAR-CODE equals the char-code of
-START-CHAR."
-  (declare (character start-char)
-           ((or null character) end-char))
-  (let ((start (char-code start-char))
-        (end (when end-char (char-code end-char))))
-    (if end
-        `(the boolean
-              (and (>= ,char-code ,start)
-                   (<= ,char-code ,end)))
-        `(the boolean
-              (= ,char-code ,start)))))
-
-(declaim (inline digit-p))
-(defun digit-p (char-code)
-  (declare (fixnum char-code)
+(defmethod assert-valid ((schema (eql 'int-schema)) (integer integer))
+  "Valid if INTEGER is a signed 32-bit integer."
+  (declare (ignore schema)
            (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\0 #\9))
-(declaim (notinline digit-p))
+  (check-type integer int-schema "a signed 32-bit integer"))
 
-(declaim (inline uppercase-p))
-(defun uppercase-p (char-code)
-  (declare (fixnum char-code)
+;; long-schema
+
+(defprimitive long-schema (signed-byte 64)
+  "Represents the avro long schema.")
+
+(defmethod assert-valid ((schema (eql 'long-schema)) (integer integer))
+  "Valid if INTEGER is a signed 64-bit integer."
+  (declare (ignore schema)
            (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\A #\Z))
-(declaim (notinline uppercase-p))
+  (check-type integer long-schema "a signed 64-bit integer"))
 
-(declaim (inline lowercase-p))
-(defun lowercase-p (char-code)
-  (declare (fixnum char-code)
+;; float-schema
+
+(defprimitive float-schema
+    #.(let ((float-digits (float-digits 1f0)))
+        (unless (= 24 float-digits)
+          (error "(float-digits 1f0) is ~S and not 24" float-digits))
+        'single-float)
+  "Represents the avro float schema.")
+
+;; double-schema
+
+(defprimitive double-schema
+    #.(let ((float-digits (float-digits 1d0)))
+        (unless (= 53 float-digits)
+          (error "(float-digits 1d0) is ~S and not 53" float-digits))
+        'double-float)
+  "Represents the avro double schema.")
+
+;; bytes-schema
+
+(defarray byte (unsigned-byte 8))
+
+(defprimitive bytes-schema array[byte]
+  "Represents the avro bytes schema.")
+
+(defmethod assert-valid ((schema (eql 'bytes-schema)) (array simple-array))
+  "Valid if ARRAY is a simple-array of unsigned 8-bit bytes."
+  (declare (ignore schema)
            (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\a #\z))
-(declaim (notinline lowercase-p))
+  (check-type array array[byte]))
 
-(declaim (inline underscore-p))
-(defun underscore-p (char-code)
-  (declare (fixnum char-code)
+;; string-schema
+
+(defprimitive string-schema simple-string
+  "Represents the avro string schema.")
+
+
+(deftype primitive-schema ()
+  `(member ,@*primitives*))
+
+;;; avro logical schemas aliasing primitives
+
+(eval-when (:compile-toplevel :execute)
+  (defparameter *logical-aliases* nil
+    "Alist mapping a logical schema to the primitive schema it aliases."))
+
+(defmacro defalias (name (primitive &rest moar) &body docstring)
+  "Define a logical schema NAME aliasing PRIMITIVE with MOAR restrictions."
+  (declare (symbol name)
+           (primitive-schema primitive))
+  (pushnew (cons name primitive) *logical-aliases* :test #'eq :key #'car)
+  `(deftype ,name ()
+     ,@docstring
+     ',(if moar
+           `(and ,primitive ,@moar)
+           primitive)))
+
+;; uuid-schema
+
+(defun! hexp (char)
+    ((character) boolean)
+  "Determine if CHAR conforms to /[0-9a-z-A-Z]/"
+  (declare (inline digit-p))
+  (let ((char-code (char-code char)))
+    (or (digit-p char-code)
+        (in-range-p char-code #\a #\f)
+        (in-range-p char-code #\A #\F))))
+
+(defun! rfc-4122-uuid-p (uuid)
+    ((string-schema) boolean)
+  "Determine if UUID conforms to RFC-4122."
+  (declare (inline hexp))
+  (and (= 36 (length uuid))
+       (char= #\-
+              (schar uuid 8)
+              (schar uuid 13)
+              (schar uuid 18)
+              (schar uuid 23))
+       (loop for i from 00 below 08 always (hexp (schar uuid i)))
+       (loop for i from 09 below 13 always (hexp (schar uuid i)))
+       (loop for i from 14 below 18 always (hexp (schar uuid i)))
+       (loop for i from 19 below 23 always (hexp (schar uuid i)))
+       (loop for i from 24 below 36 always (hexp (schar uuid i)))))
+
+(defun! uuid-schema-p (uuid)
+    ((t) boolean)
+  (declare (inline rfc-4122-uuid-p))
+  (and (typep uuid 'string-schema)
+       (rfc-4122-uuid-p uuid)))
+
+(defalias uuid-schema (string-schema (satisfies uuid-schema-p))
+  "Represents the avro uuid schema.")
+
+(defmethod assert-valid ((schema (eql 'uuid-schema)) (uuid simple-string))
+  "UUID is valid if it conforms to RFC-4122."
+  (declare (ignore schema)
+           (inline rfc-4122-uuid-p)
            (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\_))
-(declaim (notinline underscore-p))
+  (unless (rfc-4122-uuid-p uuid)
+    (error "~S does not conform to RFC-4122" uuid)))
 
-(defun avro-name-p (name)
-  "True if NAME matches regex /^[A-Za-z_][A-Za-z0-9_]*$/ and nil otherwise"
-  (declare (optimize (speed 3) (safety 0))
-           (inline lowercase-p uppercase-p underscore-p digit-p))
-  (the boolean
-       (when (and (simple-string-p name)
-                  (not (zerop (length name))))
-         (let ((first (char-code (schar name 0))))
-           (when (or (lowercase-p first)
-                     (uppercase-p first)
-                     (underscore-p first))
-             (loop
-                for i from 1 below (length name)
-                for char-code = (char-code (schar name i))
+;; date-schema
 
-                always (or (lowercase-p char-code)
-                           (uppercase-p char-code)
-                           (underscore-p char-code)
-                           (digit-p char-code))))))))
+(defalias date-schema (int-schema)
+  "Represents the avro date schema.
 
-(defun avro-fullname-p (fullname)
-  "True if FULLNAME is either an avro-name or dot-separated string of avro-names."
-  (declare (optimize (speed 3) (safety 0)))
-  (the boolean
-       (when (simple-string-p fullname)
-         (let ((splits (uiop:split-string fullname :separator ".")))
-           (every #'avro-name-p splits)))))
+This represents a date on the calendar, with no reference to a
+particular timezone or time-of-day.
 
-;;; type utilities
+Serialized as the number of days from the ISO unix epoch 1970-01-01.")
 
-;; TODO use a hash-table to prevent unnecessary symbols from being
-;; created (use the args passed into the deftypes)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun intern-gensym ()
-    "Return a newly interned symbol."
-    (loop
-       for (symbol existsp) = (multiple-value-list (intern (symbol-name (gensym))))
-       when (null existsp)
-       return symbol)))
+;; time-millis-schema
 
-(deftype typed-vector (elt-type)
-  (let ((pred (intern-gensym)))
-    (setf (symbol-function pred)
-          (lambda (vector)
-            (and (typep vector 'vector)
-                 (every (lambda (elt)
-                          (typep elt elt-type))
-                        vector))))
-    `(satisfies ,pred)))
+(defalias time-millis-schema (int-schema (integer 0))
+  "Represents the avro time-millis schema.
 
-(deftype enum (&rest enum-values)
-  (let ((pred (intern-gensym)))
-    (setf (symbol-function pred)
-          (lambda (maybe-enum)
-            (member maybe-enum enum-values :test #'equal)))
-    `(satisfies ,pred)))
+This represents a millisecond-precision time-of-day, with no reference
+to a particular calendar, timezone, or date.
+
+Serialized as the number of milliseconds after midnight, 00:00:00.000.")
+
+;; time-micros-schema
+
+(defalias time-micros-schema (long-schema (integer 0))
+  "Represents the avro time-micros schema.
+
+This represents a microsecond-precision time-of-day, with no reference
+to a particular calendar, timezone, or date.
+
+Serialized as the number of microseconds after midnight, 00:00:00.000000.")
+
+;; timestamp-millis-schema
+
+(defalias timestamp-millis-schema (long-schema)
+  "Represents the avro timestamp-millis schema.
+
+This represents a millisecond-precision instant on the global
+timeline, independent of a particular timezone or calendar.
+
+Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000.")
+
+;; timestamp-micros-schema
+
+(defalias timestamp-micros-schema (long-schema)
+  "Represents the avro timestamp-micros schema.
+
+This represents a microsecond-precision instant on the global
+timeline, independent of a particular timezone or calendar.
+
+Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000.")
+
+;; local-timestamp-millis-schema
+
+(defalias local-timestamp-millis-schema (long-schema)
+  "Represents the avro local-timestamp-millis schema.
+
+This represents a millisecond-precision timestamp in a local timezone,
+regardless of what specific timezone is considered local.
+
+Serialized as the number of milliseconds from 1970-01-01T00:00:00.000.")
+
+;; local-timestamp-micros-schema
+
+(defalias local-timestamp-micros-schema (long-schema)
+  "Represents the avro local-timestamp-micros schema.
+
+This represents a microsecond-precision timestamp in a local timezone,
+regardless of what specific timezone is considered local.
+
+Serialized as the number of microseconds from 1970-01-01T00:00:00.000000.")
+
+
+(deftype logical-alias ()
+  `(member ,@(mapcar #'car *logical-aliases*)))

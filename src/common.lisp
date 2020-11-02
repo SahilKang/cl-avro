@@ -17,26 +17,6 @@
 
 (in-package #:cl-avro)
 
-(defun deduce-fullname (name namespace enclosing-namespace)
-  (cond
-    ((position #\. name)
-     name)
-    ((not (zerop (length namespace)))
-     (concatenate 'string namespace "." name))
-    ((not (zerop (length enclosing-namespace)))
-     (concatenate 'string enclosing-namespace "." name))
-    (t name)))
-
-(defun deduce-namespace (name namespace enclosing-namespace)
-  (let ((pos (position #\. name :from-end t)))
-    (cond
-      (pos
-       (subseq name 0 pos))
-      ((not (zerop (length namespace)))
-       namespace)
-      (t
-       enclosing-namespace))))
-
 (macrolet
     ((assign-primitive-schemas-list (param-name)
        (let* ((names '("NULL-SCHEMA"
@@ -74,6 +54,7 @@
         (error "~&~S does not end in '-schema'" schema))
       (subseq string 0 hyphen-pos))))
 
+;; TODO parse out declare from body
 (defmacro defmethods-for-primitives
     (method-name schema-name (&rest lambda-list) &body body)
   "Expand to defmethod forms for each avro primitive schema.
