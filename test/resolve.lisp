@@ -37,7 +37,7 @@
                           default: \"FOO\"}")))
 
     ;; TODO switch around reader and writer schema
-    (is (string= 
+    (is (string=
          "BAR"
          (avro:which-one
           (avro:deserialize

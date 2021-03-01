@@ -31,7 +31,7 @@
   (:import-from #:cl-avro.schema.logical.time
                 #:time-millis-base
                 #:time-micros-base
-                #:hour 
+                #:hour
                 #:minute)
   (:shadowing-import-from #:cl-avro.schema.logical.time
                           #:second)
