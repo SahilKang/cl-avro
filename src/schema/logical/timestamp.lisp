@@ -23,17 +23,15 @@
                 #:underlying)
   (:import-from #:cl-avro.schema.primitive
                 #:long)
-  (:import-from #:cl-avro.schema.logical.date
-                #:date-mixin
+  (:import-from #:cl-avro.schema.logical.timestamp-base
+                #:timestamp-millis-base
+                #:timestamp-micros-base
                 #:year
                 #:month
-                #:day)
-  (:import-from #:cl-avro.schema.logical.time
-                #:time-millis-base
-                #:time-micros-base
+                #:day
                 #:hour
                 #:minute)
-  (:shadowing-import-from #:cl-avro.schema.logical.time
+  (:shadowing-import-from #:cl-avro.schema.logical.timestamp-base
                           #:second)
   (:export #:timestamp-millis-schema
            #:timestamp-micros-schema
@@ -60,7 +58,7 @@
   (:documentation
    "Avro timestamp-millis schema."))
 
-(defclass timestamp-millis (date-mixin time-millis-base)
+(defclass timestamp-millis (timestamp-millis-base)
   ()
   (:metaclass timestamp-millis-schema)
   (:documentation
@@ -98,12 +96,7 @@ timeline, independent of a particular timezone or calendar."))
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-millis) &key year month day hour minute millisecond)
-  (when (or year month hour minute millisecond)
-    (multiple-value-bind (second remainder)
-        (truncate millisecond 1000)
-      (local-time:encode-timestamp
-       (* remainder 1000 1000) second minute hour day month year :into instance)))
+    ((instance timestamp-millis) &key)
   (unless (and (local-time:timestamp>= instance +min-timestamp-millis+)
                (local-time:timestamp<= instance +max-timestamp-millis+))
     (error "Timestamp out of bounds")))
@@ -118,7 +111,7 @@ timeline, independent of a particular timezone or calendar."))
   (:documentation
    "Avro timestamp-micros schema."))
 
-(defclass timestamp-micros (date-mixin time-micros-base)
+(defclass timestamp-micros (timestamp-micros-base)
   ()
   (:metaclass timestamp-micros-schema)
   (:documentation
@@ -156,12 +149,7 @@ timeline, independent of a particular timezone or calendar."))
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-micros) &key year month day hour minute microsecond)
-  (when (or year month hour minute microsecond)
-    (multiple-value-bind (second remainder)
-        (truncate microsecond (* 1000 1000))
-      (local-time:encode-timestamp
-       (* remainder 1000) second minute hour day month year :into instance)))
+    ((instance timestamp-micros) &key)
   (unless (and (local-time:timestamp>= instance +min-timestamp-micros+)
                (local-time:timestamp<= instance +max-timestamp-micros+))
     (error "Timestamp out of bounds")))

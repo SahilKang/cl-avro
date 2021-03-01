@@ -92,10 +92,12 @@
                                 :depends-on ("base"))
                                (:file "time"
                                 :depends-on ("base"))
+                               (:file "timestamp-base"
+                                :depends-on ("date" "time"))
                                (:file "timestamp"
-                                :depends-on ("base" "date" "time"))
+                                :depends-on ("base" "timestamp-base"))
                                (:file "local-timestamp"
-                                :depends-on ("base" "date" "time"))
+                                :depends-on ("base" "timestamp-base"))
                                (:file "package"
                                 :depends-on ("base"
                                              "uuid"

@@ -29,8 +29,8 @@
            #:time-micros-schema
            #:underlying
 
-           #:time-millis-base
-           #:time-micros-base
+           #:time-millis-mixin
+           #:time-micros-mixin
            #:time-millis
            #:time-micros
 
@@ -39,61 +39,45 @@
            #:second))
 (in-package #:cl-avro.schema.logical.time)
 
-;;; base classes
+;;; mixins
 
-(defclass time-of-day (local-time:timestamp)
+(defclass hour-minute-mixin (local-time:timestamp)
   ()
   (:documentation
-   "Base class for avro time-of-day classes."))
-
-(defclass time-millis-base (time-of-day)
-  ()
-  (:documentation
-   "Base class for avro time millis classes."))
-
-(defmethod initialize-instance :after
-    ((instance time-millis-base) &key hour minute millisecond)
-  (when (or hour minute millisecond)
-    (multiple-value-bind (second remainder)
-        (truncate millisecond 1000)
-      (local-time:encode-timestamp
-       (* remainder 1000 1000) second minute hour 1 1 1 :into instance))))
-
-(defclass time-micros-base (time-of-day)
-  ()
-  (:documentation
-   "Base class for avro time micros classes."))
-
-(defmethod initialize-instance :after
-    ((instance time-micros-base) &key hour minute microsecond)
-  (when (or hour minute microsecond)
-    (multiple-value-bind (second remainder)
-        (truncate microsecond (* 1000 1000))
-      (local-time:encode-timestamp
-       (* remainder 1000) second minute hour 1 1 1 :into instance))))
+   "hour-minute mixin."))
 
 (defgeneric hour (time-of-day)
   (:documentation "Return hour.")
-  (:method ((instance time-of-day))
+  (:method ((instance hour-minute-mixin))
     (local-time:timestamp-hour instance)))
 
 (defgeneric minute (time-of-day)
   (:documentation "Return minute.")
-  (:method ((instance time-of-day))
+  (:method ((instance hour-minute-mixin))
     (local-time:timestamp-minute instance)))
 
 (defgeneric second (time-of-day)
-  (:documentation "Return (values second remainder).")
+  (:documentation "Return (values second remainder)."))
 
-  (:method ((instance time-millis-base))
-    (let ((second (local-time:timestamp-second instance))
-          (millisecond (local-time:timestamp-millisecond instance)))
-      (values second (/ millisecond 1000))))
+(defclass time-millis-mixin (hour-minute-mixin)
+  ()
+  (:documentation
+   "time-millis mixin."))
 
-  (:method ((instance time-micros-base))
-    (let ((second (local-time:timestamp-second instance))
-          (microsecond (local-time:timestamp-microsecond instance)))
-      (values second (/ microsecond (* 1000 1000))))))
+(defmethod second ((instance time-millis-mixin))
+  (let ((second (local-time:timestamp-second instance))
+        (millisecond (local-time:timestamp-millisecond instance)))
+    (values second (/ millisecond 1000))))
+
+(defclass time-micros-mixin (hour-minute-mixin)
+  ()
+  (:documentation
+   "time-micros mixin."))
+
+(defmethod second ((instance time-micros-mixin))
+  (let ((second (local-time:timestamp-second instance))
+        (microsecond (local-time:timestamp-microsecond instance)))
+    (values second (/ microsecond (* 1000 1000)))))
 
 ;;; time-millis
 
@@ -109,7 +93,7 @@
     ((class time-millis-schema) (superclass logical-schema))
   t)
 
-(defclass time-millis (time-millis-base)
+(defclass time-millis (time-millis-mixin)
   ()
   (:metaclass time-millis-schema)
   (:documentation
@@ -117,6 +101,14 @@
 
 This represents a millisecond-precision time-of-day, with no reference
 to a particular calendar, timezone, or date."))
+
+(defmethod initialize-instance :after
+    ((instance time-millis) &key hour minute millisecond)
+  (when (or hour minute millisecond)
+    (multiple-value-bind (second remainder)
+        (truncate millisecond 1000)
+      (local-time:encode-timestamp
+       (* remainder 1000 1000) second minute hour 1 1 1 :into instance))))
 
 ;;; time-micros
 
@@ -132,7 +124,7 @@ to a particular calendar, timezone, or date."))
     ((class time-micros-schema) (superclass logical-schema))
   t)
 
-(defclass time-micros (time-micros-base)
+(defclass time-micros (time-micros-mixin)
   ()
   (:metaclass time-micros-schema)
   (:documentation
@@ -140,3 +132,11 @@ to a particular calendar, timezone, or date."))
 
 This represents a microsecond-precision time-of-day, with no reference
 to a particular calendar, timezone, or date."))
+
+(defmethod initialize-instance :after
+    ((instance time-micros) &key hour minute microsecond)
+  (when (or hour minute microsecond)
+    (multiple-value-bind (second remainder)
+        (truncate microsecond (* 1000 1000))
+      (local-time:encode-timestamp
+       (* remainder 1000) second minute hour 1 1 1 :into instance))))
