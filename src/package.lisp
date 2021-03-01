@@ -19,6 +19,140 @@
 
 (defpackage #:cl-avro
   (:nicknames #:avro)
+  (:use #:cl-avro.schema
+        #:cl-avro.io
+        #:cl-avro.single-object-encoding
+        #:cl-avro.object-container-file)
+  (:export #:schema
+           #:object
+           #:schema-of
+
+           #:fingerprint
+           #:fingerprint64
+           #:crc-64-avro
+           #:*default-fingerprint-algorithm*
+
+           #:serialize
+           #:deserialize
+           #:compare
+
+           #:single-object
+           #:single-object-p
+           #:write-single-object
+           #:single-object->fingerprint
+           #:deserialize-single-object
+
+           #:header
+           #:magic
+           #:meta
+           #:sync
+           #:schema
+           #:codec
+           #:null
+           #:deflate
+           #:snappy
+           #:bzip2
+           #:xz
+           #:zstandard
+
+           #:file-block
+           #:count
+           #:bytes
+
+           #:file-input-stream
+           #:skip-block
+           #:read-block
+
+           #:file-output-stream
+           #:write-block
+
+           #:null
+           #:boolean #:true #:false
+           #:int
+           #:long
+           #:float
+           #:double
+           #:bytes
+           #:string
+
+           #:name
+           #:namespace
+           #:fullname
+           #:aliases
+
+           #:array
+           #:array-object
+           #:items
+           #:objects
+
+           #:enum
+           #:enum-object
+           #:symbols
+           #:default
+           #:which-one
+
+           #:fixed
+           #:fixed-object
+           #:size
+           #:bytes
+
+           #:map
+           #:map-object
+           #:values
+
+           #:union
+           #:union-object
+           #:schemas
+           #:object
+           #:which-one
+
+           #:record
+           #:record-object
+           #:fields
+
+           #:field
+           #:type
+           #:order
+           #:ascending
+           #:descending
+           #:ignore
+
+           #:underlying
+
+           #:uuid
+
+           #:date
+           #:year
+           #:month
+           #:day
+
+           #:time-millis
+           #:time-micros
+           #:hour
+           #:minute
+           #:second
+
+           #:timestamp-millis
+           #:timestamp-micros
+
+           #:local-timestamp-millis
+           #:local-timestamp-micros
+
+           #:decimal
+           #:decimal-object
+           #:unscaled
+           #:scale
+           #:precision
+
+           #:duration
+           #:duration-object
+           #:months
+           #:days
+           #:milliseconds))
+
+#+nil
+(defpackage #:cl-avro
+  (:nicknames #:avro)
   (:use #:cl)
   (:export
 

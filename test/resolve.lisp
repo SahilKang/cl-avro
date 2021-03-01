@@ -23,33 +23,39 @@
 (in-package #:test/resolve)
 
 (test resolve-enum
-  (let ((writer-schema (avro:json->schema
+  (let ((writer-schema (avro:deserialize
+                        'avro:schema
                         "{type: \"enum\",
                           name: \"EnumName\",
                           symbols: [\"FOO\", \"BAR\", \"BAZ\"],
                           default: \"BAZ\"}"))
-        (reader-schema (avro:json->schema
+        (reader-schema (avro:deserialize
+                        'avro:schema
                         "{type: \"enum\",
                           name: \"EnumName\",
                           symbols: [\"FOO\", \"BAR\"],
                           default: \"FOO\"}")))
-    (is (string=
+
+    ;; TODO switch around reader and writer schema
+    (is (string= 
          "BAR"
-         (avro:deserialize (avro:serialize nil writer-schema "BAR")
-                           reader-schema)))
-    (is (string=
-         "BAR"
-         (avro:deserialize (avro:serialize nil writer-schema "BAR")
-                           reader-schema
-                           writer-schema)))
+         (avro:which-one
+          (avro:deserialize
+           reader-schema
+           (avro:serialize (make-instance writer-schema :enum "BAR"))
+           :writer-schema writer-schema))))
+
     (is (string=
          "FOO"
-         (avro:deserialize (avro:serialize nil writer-schema "BAZ")
-                           reader-schema
-                           writer-schema)))))
+         (avro:which-one
+          (avro:deserialize
+           reader-schema
+           (avro:serialize (make-instance writer-schema :enum "BAZ"))
+           :writer-schema writer-schema))))))
 
 (test resolve-record
-  (let ((writer-schema (avro:json->schema
+  (let ((writer-schema (avro:deserialize
+                        'avro:schema
                         "{type: \"record\",
                           name: \"RecordName\",
                           fields: [
@@ -58,7 +64,8 @@
                             {name: \"UnknownField\",
                              type: \"string\",
                              default: \"baz\"}]}"))
-        (reader-schema (avro:json->schema
+        (reader-schema (avro:deserialize
+                        'avro:schema
                         "{type: \"record\",
                           name: \"RecordName2\",
                           aliases: [\"RecordName\"],
@@ -73,8 +80,15 @@
     (is
      (equal
       '(2 "foo" "bar")
-      (coerce
-       (avro:deserialize (avro:serialize nil writer-schema '("foo" 2 "ignored"))
-                         reader-schema
-                         writer-schema)
-       'list)))))
+      (let ((object (avro:deserialize
+                     reader-schema
+                     (avro:serialize (make-instance
+                                      writer-schema
+                                      :|Field_1| "foo"
+                                      :|Field_2| 2
+                                      :|UnknownField| "ignored"))
+                     :writer-schema writer-schema)))
+        (list
+         (avro:field object "Field_2")
+         (avro:field object "Field_11")
+         (avro:field object "Field_3")))))))

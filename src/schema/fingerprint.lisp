@@ -15,41 +15,128 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.schema.fingerprint
+  (:use #:cl)
+  (:import-from #:cl-avro.schema.complex
+                #:schema)
+  (:import-from #:cl-avro.schema.io
+                #:schema->json)
+  (:export #:fingerprint
+           #:*default-fingerprint-algorithm*
+           #:crc-64-avro
+           #:fingerprint64))
+(in-package #:cl-avro.schema.fingerprint)
 
 (declaim ((unsigned-byte 64) +empty+))
-#.(defparameter +empty+ #xc15d213aa4d7a795)
+(defconstant +empty+ #xc15d213aa4d7a795)
 
-(declaim ((simple-vector 256) +table+))
-(defparameter +table+
-  #.(map 'simple-vector
-         (lambda (i)
-           (loop
-             repeat 8
-             do (setf i (logxor (ash i -1)
-                                (logand +empty+
-                                        (- (logand i 1)))))
-             finally (return i)))
-         (loop for i below 256 collect i)))
+(declaim ((simple-array (unsigned-byte 64) (256)) +table+))
+(defconstant +table+
+  (if (boundp '+table+)
+      +table+
+      (map '(simple-array (unsigned-byte 64) (256))
+           (lambda (i)
+             (loop
+               repeat 8
+               do (setf i (logxor (ash i -1)
+                                  (logand +empty+
+                                          (- (logand i 1)))))
+               finally (return i)))
+           (loop for i below 256 collect i))))
 
-(defun+ avro-64bit-crc (bytes)
-    ((vector[byte]) (unsigned-byte 64))
-  (reduce (lambda (fp byte)
-            (declare ((unsigned-byte 64) fp)
-                     ((unsigned-byte 8) byte))
-            (let ((table-ref (svref +table+ (logand #xff (logxor fp byte)))))
-              (declare ((unsigned-byte 64) table-ref))
-              (logxor (ash fp -8) table-ref)))
-          bytes
-          :initial-value +empty+))
+(declaim
+ (ftype (function ((unsigned-byte 64) (unsigned-byte 8))
+                  (values (unsigned-byte 64) &optional))
+        %fingerprint64)
+ (inline %fingerprint64))
+(defun %fingerprint64 (fp byte)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((table-ref (elt +table+ (logand #xff (logxor fp byte)))))
+    (logxor (ash fp -8) table-ref)))
+(declaim (notinline %fingerprint64))
 
-(defparameter *default-fingerprint-algorithm* #'avro-64bit-crc
+#+nil
+(declaim
+ (ftype (function ((simple-array (unsigned-byte 8) (*)))
+                  (values (unsigned-byte 64) &optional)))
+ (inline fingerprint64))
+#+nil
+(defun fingerprint64 (bytes)
+  (declare (optimize (speed 3) (safety 0))
+           (inline %fingerprint64))
+  (reduce #'%fingerprint64 bytes :initial-value +empty+))
+#+nil
+(declaim (notinline fingerprint64))
+
+;; TODO clean this shit up
+(declaim
+ (ftype (function ((or schema (simple-array (unsigned-byte 8) (*))))
+                  (values (unsigned-byte 64) &optional))
+        fingerprint64)
+ (inline fingerprint64))
+(defun fingerprint64 (bytes-or-schema)
+  (declare (optimize (speed 3) (safety 0))
+           (inline %fingerprint64))
+  (let ((bytes (if (typep bytes-or-schema 'schema)
+                   (babel:string-to-octets
+                    (with-output-to-string (stream)
+                      (schema->json bytes-or-schema stream t))
+                    :encoding :utf-8)
+                   bytes-or-schema)))
+    (reduce #'%fingerprint64 bytes :initial-value +empty+)))
+(declaim (notinline fingerprint64))
+
+(deftype fingerprint ()
+  '(function
+    ((simple-array (unsigned-byte 8) (*)))
+    (values (simple-array (unsigned-byte 8) (*)) &optional)))
+
+(declaim
+ (ftype (function ((unsigned-byte 64))
+                  (values (simple-array (unsigned-byte 8) (8)) &optional))
+        to-little-endian)
+ (inline to-little-endian))
+(defun to-little-endian (number)
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    with bytes = (make-array 8 :element-type '(unsigned-byte 8))
+
+    for i below 8
+    for byte of-type (unsigned-byte 8) = (logand #xff (ash number (* i -8)))
+    do (setf (elt bytes i) byte)
+
+    finally
+       (return bytes)))
+(declaim (notinline to-little-endian))
+
+;; TODO use better safety if this is external
+(declaim
+ (ftype fingerprint crc-64-avro)
+ (inline crc-64-avro))
+(defun crc-64-avro (bytes)
+  (declare (optimize (speed 3) (safety 0))
+           (inline fingerprint64 to-little-endian))
+  (to-little-endian
+   (fingerprint64 bytes)))
+(declaim (notinline crc-64-avro))
+
+(defparameter *default-fingerprint-algorithm* #'crc-64-avro
   "Default function used by FINGERPRINT.")
 
-(defun* fingerprint (schema &optional (algorithm *default-fingerprint-algorithm*))
-    ((avro-schema &optional (function (vector[byte]) (unsigned-byte 64))) (unsigned-byte 64))
+(declaim
+ (ftype (function (schema &optional fingerprint)
+                  (values (simple-array (unsigned-byte 8) (*)) &optional))
+        fingerprint)
+ (inline fingerprint))
+(defun fingerprint
+    (schema &optional (algorithm *default-fingerprint-algorithm*))
   "Return the fingerprint of avro SCHEMA under ALGORITHM."
-  (declare ((function (vector[byte]) (unsigned-byte 64)) algorithm))
-  (let* ((string (schema->json schema t))
-         (bytes (babel:string-to-octets string :encoding :utf-8)))
-    (funcall algorithm bytes)))
+  (declare (optimize (speed 3) (safety 3)))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (let* ((string (with-output-to-string (stream)
+                     (schema->json schema stream t)))
+           (bytes (babel:string-to-octets string :encoding :utf-8)))
+      (funcall algorithm bytes))))
+(declaim (notinline fingerprint))

@@ -34,35 +34,42 @@
     (let* ((expected-precision 3)
            (expected-scale 2)
            (json (make-json expected-precision expected-scale))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= expected-scale (avro:scale schema)))
       (let ((value 200))
-        (is (= value (avro:deserialize
-                      (avro:serialize nil schema value)
-                      schema))))
+        (is (= value (avro:unscaled
+                      (avro:deserialize
+                       schema
+                       (avro:serialize
+                        (make-instance schema :unscaled value)))))))
       (signals error
-        (avro:serialize nil schema 2000)))
+        (make-instance schema :unscaled 2000)))
+
     (let* ((expected-precision 3)
            (expected-scale expected-precision)
            (json (make-json expected-precision expected-scale))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= expected-scale (avro:scale schema)))
       (let ((value 200))
-        (is (= value (avro:deserialize
-                      (avro:serialize nil schema value)
-                      schema))))
+        (is (= value (avro:unscaled
+                      (avro:deserialize
+                       schema
+                       (avro:serialize
+                        (make-instance schema :unscaled value)))))))
       (signals error
-        (avro:serialize nil schema 2000)))
+        (make-instance schema :unscaled 2000)))
+
     (let* ((expected-precision 3)
            (expected-scale (1+ expected-precision))
            (json (make-json expected-precision expected-scale))
-           (schema (avro:json->schema json)))
-      (is (eq 'avro:bytes-schema schema)))
+           (schema (avro:deserialize 'avro:schema json)))
+      (is (eq 'avro:bytes schema)))
+
     (let* ((expected-precision 3)
            (json (make-json expected-precision))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= 0 (avro:scale schema))))))
 
@@ -80,145 +87,226 @@
            (expected-scale 2)
            (expected-size 2)
            (json (make-json expected-precision expected-size expected-scale))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= expected-scale (avro:scale schema)))
-      (is (= expected-size (avro:size (avro::underlying-schema schema))))
+      (is (= expected-size (avro:size (avro:underlying schema))))
       (let ((value 200))
-        (is (= value (avro:deserialize
-                      (avro:serialize nil schema value)
-                      schema))))
+        (is (= value (avro:unscaled
+                      (avro:deserialize
+                       schema
+                       (avro:serialize
+                        (make-instance schema :unscaled value)))))))
       (signals error
-        (avro:serialize nil schema 2000)))
+        (make-instance schema :unscaled 2000)))
+
     (let* ((expected-precision 3)
            (expected-scale expected-precision)
            (expected-size 2)
            (json (make-json expected-precision expected-size expected-scale))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= expected-scale (avro:scale schema)))
-      (is (= expected-size (avro:size (avro::underlying-schema schema))))
+      (is (= expected-size (avro:size (avro:underlying schema))))
       (let ((value 200))
-        (is (= value (avro:deserialize
-                      (avro:serialize nil schema value)
-                      schema))))
+        (is (= value (avro:unscaled
+                      (avro:deserialize
+                       schema
+                       (avro:serialize
+                        (make-instance schema :unscaled value)))))))
       (signals error
-        (avro:serialize nil schema 2000)))
+        (make-instance schema :unscaled 2000)))
+
     (let* ((expected-precision 3)
            (expected-scale (1+ expected-precision))
            (expected-size 2)
            (json (make-json expected-precision expected-size expected-scale))
-           (schema (avro:json->schema json)))
-      (is (eq 'avro:fixed-schema (type-of schema)))
+           (schema (avro:deserialize 'avro:schema json)))
+      (is (typep schema 'avro:fixed))
       (is (= expected-size (avro:size schema))))
+
     (let* ((expected-precision 3)
            (expected-scale 2)
            (expected-size 1)
            (json (make-json expected-precision expected-size expected-scale))
-           (schema (avro:json->schema json)))
-      (is (eq 'avro:fixed-schema (type-of schema)))
+           (schema (avro:deserialize 'avro:schema json)))
+      (is (typep schema 'avro:fixed))
       (is (= expected-size (avro:size schema))))
+
     (let* ((expected-precision 3)
            (expected-size 4)
            (json (make-json expected-precision expected-size))
-           (schema (avro:json->schema json)))
+           (schema (avro:deserialize 'avro:schema json)))
       (is (= expected-precision (avro:precision schema)))
       (is (= 0 (avro:scale schema)))
-      (is (= expected-size (avro:size (avro::underlying-schema schema)))))))
+      (is (= expected-size (avro:size (avro:underlying schema)))))))
 
 
 (test uuid
-  (let ((schema (avro:json->schema "{type: \"string\", logicalType: \"uuid\"}"))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"string\", logicalType: \"uuid\"}"))
         (expected "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-    (is (eq 'avro:uuid-schema schema))
-    (is (string= expected (avro:deserialize
-                           (avro:serialize nil schema expected)
-                           schema)))
+    (is (eq (find-class 'avro:uuid) schema))
+    (is (string= expected (avro:uuid
+                           (avro:deserialize
+                            schema
+                            (avro:serialize
+                             (make-instance schema :uuid expected))))))
     (signals error
-      (avro:serialize nil schema "abc"))
+      (make-instance schema :uuid "abc"))
     (signals error
-      (avro:serialize nil schema ""))
-    (signals error
-      (avro:serialize nil schema 123))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"uuid\"}")))
-    (is (eq 'avro:bytes-schema schema))))
+      (make-instance schema :uuid ""))
+    (signals (or error warning)
+      (make-instance schema :uuid 123))
+    (signals (or error warning)
+      (make-instance schema :uuid nil)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"bytes\", logicalType: \"uuid\"}")))
+    (is (eq 'avro:bytes schema))))
 
 
 (test date
-  (let ((schema (avro:json->schema "{type: \"int\", logicalType: \"date\"}"))
-        (expected 123))
-    (is (eq 'avro:date-schema schema))
-    (is (= expected (avro:deserialize
-                     (avro:serialize nil schema expected)
-                     schema)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"int\", logicalType: \"date\"}"))
+        (expected '(1 2 3)))
+    (is (eq (find-class 'avro:date) schema))
+    (is (equal expected
+               (let ((date (avro:deserialize
+                            schema
+                            (avro:serialize
+                             (make-instance
+                              schema
+                              :year (first expected)
+                              :month (second expected)
+                              :day (third expected))))))
+                 (list (avro:year date)
+                       (avro:month date)
+                       (avro:day date)))))
     (signals error
-      (avro:serialize nil schema "abc"))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"string\", logicalType: \"date\"}")))
-    (is (eq 'avro:string-schema schema))))
+      (make-instance schema :year "abc")))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"string\", logicalType: \"date\"}")))
+    (is (eq 'avro:string schema))))
 
 
 (test time-millis
-  (let ((schema (avro:json->schema "{type: \"int\", logicalType: \"time-millis\"}"))
-        (expected 123))
-    (is (eq 'avro:time-millis-schema schema))
-    (is (= expected (avro:deserialize
-                     (avro:serialize nil schema expected)
-                     schema)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"int\", logicalType: \"time-millis\"}"))
+        (expected '(1 2 3)))
+    (is (eq (find-class 'avro:time-millis) schema))
+    (is (equal expected
+               (let ((time (avro:deserialize
+                            schema
+                            (avro:serialize
+                             (make-instance
+                              schema
+                              :hour (first expected)
+                              :minute (second expected)
+                              :millisecond (third expected))))))
+                 (list (avro:hour time)
+                       (avro:minute time)
+                       (multiple-value-bind (second remainder)
+                           (avro:second time)
+                         (+ (* 1000 second)
+                            (* 1000 remainder)))))))
     (signals error
-      (avro:serialize nil schema -1))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"time-millis\"}")))
-    (is (eq 'avro:bytes-schema schema))))
+      (make-instance schema :hour -1)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"bytes\", logicalType: \"time-millis\"}")))
+    (is (eq 'avro:bytes schema))))
 
 
 (test time-micros
-  (let ((schema (avro:json->schema "{type: \"long\", logicalType: \"time-micros\"}"))
-        (expected 123))
-    (is (eq 'avro:time-micros-schema schema))
-    (is (= expected (avro:deserialize
-                     (avro:serialize nil schema expected)
-                     schema)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"long\", logicalType: \"time-micros\"}"))
+        (expected '(1 2 3)))
+    (is (eq (find-class 'avro:time-micros) schema))
+    (is (equal expected
+               (let ((time (avro:deserialize
+                            schema
+                            (avro:serialize
+                             (make-instance
+                              schema
+                              :hour (first expected)
+                              :minute (second expected)
+                              :microsecond (third expected))))))
+                 (list (avro:hour time)
+                       (avro:minute time)
+                       (multiple-value-bind (second remainder)
+                           (avro:second time)
+                         (+ (* 1000 1000 second)
+                            (* 1000 1000 remainder)))))))
     (signals error
-      (avro:serialize nil schema -1))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"time-micros\"}")))
-    (is (eq 'avro:bytes-schema schema))))
+      (make-instance schema :hour -1)))
+  (let ((schema (avro:deserialize
+                 'avro:schema"{type: \"bytes\", logicalType: \"time-micros\"}")))
+    (is (eq 'avro:bytes schema))))
 
 
 (test timestamp-millis
-  (let ((schema (avro:json->schema "{type: \"long\", logicalType: \"timestamp-millis\"}"))
-        (expected 123))
-    (is (eq 'avro:timestamp-millis-schema schema))
-    (is (= expected (avro:deserialize
-                     (avro:serialize nil schema expected)
-                     schema)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"long\", logicalType: \"timestamp-millis\"}"))
+        (expected '(1 2 3 4 5 6)))
+    (is (eq (find-class 'avro:timestamp-millis) schema))
+    (is (equal expected
+               (let ((timestamp (avro:deserialize
+                                 schema
+                                 (avro:serialize
+                                  (make-instance
+                                   schema
+                                   :year (first expected)
+                                   :month (second expected)
+                                   :day (third expected)
+                                   :hour (fourth expected)
+                                   :minute (fifth expected)
+                                   :millisecond (sixth expected))))))
+                 (list (avro:year timestamp)
+                       (avro:month timestamp)
+                       (avro:day timestamp)
+                       (avro:hour timestamp)
+                       (avro:minute timestamp)
+                       (multiple-value-bind (second remainder)
+                           (avro:second timestamp)
+                         (+ (* 1000 second)
+                            (* 1000 remainder)))))))
     (signals error
-      (avro:serialize nil schema "abc"))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"timestamp-millis\"}")))
-    (is (eq 'avro:bytes-schema schema))))
+      (make-instance schema :year "abc")))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"bytes\", logicalType: \"timestamp-millis\"}")))
+    (is (eq 'avro:bytes schema))))
 
 
 (test timestamp-micros
-  (let ((schema (avro:json->schema "{type: \"long\", logicalType: \"timestamp-micros\"}"))
-        (expected 123))
-    (is (eq 'avro:timestamp-micros-schema schema))
-    (is (= expected (avro:deserialize
-                     (avro:serialize nil schema expected)
-                     schema)))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"long\", logicalType: \"timestamp-micros\"}"))
+        (expected (list 1 2 3 4 5 6)))
+    (is (eq (find-class 'avro:timestamp-micros) schema))
+    (is (equal expected
+               (let ((timestamp (avro:deserialize
+                                 schema
+                                 (avro:serialize
+                                  (make-instance
+                                   schema
+                                   :year (first expected)
+                                   :month (second expected)
+                                   :day (third expected)
+                                   :hour (fourth expected)
+                                   :minute (fifth expected)
+                                   :microsecond (sixth expected))))))
+                 (list (avro:year timestamp)
+                       (avro:month timestamp)
+                       (avro:day timestamp)
+                       (avro:hour timestamp)
+                       (avro:minute timestamp)
+                       (multiple-value-bind (second remainder)
+                           (avro:second timestamp)
+                         (+ (* 1000 1000 second)
+                            (* 1000 1000 remainder)))))))
     (signals error
-      (avro:serialize nil schema "abc"))
-    (signals error
-      (avro:serialize nil schema nil)))
-  (let ((schema (avro:json->schema "{type: \"bytes\", logicalType: \"timestamp-micros\"}")))
-    (is (eq 'avro:bytes-schema schema))))
+      (make-instance schema :year "abc")))
+  (let ((schema (avro:deserialize
+                 'avro:schema "{type: \"bytes\", logicalType: \"timestamp-micros\"}")))
+    (is (eq 'avro:bytes schema))))
 
 
 (test duration
@@ -228,20 +316,26 @@
                      logicalType: \"duration\"}"
                    size)))
     (let* ((size 12)
-           (schema (avro:json->schema (make-json size)))
-           (expected #(2 4 6)))
-      (is (eq 'avro:duration-schema (type-of schema)))
-      (is (= size (avro:size (avro::underlying-schema schema))))
-      (is (equalp expected (avro:deserialize
-                            (avro:serialize nil schema expected)
-                            schema)))
-      (signals error
-        (avro:serialize nil schema #()))
-      (signals error
-        (avro:serialize nil schema nil))
-      (signals error
-        (avro:serialize nil schema #(2 4 #.(expt 2 32)))))
+           (schema (avro:deserialize 'avro:schema (make-json size)))
+           (expected '(2 4 6)))
+      (is (typep schema 'avro:duration))
+      (is (= size (avro:size (avro:underlying schema))))
+      (is (equal expected
+                 (let ((duration (avro:deserialize
+                                  schema
+                                  (avro:serialize
+                                   (make-instance
+                                    schema
+                                    :months (first expected)
+                                    :days (second expected)
+                                    :milliseconds (third expected))))))
+                   (list (avro:months duration)
+                         (avro:days duration)
+                         (avro:milliseconds duration)))))
+      (signals (or error warning)
+        (make-instance schema :months 2 :days 4 :milliseconds (expt 2 32))))
+
     (let* ((size 11)
-           (schema (avro:json->schema (make-json size))))
-      (is (eq 'avro:fixed-schema (type-of schema)))
+           (schema (avro:deserialize 'avro:schema (make-json size))))
+      (is (typep schema 'avro:fixed))
       (is (= size (avro:size schema))))))
