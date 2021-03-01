@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
