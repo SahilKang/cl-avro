@@ -25,38 +25,33 @@
                 #:int)
   (:export #:date-schema
            #:underlying
-           #:date-base
+           #:date-mixin
            #:date
            #:year
            #:month
            #:day))
 (in-package #:cl-avro.schema.logical.date)
 
-;;; base class
+;;; mixin
 
-(defclass date-base (local-time:timestamp)
+(defclass date-mixin (local-time:timestamp)
   ()
   (:documentation
-   "Base class for avro date classes."))
-
-(defmethod initialize-instance :after
-    ((instance date-base) &key year month day)
-  (when (or year month)
-    (local-time:encode-timestamp 0 0 0 0 day month year :into instance)))
+   "Date mixin."))
 
 (defgeneric year (date)
   (:documentation "Return year.")
-  (:method ((instance date-base))
+  (:method ((instance date-mixin))
     (local-time:timestamp-year instance)))
 
 (defgeneric month (date)
   (:documentation "Return month.")
-  (:method ((instance date-base))
+  (:method ((instance date-mixin))
     (local-time:timestamp-month instance)))
 
 (defgeneric day (date)
   (:documentation "Return day.")
-  (:method ((instance date-base))
+  (:method ((instance date-mixin))
     (local-time:timestamp-day instance)))
 
 ;;; date
@@ -73,7 +68,7 @@
     ((class date-schema) (superclass logical-schema))
   t)
 
-(defclass date (date-base)
+(defclass date (date-mixin)
   ()
   (:metaclass date-schema)
   (:documentation
@@ -81,3 +76,8 @@
 
 This represents a date on the calendar, with no reference to a
 particular timezone or time-of-day."))
+
+(defmethod initialize-instance :after
+    ((instance date) &key year month day)
+  (when (or year month)
+    (local-time:encode-timestamp 0 0 0 0 day month year :into instance)))

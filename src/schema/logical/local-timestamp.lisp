@@ -24,7 +24,7 @@
   (:import-from #:cl-avro.schema.primitive
                 #:long)
   (:import-from #:cl-avro.schema.logical.date
-                #:date-base
+                #:date-mixin
                 #:year
                 #:month
                 #:day)
@@ -60,7 +60,7 @@
   (:documentation
    "Avro local-timestamp-millis schema."))
 
-(defclass local-timestamp-millis (date-base time-millis-base)
+(defclass local-timestamp-millis (date-mixin time-millis-base)
   ()
   (:metaclass local-timestamp-millis-schema)
   (:documentation
@@ -79,7 +79,7 @@ regardless of what specific timezone is considered local."))
   (:documentation
    "Avro local-timestamp-micros schema."))
 
-(defclass local-timestamp-micros (date-base time-micros-base)
+(defclass local-timestamp-micros (date-mixin time-micros-base)
   ()
   (:metaclass local-timestamp-micros-schema)
   (:documentation
