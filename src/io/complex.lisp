@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,225 +15,172 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.io.complex
+  (:use #:cl)
+  (:local-nicknames
+   (#:schema #:cl-avro.schema)
+   (#:stream #:cl-avro.io.block-stream))
+  (:import-from #:cl-avro.io.base
+                #:serialize
+                #:deserialize)
+  (:export #:serialize
+           #:deserialize))
+(in-package #:cl-avro.io.complex)
 
-;;; fixed-schema
+;;; fixed schema
 
-(defmethod validp ((schema fixed-schema) object)
-  (and (typep object '(typed-vector (unsigned-byte 8)))
-       (= (length object) (size schema))))
+(defmethod serialize ((object schema:fixed-object) &key stream)
+  "Write fixed bytes into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (write-sequence (schema:bytes object) stream)
+  (values))
 
-(defmethod deserialize ((stream stream)
-                        (schema fixed-schema)
-                        &optional writer-schema)
-  "Read using the number of bytes declared in the schema."
-  (declare (ignore writer-schema))
-  (let ((buf (make-array (size schema) :element-type '(unsigned-byte 8))))
-    (loop
-       for i below (size schema)
-       do (setf (elt buf i) (read-byte stream nil :eof)))
-    buf))
+(defmethod deserialize ((schema schema:fixed) (stream stream) &key)
+  "Read a fixed number of bytes from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((size (schema:size schema))
+         (bytes (make-array size :element-type '(unsigned-byte 8))))
+    (unless (= (read-sequence bytes stream) size)
+      (error 'end-of-file :stream *error-output*))
+    (make-instance schema :bytes bytes)))
 
-(defmethod serialize ((stream stream)
-                      (schema fixed-schema)
-                      object)
+;;; union schema
+
+(defmethod serialize ((object schema:union-object) &key stream)
+  "Write tagged union into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((position (nth-value 1 (schema:which-one object))))
+    (serialize position :stream stream))
+  (serialize (schema:object object) :stream stream)
+  (values))
+
+(defmethod deserialize ((schema schema:union) (stream stream) &key)
+  "Read a tagged union from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((schemas (schema:schemas schema))
+         (position (deserialize 'schema:int stream))
+         (chosen-schema (elt schemas position))
+         (value (deserialize chosen-schema stream)))
+    (declare ((simple-array schema:schema (*)) schemas))
+    (make-instance schema :object value)))
+
+;;; array schema
+
+(defmethod serialize ((object schema:array-object) &key stream)
+  "Write array into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((array (schema:objects object))
+         (count (length array)))
+    (declare ((simple-array schema:schema (*)) array))
+    (unless (zerop count)
+      (serialize count :stream stream)
+      (flet ((serialize (elt)
+               (serialize elt :stream stream)))
+        (map nil #'serialize array))))
+  (serialize 0 :stream stream)
+  (values))
+
+(defmethod deserialize ((schema schema:array) (stream stream) &key)
+  "Read an array from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
   (loop
-     for i below (length object)
-     do (write-byte (elt object i) stream)))
+    with array-stream = (make-instance 'stream:array-input-stream
+                                       :schema (schema:items schema)
+                                       :stream stream)
+    and vector = (make-array 0 :element-type (schema:items schema)
+                               :adjustable t :fill-pointer t)
 
-;;; union-schema
+    for item = (stream:read-item array-stream)
+    until (eq item :eof)
+    do (vector-push-extend item vector)
 
-(defclass union-value ()
-  ((value
-    :initform (error "Must supply :value")
-    :initarg :value
-    :reader value)
-   (position
-    :initform (error "Must supply :position")
-    :initarg :position
-    :type (integer 0))))
+    finally
+       (return (make-instance schema :objects vector))))
 
-(defmethod print-object ((union-value union-value) stream)
-  (with-slots (value) union-value
-    (format stream "~A" value)))
+;;; map schema
 
-(defmethod validp ((schema union-schema) object)
-  (some (lambda (s) (validp s object)) (schemas schema)))
+(defmethod serialize ((object schema:map-object) &key stream)
+  "Write map into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((hash-table (schema:map object))
+         (count (hash-table-count hash-table)))
+    (unless (zerop count)
+      (serialize count :stream stream)
+      (flet ((serialize (key value)
+               (serialize key :stream stream)
+               (serialize value :stream stream)))
+        (maphash #'serialize hash-table))))
+  (serialize 0 :stream stream)
+  (values))
 
-(defmethod validp ((schema union-schema) (object union-value))
-  (with-slots (value position) object
-    (when (< position (length (schemas schema)))
-      (validp (elt (schemas schema) position) value))))
-
-(defmethod deserialize ((stream stream)
-                        (schema union-schema)
-                        &optional writer-schema)
-  "Read with a long indicating the union type and then the value itself."
-  (declare (ignore writer-schema))
-  (let* ((pos (deserialize stream 'long-schema))
-         (val (deserialize stream (elt (schemas schema) pos))))
-    (make-instance 'union-value :value val :position pos)))
-
-(defmethod serialize ((stream stream)
-                      (schema union-schema)
-                      (object union-value))
-  (with-slots (value position) object
-    (serialize stream 'long-schema position)
-    (serialize stream (elt (schemas schema) position) value)))
-
-(defmethod serialize ((stream stream)
-                      (schema union-schema)
-                      object)
-  (let ((pos (loop
-                for schema across (schemas schema) and i from 0
-                when (validp schema object)
-                collect i)))
-    (cond
-      ((zerop (length pos))
-       (error "~&Object doesn't match any union schema: ~A" object))
-      ((> (length pos) 1)
-       (error "~&Object matches multiple union schemas: ~A" object))
-      (t
-       (let ((union-value (make-instance 'union-value
-                                         :value object
-                                         :position (first pos))))
-         (serialize stream schema union-value))))))
-
-;;; array-schema
-
-(defmethod validp ((schema array-schema) object)
-  (and (typep object 'sequence)
-       (every (lambda (elt) (validp (item-schema schema) elt)) object)))
-
-(defmethod deserialize ((stream stream)
-                        (schema array-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
+(defmethod deserialize ((schema schema:map) (stream stream) &key)
+  "Read a map from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
   (loop
-     with vector = (make-array 0 :adjustable t :fill-pointer 0)
-     with array-stream = (make-instance 'array-input-stream
-                                        :input-stream stream
-                                        :schema (item-schema schema))
+    with map-stream = (make-instance 'stream:map-input-stream
+                                     :schema (schema:values schema)
+                                     :stream stream)
+    and hash-table = (make-hash-table :test #'equal)
 
-     for item = (stream-read-item array-stream)
-     until (eq item :eof)
-     do (vector-push-extend item vector)
+    for pair = (stream:read-item map-stream)
+    until (eq pair :eof)
+    for (key . value) = pair
+    do (setf (gethash key hash-table) value)
 
-     finally (return vector)))
+    finally
+       (return (make-instance schema :map hash-table))))
 
-(defmethod serialize ((stream stream)
-                      (schema array-schema)
-                      (object sequence))
-  (let ((block-count (length object)))
-    (unless (zerop block-count)
-      (serialize stream 'long-schema block-count)
-      (loop
-         with schema = (item-schema schema)
-         for i below block-count
-         do (serialize stream schema (elt object i)))))
-  (serialize stream 'long-schema 0))
+;;; enum schema
 
-;;; map-schema
+(defmethod serialize ((object schema:enum-object) &key stream)
+  "Write enum into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((position (nth-value 1 (schema:which-one object))))
+    (serialize position :stream stream))
+  (values))
 
-(defmethod validp ((schema map-schema) object)
-  (and (hash-table-p object)
-       (eq (hash-table-test object) 'equal)
-       (loop
-          with value-schema = (value-schema schema)
+(defmethod deserialize ((schema schema:enum) (stream stream) &key)
+  "Read an enum from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
+  ;; TODO should just have a factory method on the class/schema
+  ;; i.e intern enum objects on the class/schema
+  (let* ((symbols (schema:symbols schema))
+         (position (deserialize 'schema:int stream))
+         (chosen-enum (elt symbols position)))
+    (declare ((simple-array schema:name (*)) symbols))
+    (make-instance schema :enum chosen-enum)))
 
-          for key being the hash-keys of object using (hash-value value)
+;;; record schema
 
-          always (and (validp 'string-schema key)
-                      (validp value-schema value)))))
-
-(defmethod deserialize ((stream stream)
-                        (schema map-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
+(defmethod serialize ((object schema:record-object) &key stream)
+  "Write record into STREAM."
+  (declare (optimize (speed 3) (safety 0)))
   (loop
-     with hash-table = (make-hash-table :test #'equal)
-     with map-stream = (make-instance 'map-input-stream
-                                      :input-stream stream
-                                      :schema (value-schema schema))
+    with fields of-type (simple-array schema:field (*)) = (schema:fields
+                                                           (class-of object))
 
-     for pair = (stream-read-item map-stream)
-     until (eq pair :eof)
-     for (key val) = pair
-     do (setf (gethash key hash-table) val)
+    for field of-type schema:field across fields
+    for value = (schema:field object (schema:name field))
 
-     finally (return hash-table)))
+    do (serialize value :stream stream)
 
-(defmethod serialize ((stream stream)
-                      (schema map-schema)
-                      (object hash-table))
-  (let ((block-count (hash-table-count object))
-        (value-schema (value-schema schema)))
-    (unless (zerop block-count)
-      (serialize stream 'long-schema block-count)
-      (maphash (lambda (k v)
-                 (serialize stream 'string-schema k)
-                 (serialize stream value-schema v))
-               object)))
-  (serialize stream 'long-schema 0))
+    finally
+       (return (values))))
 
-;;; enum-schema
-
-(defmethod validp ((schema enum-schema) object)
-  (and (typep object 'avro-name)
-       (not (null (position object (symbols schema) :test #'string=)))))
-
-(defmethod deserialize ((stream stream)
-                        (schema enum-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (let ((pos (deserialize stream 'int-schema)))
-    (elt (symbols schema) pos)))
-
-(defmethod serialize ((stream stream)
-                      (schema enum-schema)
-                      (object string))
-  (let ((pos (position object (symbols schema) :test #'string=)))
-    (when (null pos)
-      (error "~&String not in enum: ~A" object))
-    (serialize stream 'int-schema pos)))
-
-;;; record-schema
-
-(defmethod validp ((schema record-schema) object)
-  (and (typep object 'sequence)
-       (= (length (field-schemas schema)) (length object))
-       (every #'validp (field-schemas schema) object)))
-
-(defmethod validp ((schema field-schema) object)
-  (validp (field-type schema) object))
-
-(defmethod deserialize ((stream stream)
-                        (schema record-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (let* ((field-schemas (field-schemas schema))
-         (fields (make-array (length field-schemas))))
-    (loop
-       for schema across field-schemas and i from 0
-       for value = (deserialize stream schema)
-       do (setf (elt fields i) value))
-    fields))
-
-(defmethod deserialize ((stream stream)
-                        (schema field-schema)
-                        &optional writer-schema)
-  (declare (ignore writer-schema))
-  (deserialize stream (field-type schema)))
-
-(defmethod serialize ((stream stream)
-                      (schema record-schema)
-                      object)
+(defmethod deserialize ((schema schema:record) (stream stream) &key)
+  "Read a record from STREAM."
+  (declare (optimize (speed 3) (safety 0)))
   (loop
-     for schema across (field-schemas schema) and i from 0
-     for field = (elt object i)
-     do (serialize stream schema field)))
+    with fields of-type (simple-array schema:field (*)) = (schema:fields schema)
+    and initargs of-type list = nil
 
-(defmethod serialize ((stream stream)
-                      (schema field-schema)
-                      object)
-  (serialize stream (field-type schema) object))
+    for field of-type schema:field across fields
+    for value = (deserialize (schema:type field) stream)
+
+    do
+       (push value initargs)
+       (push (intern (schema:name field) 'keyword) initargs)
+
+    finally
+       (return (apply #'make-instance schema initargs))))

@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -19,81 +19,133 @@
 
 (defpackage #:cl-avro
   (:nicknames #:avro)
-  (:use #:cl #:trivial-gray-streams)
-  (:export
+  (:use #:cl-avro.schema
+        #:cl-avro.io
+        #:cl-avro.single-object-encoding
+        #:cl-avro.object-container-file)
+  (:export #:schema
+           #:object
+           #:schema-of
 
-   ;; primitive avro schemas
-   #:null-schema
-   #:boolean-schema
-   #:int-schema
-   #:long-schema
-   #:float-schema
-   #:double-schema
-   #:bytes-schema
-   #:string-schema
+           #:fingerprint
+           #:fingerprint64
+           #:crc-64-avro
+           #:*default-fingerprint-algorithm*
 
-   ;; complex avro schemas
-   #:fixed-schema
-   #:union-schema
-   #:array-schema
-   #:map-schema
-   #:enum-schema
-   #:record-schema
-   #:field-schema
+           #:serialize
+           #:deserialize
+           #:compare
 
-   ;; methods on complex schemas
-   #:name
-   #:namespace
-   #:aliases
-   #:doc
-   #:size
-   #:schemas
-   #:item-schema
-   #:value-schema
-   #:symbols
-   #:default
-   #:field-type
-   #:order
-   #:field-schemas
+           #:single-object
+           #:single-object-p
+           #:write-single-object
+           #:single-object->fingerprint
+           #:deserialize-single-object
 
-   ;; logical avro schemas
-   #:decimal-schema
-   #:scale
-   #:precision
+           #:header
+           #:magic
+           #:meta
+           #:sync
+           #:schema
+           #:codec
+           #:null
+           #:deflate
+           #:snappy
+           #:bzip2
+           #:xz
+           #:zstandard
 
-   #:uuid-schema
-   #:date-schema
-   #:time-millis-schema
-   #:time-micros-schema
-   #:timestamp-millis-schema
-   #:timestamp-micros-schema
-   #:duration-schema
+           #:file-block
+           #:count
+           #:bytes
 
-   ;; io
-   #:validp
-   #:serialize
-   #:deserialize
-   #:json->schema
-   #:schema->json
-   #:compare
+           #:file-input-stream
+           #:skip-block
+           #:read-block
 
-   ;; avro object container files
-   #:file-input-stream
-   #:file-output-stream
-   #:schema
-   #:codec
-   #:metadata
-   #:sync
-   #:read-block
-   #:write-block
-   #:skip-block
+           #:file-output-stream
+           #:write-block
 
-   ;; fingerprinting avro schemas
-   #:fingerprint
-   #:*default-fingerprint-algorithm*
-   #:avro-64bit-crc
+           #:null
+           #:boolean #:true #:false
+           #:int
+           #:long
+           #:float
+           #:double
+           #:bytes
+           #:string
 
-   ;; avro single object encoding
-   #:single-object-p
-   #:write-single-object
-   #:read-single-object))
+           #:name
+           #:namespace
+           #:fullname
+           #:aliases
+
+           #:array
+           #:array-object
+           #:items
+           #:objects
+
+           #:enum
+           #:enum-object
+           #:symbols
+           #:default
+           #:which-one
+
+           #:fixed
+           #:fixed-object
+           #:size
+           #:bytes
+
+           #:map
+           #:map-object
+           #:values
+
+           #:union
+           #:union-object
+           #:schemas
+           #:object
+           #:which-one
+
+           #:record
+           #:record-object
+           #:fields
+
+           #:field
+           #:type
+           #:order
+           #:ascending
+           #:descending
+           #:ignore
+
+           #:underlying
+
+           #:uuid
+
+           #:date
+           #:year
+           #:month
+           #:day
+
+           #:time-millis
+           #:time-micros
+           #:hour
+           #:minute
+           #:second
+
+           #:timestamp-millis
+           #:timestamp-micros
+
+           #:local-timestamp-millis
+           #:local-timestamp-micros
+
+           #:decimal
+           #:decimal-object
+           #:unscaled
+           #:scale
+           #:precision
+
+           #:duration
+           #:duration-object
+           #:months
+           #:days
+           #:milliseconds))

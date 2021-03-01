@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,178 +15,96 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.schema.primitive
+  (:use #:cl)
+  (:shadow #:null
+           #:boolean
+           #:float
+           #:string)
+  (:export #:primitive-schema
+           #:primitive-object
+           #:+primitive->name+
 
-;;; avro primitive types
+           #:null
+           #:boolean #:true #:false
+           #:int
+           #:long
+           #:float
+           #:double
+           #:bytes
+           #:string))
+(in-package #:cl-avro.schema.primitive)
 
-(deftype null-schema ()
-  "Represents the avro null schema."
-  'null)
+(eval-when (:compile-toplevel)
+  (defparameter *primitives* nil
+    "List of primitive schemas."))
 
-(deftype boolean-schema ()
-  "Represents the avro boolean schema."
-  'boolean)
+(defmacro defprimitive (name base &body docstring)
+  "Define a primitive schema NAME based on BASE."
+  (declare (symbol name)
+           ((or symbol cons) base))
+  (pushnew name *primitives* :test #'eq)
+  `(deftype ,name ()
+     ,@docstring
+     ',base))
 
-(defmacro get-signed-range (bits)
-  (let* ((max (1- (expt 2 (1- bits))))
-         (min (- (1+ max))))
-    `'(,min ,max)))
 
-(deftype int-schema ()
-  "Represents the avro int schema."
-  (let ((min-max (get-signed-range 32))
-        (signed-32-bit-p (intern-gensym)))
-    (setf (symbol-function signed-32-bit-p)
-          (lambda (int)
-            (and (typep int 'integer)
-                 (>= int (first min-max))
-                 (<= int (second min-max)))))
-    `(satisfies ,signed-32-bit-p)))
+(defprimitive null cl:null
+  "Represents the avro null schema.")
 
-(deftype long-schema ()
-  "Represents the avro long schema."
-  (let ((min-max (get-signed-range 64))
-        (signed-64-bit-p (intern-gensym)))
-    (setf (symbol-function signed-64-bit-p)
-          (lambda (long)
-            (and (typep long 'integer)
-                 (>= long (first min-max))
-                 (<= long (second min-max)))))
-    `(satisfies ,signed-64-bit-p)))
+(defprimitive boolean (member true false)
+  "Represents the avro boolean schema.")
 
-(deftype float-schema ()
-  "Represents the avro float schema."
-  (let ((32-bit-float-p (intern-gensym)))
-    (setf (symbol-function 32-bit-float-p)
-          (lambda (float)
-            (or (typep float 'integer)
-                (and (typep float 'float)
-                     (or (= 0.0 float)
-                         (= 24 (float-precision float)))))))
-    `(satisfies ,32-bit-float-p)))
+(defprimitive int (signed-byte 32)
+  "Represents the avro int schema.")
 
-(deftype double-schema ()
-  "Represents the avro double schema."
-  (let ((64-bit-float-p (intern-gensym)))
-    (setf (symbol-function 64-bit-float-p)
-          (lambda (float)
-            (or (typep float 'integer)
-                (and (typep float 'float)
-                     (or (= 0.0 float)
-                         (= 53 (float-precision float)))))))
-    `(satisfies ,64-bit-float-p)))
+(defprimitive long (signed-byte 64)
+  "Represents the avro long schema.")
 
-(deftype bytes-schema ()
-  "Represents the avro bytes schema."
-  '(typed-vector (unsigned-byte 8)))
+(defprimitive float
+    #.(let ((float-digits (float-digits 1f0)))
+        (unless (= 24 float-digits)
+          (error "(float-digits 1f0) is ~S and not 24" float-digits))
+        'single-float)
+  "Represents the avro float schema.")
 
-(deftype string-schema ()
-  "Represents the avro string schema."
-  'string)
+(defprimitive double
+    #.(let ((float-digits (float-digits 1d0)))
+        (unless (= 53 float-digits)
+          (error "(float-digits 1d0) is ~S and not 53" float-digits))
+        'double-float)
+  "Represents the avro double schema.")
 
-;;; avro-name
+(defprimitive bytes
+    #.(let ((upgraded-type (upgraded-array-element-type '(unsigned-byte 8))))
+        (unless (equal upgraded-type '(unsigned-byte 8))
+          (error "byte array gets upgraded to ~S" upgraded-type))
+        '(vector (unsigned-byte 8)))
+  "Represents the avro bytes schema.")
 
-(deftype avro-name () '(satisfies avro-name-p))
+(defprimitive string cl:string
+  "Represents the avro string schema.")
 
-(deftype avro-fullname () '(satisfies avro-fullname-p))
 
-(defmacro in-range-p (char-code start-char &optional end-char)
-  "True if CHAR-CODE is between the char-code given by START-CHAR and END-CHAR.
+(macrolet
+    ((deftypes ()
+       `(progn
+          (deftype primitive-schema ()
+            "The set of avro primitive schemas."
+            '(member ,@*primitives*))
 
-If END-CHAR is nil, then determine if CHAR-CODE equals the char-code of
-START-CHAR."
-  (declare (character start-char)
-           ((or null character) end-char))
-  (let ((start (char-code start-char))
-        (end (when end-char (char-code end-char))))
-    (if end
-        `(the boolean
-              (and (>= ,char-code ,start)
-                   (<= ,char-code ,end)))
-        `(the boolean
-              (= ,char-code ,start)))))
+          (deftype primitive-object ()
+            "The set of objects adhering to an avro primitive schema."
+            '(or ,@*primitives*)))))
+  (deftypes))
 
-(declaim (inline digit-p))
-(defun digit-p (char-code)
-  (declare (fixnum char-code)
-           (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\0 #\9))
-(declaim (notinline digit-p))
-
-(declaim (inline uppercase-p))
-(defun uppercase-p (char-code)
-  (declare (fixnum char-code)
-           (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\A #\Z))
-(declaim (notinline uppercase-p))
-
-(declaim (inline lowercase-p))
-(defun lowercase-p (char-code)
-  (declare (fixnum char-code)
-           (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\a #\z))
-(declaim (notinline lowercase-p))
-
-(declaim (inline underscore-p))
-(defun underscore-p (char-code)
-  (declare (fixnum char-code)
-           (optimize (speed 3) (safety 0)))
-  (in-range-p char-code #\_))
-(declaim (notinline underscore-p))
-
-(defun avro-name-p (name)
-  "True if NAME matches regex /^[A-Za-z_][A-Za-z0-9_]*$/ and nil otherwise"
-  (declare (optimize (speed 3) (safety 0))
-           (inline lowercase-p uppercase-p underscore-p digit-p))
-  (the boolean
-       (when (and (simple-string-p name)
-                  (not (zerop (length name))))
-         (let ((first (char-code (schar name 0))))
-           (when (or (lowercase-p first)
-                     (uppercase-p first)
-                     (underscore-p first))
-             (loop
-                for i from 1 below (length name)
-                for char-code = (char-code (schar name i))
-
-                always (or (lowercase-p char-code)
-                           (uppercase-p char-code)
-                           (underscore-p char-code)
-                           (digit-p char-code))))))))
-
-(defun avro-fullname-p (fullname)
-  "True if FULLNAME is either an avro-name or dot-separated string of avro-names."
-  (declare (optimize (speed 3) (safety 0)))
-  (the boolean
-       (when (simple-string-p fullname)
-         (let ((splits (uiop:split-string fullname :separator ".")))
-           (every #'avro-name-p splits)))))
-
-;;; type utilities
-
-;; TODO use a hash-table to prevent unnecessary symbols from being
-;; created (use the args passed into the deftypes)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun intern-gensym ()
-    "Return a newly interned symbol."
-    (loop
-       for (symbol existsp) = (multiple-value-list (intern (symbol-name (gensym))))
-       when (null existsp)
-       return symbol)))
-
-(deftype typed-vector (elt-type)
-  (let ((pred (intern-gensym)))
-    (setf (symbol-function pred)
-          (lambda (vector)
-            (and (typep vector 'vector)
-                 (every (lambda (elt)
-                          (typep elt elt-type))
-                        vector))))
-    `(satisfies ,pred)))
-
-(deftype enum (&rest enum-values)
-  (let ((pred (intern-gensym)))
-    (setf (symbol-function pred)
-          (lambda (maybe-enum)
-            (member maybe-enum enum-values :test #'equal)))
-    `(satisfies ,pred)))
+(eval-when (:compile-toplevel)
+  (defparameter +primitive->name+
+    (labels
+        ((name (schema)
+           (string-downcase (symbol-name schema)))
+         (make-pair (schema)
+           (cons schema (name schema))))
+      (mapcar #'make-pair *primitives*))
+    "An alist mapping primitive schemas to their names."))

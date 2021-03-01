@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,55 +27,62 @@
 
 (test read-file
   (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
-    (let ((expected '(#("011990-99999" -619524000000 0)
-                      #("011990-99999" -619506000000 22)
-                      #("011990-99999" -619484400000 -11)
-                      #("012650-99999" -655531200000 111)
-                      #("012650-99999" -655509600000 78)))
+    (let ((expected '(("011990-99999" -619524000000 0)
+                      ("011990-99999" -619506000000 22)
+                      ("011990-99999" -619484400000 -11)
+                      ("012650-99999" -655531200000 111)
+                      ("012650-99999" -655509600000 78)))
           (actual (loop
-                     with records = nil
-                     with stream = (make-instance 'avro:file-input-stream
-                                                  :input stream)
-                     for block = (avro:read-block stream)
-                     until (eq block :eof)
-                     do (setf records (concatenate 'list records block))
-                     finally (return records))))
+                    with records = nil
+                    with stream = (make-instance 'avro:file-input-stream
+                                                 :input stream)
+                    for block = (avro:read-block stream)
+                    while block
+                    do (setf records (concatenate 'list records block))
+                    finally (return records))))
       (map nil
            (lambda (lhs rhs)
-             (is (equalp lhs rhs)))
+             (let ((station (avro:field rhs "station"))
+                   (time (avro:field rhs "time"))
+                   (temp (avro:field rhs "temp")))
+               (is (equal lhs (list station time temp)))))
            expected
            actual))))
 
 (test write-file
-  (let ((bytes (make-array 0
-                           :element-type '(unsigned-byte 8)
-                           :adjustable t
-                           :fill-pointer 0)))
+  (let ((bytes (make-array 0 :element-type '(unsigned-byte 8)
+                             :adjustable t :fill-pointer 0)))
     (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
       (loop
-         with in = (make-instance 'avro:file-input-stream :input stream)
-         with out = (make-instance 'avro:file-output-stream
-                                   :schema (avro:schema in)
-                                   :output bytes)
-         for block = (avro:read-block in)
-         until (eq block :eof)
-         do (avro:write-block out block)))
-    (let ((expected '(#("011990-99999" -619524000000 0)
-                      #("011990-99999" -619506000000 22)
-                      #("011990-99999" -619484400000 -11)
-                      #("012650-99999" -655531200000 111)
-                      #("012650-99999" -655509600000 78)))
+        with in = (make-instance 'avro:file-input-stream :input stream)
+        with out = (make-instance 'avro:file-output-stream
+                                  :schema (avro:schema (avro:header in))
+                                  :output bytes)
+        for block = (avro:read-block in)
+        while block
+        do (avro:write-block out block)))
+    (let ((expected '(("011990-99999" -619524000000 0)
+                      ("011990-99999" -619506000000 22)
+                      ("011990-99999" -619484400000 -11)
+                      ("012650-99999" -655531200000 111)
+                      ("012650-99999" -655509600000 78)))
           (actual (loop
-                     with records = nil
-                     with stream = (make-instance 'avro:file-input-stream
-                                                  :input bytes)
-                     for block = (avro:read-block stream)
-                     until (eq block :eof)
-                     do (setf records (concatenate 'list records block))
-                     finally (return records))))
+                    with records = nil
+                    with stream = (make-instance
+                                   'avro:file-input-stream
+                                   :input (coerce
+                                           bytes
+                                           '(simple-array (unsigned-byte 8) (*))))
+                    for block = (avro:read-block stream)
+                    while block
+                    do (setf records (concatenate 'list records block))
+                    finally (return records))))
       (map nil
            (lambda (lhs rhs)
-             (is (equalp lhs rhs)))
+             (let ((station (avro:field rhs "station"))
+                   (time (avro:field rhs "time"))
+                   (temp (avro:field rhs "temp")))
+               (is (equal lhs (list station time temp)))))
            expected
            actual))))
 
@@ -84,4 +91,4 @@
     (let ((stream (make-instance 'avro:file-input-stream :input stream)))
       (is (avro:skip-block stream))
       (is (null (avro:skip-block stream)))
-      (is (eq :eof (avro:read-block stream))))))
+      (is (null (avro:read-block stream))))))

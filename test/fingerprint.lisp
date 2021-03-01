@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -23,81 +23,88 @@
 (in-package #:test/fingerprint)
 
 (test int-fingerprint
-  (let ((schema (avro:json->schema "\"int\""))
+  (let ((schema (avro:deserialize 'avro:schema "\"int\""))
         (expected #x7275d51a3f395c8f))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test needs-moar-int
-  (let ((schema (avro:json->schema "{type: \"int\"}"))
+  (let ((schema (avro:deserialize 'avro:schema "{type: \"int\"}"))
         (expected #x7275d51a3f395c8f))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test float-fingerprint
-  (let ((schema (avro:json->schema "\"float\""))
+  (let ((schema (avro:deserialize 'avro:schema "\"float\""))
         (expected #x4d7c02cb3ea8d790))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test long-fingerprint
-  (let ((schema (avro:json->schema "\"long\""))
+  (let ((schema (avro:deserialize 'avro:schema "\"long\""))
         (expected #xd054e14493f41db7))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test double-fingerprint
-  (let ((schema (avro:json->schema "\"double\""))
+  (let ((schema (avro:deserialize 'avro:schema "\"double\""))
         (expected #x8e7535c032ab957e))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test fixed-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"fixed\",
                    name: \"MyFixed\",
                    namespace: \"org.apache.hadoop.avro\",
                    size: 1}"))
         (expected #x45df5be838d1dbfa))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test enum-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"enum\",
                    name: \"Test\",
                    \"symbols\": [\"A\", \"B\"]}"))
         (expected #x167a7fe2c2f2a203))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test array-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"array\",
                    items: {type: \"enum\",
                            name: \"Test\",
                            symbols: [\"A\", \"B\"]}}"))
         (expected #x87033afae1add910))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test map-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"map\",
                    values: {type: \"enum\",
                             name: \"Test\",
                             symbols: [\"A\", \"B\"]}}"))
         (expected #x2d816b6f62b02adf))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test union-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "[\"string\", \"null\", \"long\"]"))
         (expected #x6675680d41bea565))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test record-fingerprint
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"Test\",
                    fields: [{name: \"f\", type: \"long\"}]}"))
         (expected #x8e58ebe6f5e594ed))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test another-record
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"Node\",
                    fields: [
@@ -105,10 +112,11 @@
                      {name: \"children\",
                       type: {type: \"array\", items: \"Node\"}}]}"))
         (expected #xb756e7c344a5cb52))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test lisp-record
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"Lisp\",
                    fields: [
@@ -121,10 +129,11 @@
                          fields: [{name: \"car\", type: \"Lisp\"},
                                   {name: \"cdr\", type: \"Lisp\"}]}]}]}"))
         (expected #x06b3a0ed231ad968))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test handshake-request
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"HandshakeRequest\",
                    namespace: \"org.apache.avro.ipc\",
@@ -136,10 +145,11 @@
                      {name: \"meta\",
                       type: [\"null\", {type: \"map\", values: \"bytes\"}]}]}"))
         (expected #x57577c5a9ed76ab9))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test handshake-response
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"HandshakeResponse\",
                    namespace: \"org.apache.avro.ipc\",
@@ -159,10 +169,11 @@
                      {name: \"meta\",
                       type: [\"null\", {type: \"map\", values: \"bytes\"}]}]}"))
         (expected #x0ea54ede01eefe00))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test kitchen-sink
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{
       \"type\": \"record\",
       \"name\": \"Interop\",
@@ -210,10 +221,11 @@
       ]
     }"))
         (expected #xa4b5a0a6930a2ce8))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test ip-address
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"ipAddr\",
                    fields: [
@@ -222,23 +234,25 @@
                         {name: \"IPv6\", type: \"fixed\", size: 16},
                         {name: \"IPv4\", type: \"fixed\", size: 4}]}]}"))
         (expected #x44188a294e1b968d))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test docstring
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"TestDoc\",
                    doc: \"Doc String\",
                    fields: [
                      {name: \"name\", type: \"string\", doc: \"Doc String\"}]}"))
         (expected #x09c1cd2bf060660e))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))
 
 (test another-docstring
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"enum\",
                    name: \"Test\",
                    symbols: [\"A\", \"B\"],
                    doc: \"Doc String\"}"))
         (expected #x167a7fe2c2f2a203))
-    (is (= expected (avro:fingerprint schema)))))
+    (is (= expected (avro:fingerprint64 schema)))))

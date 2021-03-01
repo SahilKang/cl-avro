@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -82,23 +82,25 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                               type: \"int\"}
                            ]}}
                  ]}")
-         (schema (avro:json->schema json))
+         (schema (avro:deserialize 'avro:schema json))
          (jso (st-json:read-json json))
          (roundtrip-jso (st-json:read-json
-                         (avro:schema->json schema))))
-    (let ((valid '("foo" (7)))
-          (invalid '("foo" ("abc"))))
-      (is (avro:validp schema valid))
-      (is (not (avro:validp schema invalid))))
+                         (avro:serialize schema))))
+    (let ((fields (avro:fields schema)))
+      (multiple-value-bind (default defaultp)
+          (avro:default (elt fields 0))
+        (is (eq nil defaultp))
+        (is (eq nil default)))
+      (multiple-value-bind (default defaultp)
+          (avro:default (elt fields 1))
+        (is (eq t defaultp))
+        (is (= 4 (avro:field default "value")))))
 
-    (let ((fields (avro:field-schemas schema)))
-      (is (equalp nil (avro:default (elt fields 0))))
-      (is (equalp #(4) (avro:default (elt fields 1)))))
+    (is (= 4 (st-json:getjso*
+              "default.value"
+              (second (st-json:getjso "fields" roundtrip-jso)))))
 
-    (let ((nested-field (second
-                         (st-json:getjso "fields" roundtrip-jso))))
-      (is (= 4 (st-json:getjso* "default.value" nested-field)))
-      (is (same-fields-p jso roundtrip-jso)))))
+    (is (same-fields-p jso roundtrip-jso))))
 
 (test parse-array
   (let* ((json "{type: \"array\",
@@ -112,24 +114,25 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                             type: \"int\",
                             default: 7}
                          ]}}")
-         (schema (avro:json->schema json))
+         (schema (avro:deserialize 'avro:schema json))
          (jso (st-json:read-json json))
          (roundtrip-jso (st-json:read-json
-                         (avro:schema->json schema))))
-    (let ((valid '(("hello" 8) ("world" 9)))
-          (invalid '(("hello" 8) ("world" "!"))))
-      (is (avro:validp schema valid))
-      (is (not (avro:validp schema invalid))))
-
-    (let ((fields (avro:field-schemas
-                   (avro:item-schema schema))))
-      (is (string= "foo" (avro:default (elt fields 0))))
-      (is (= 7 (avro:default (elt fields 1)))))
+                         (avro:serialize schema))))
+    (let ((fields (avro:fields (avro:items schema))))
+      (multiple-value-bind (default defaultp)
+          (avro:default (elt fields 0))
+        (is (eq t defaultp))
+        (is (string= "foo" default)))
+      (multiple-value-bind (default defaultp)
+          (avro:default (elt fields 1))
+        (is (eq t defaultp))
+        (is (= 7 default))))
 
     (let ((fields (st-json:getjso* "items.fields" roundtrip-jso)))
       (is (string= "foo" (st-json:getjso "default" (first fields))))
-      (is (= 7 (st-json:getjso "default" (second fields))))
-      (is (same-fields-p jso roundtrip-jso)))))
+      (is (= 7 (st-json:getjso "default" (second fields)))))
+
+    (is (same-fields-p jso roundtrip-jso))))
 
 (test parse-map
   (let* ((json "{type: \"map\",
@@ -137,22 +140,14 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                           name: \"EnumName\",
                           default: \"BAR\",
                           symbols: [\"FOO\", \"BAR\", \"BAZ\"]}}")
-         (schema (avro:json->schema json))
+         (schema (avro:deserialize 'avro:schema json))
          (jso (st-json:read-json json))
          (roundtrip-jso (st-json:read-json
-                         (avro:schema->json schema))))
-    (let ((valid (make-hash-table :test #'equal))
-          (invalid (make-hash-table :test #'equal)))
-      (setf (gethash "key-1" valid) "FOO"
-            (gethash "key-2" valid) "BAR"
-            (gethash "key-3" valid) "BAZ"
-
-            (gethash "key-1" invalid) "foo"
-            (gethash "key-2" invalid) "BAR")
-      (is (avro:validp schema valid))
-      (is (not (avro:validp schema invalid))))
-
-    (is (string= "BAR" (avro:default (avro:value-schema schema))))
+                         (avro:serialize schema))))
+    (multiple-value-bind (default position)
+        (avro:default (avro:values schema))
+      (is (string= "BAR" default))
+      (is (= 1 position)))
 
     (is (string= "BAR" (st-json:getjso* "values.default" roundtrip-jso)))
     (is (same-fields-p jso roundtrip-jso))))
@@ -163,41 +158,36 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                  aliases: [],
                  default: \"FOO\",
                  symbols: [\"FOO\", \"BAR\", \"BAZ\"]}")
-         (schema (avro:json->schema json))
+         (schema (avro:deserialize 'avro:schema json))
          (jso (st-json:read-json json))
          (roundtrip-jso (st-json:read-json
-                         (avro:schema->json schema))))
+                         (avro:serialize schema))))
     (is (same-fields-p jso roundtrip-jso))
 
-    (multiple-value-bind (aliases aliasesp)
-        (avro:aliases schema)
-      (is aliasesp)
-      (is (equalp #() aliases)))
+    (is (equalp #() (avro:aliases schema)))
     (multiple-value-bind (aliases aliasesp)
         (st-json:getjso "aliases" roundtrip-jso)
       (is aliasesp)
       (is (null aliases)))
 
-    (multiple-value-bind (doc docp)
-        (avro:doc schema)
-      (is (not docp))
-      (is (string= "" doc)))
+    (is (null (documentation schema t)))
     (multiple-value-bind (doc docp)
         (st-json:getjso "doc" roundtrip-jso)
       (is (not docp))
       (is (null doc)))
 
-    (multiple-value-bind (default defaultp)
+    (multiple-value-bind (default position)
         (avro:default schema)
-      (is defaultp)
-      (is (string= "FOO" default)))
+      (is (string= "FOO" default))
+      (is (= 0 position)))
     (multiple-value-bind (default defaultp)
         (st-json:getjso "default" roundtrip-jso)
       (is defaultp)
       (is (string= "FOO" default)))))
 
 (test canonical-form
-  (let ((schema (avro:json->schema
+  (let ((schema (avro:deserialize
+                 'avro:schema
                  "{type: \"record\",
                    name: \"OuterRecord\",
                    namespace: \"name.space\",
@@ -228,4 +218,4 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
                    "\"fields\":["
                    "{\"name\":\"value\","
                    "\"type\":\"int\"}]}}]}")))
-    (is (string= expected (avro:schema->json schema t)))))
+    (is (string= expected (avro:serialize schema :canonical-form-p t)))))

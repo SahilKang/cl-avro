@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,28 +15,99 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.single-object-encoding
+  (:use #:cl)
+  (:local-nicknames
+   (#:schema #:cl-avro.schema)
+   (#:io #:cl-avro.io))
+  (:export #:single-object
+           #:single-object-p
+           #:write-single-object
+           #:single-object->fingerprint
+           #:deserialize-single-object))
+(in-package #:cl-avro.single-object-encoding)
 
-(defparameter +marker+ #(#xc3 #x01)
+(declaim ((simple-array (unsigned-byte 8) (2)) +marker+))
+(defconstant +marker+
+  (if (boundp '+marker+)
+      +marker+
+      (make-array 2 :element-type '(unsigned-byte 8)
+                    :initial-contents #(#xc3 #x01)))
   "First two bytes indicating avro single-object encoding.")
 
-(defun write-single-object (schema object)
-  "Return a byte-vector according to avro's single object encoding."
-  (let ((fingerprint (make-array 8 :element-type '(unsigned-byte 8)))
-        (payload (serialize nil schema object)))
-    (write-little-endian (fingerprint schema #'avro-64bit-crc) fingerprint)
-    (concatenate 'vector +marker+ fingerprint payload)))
-
+(declaim
+ (ftype (function ((simple-array (unsigned-byte 8) (*)))
+                  (values boolean &optional))
+        single-object-p)
+ (inline single-object-p))
 (defun single-object-p (bytes)
-  "Determine if BYTES adheres to avro's single object encoding."
-  (and (typep bytes '(typed-vector (unsigned-byte 8)))
-       (>= (length bytes) 10)
-       (equalp (subseq bytes 0 2) +marker+)))
+  "Determine if BYTES adheres to avro's single-object encoding."
+  (declare (optimize (speed 3) (safety 3)))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (and (>= (length bytes) 10)
+         (equalp (subseq bytes 0 2) +marker+))))
+(declaim (notinline single-object-p))
 
-(defun read-single-object (bytes)
-  "Return a two-element list: (schema-fingerprint serialized-object)."
-  (unless (single-object-p bytes)
-    (error "~&Not a valid avro single object: ~S" bytes))
-  (let ((fingerprint (read-little-endian (subseq bytes 2 10)))
-        (payload (subseq bytes 10)))
-    (list fingerprint payload)))
+(deftype single-object ()
+  '(and (simple-array (unsigned-byte 8) (*)) (satisfies single-object-p)))
+
+(declaim
+ (ftype
+  (function (schema:object)
+            (values (simple-array (unsigned-byte 8) (*)) &optional))
+  write-single-object)
+ (inline write-single-object))
+(defun write-single-object (object)
+  "Serialize OBJECT according to avro single-object encoding."
+  (declare (optimize (speed 3) (safety 3))
+           (inline schema:fingerprint))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (let* ((fingerprint (schema:fingerprint
+                         (schema:schema-of object) #'schema:crc-64-avro))
+           ;; TODO remove this copying once io:memory-output-stream is
+           ;; taken care of
+           (payload (coerce (the (vector (unsigned-byte 8))
+                                 (io:serialize object))
+                            '(simple-array (unsigned-byte 8) (*))))
+           (bytes (make-array
+                   (+ (length +marker+) (length fingerprint) (length payload))
+                   :element-type '(unsigned-byte 8))))
+      (declare ((simple-array (unsigned-byte 8) (8)) fingerprint)
+               ((simple-array (unsigned-byte 8) (*)) payload))
+      (replace bytes +marker+)
+      (replace bytes fingerprint :start1 (length +marker+))
+      (replace bytes payload
+               :start1 (+ (length +marker+) (length fingerprint)))
+      bytes)))
+(declaim (notinline write-single-object))
+
+(declaim
+ (ftype (function (single-object) (values (unsigned-byte 64) &optional))
+        single-object->fingerprint)
+ (inline single-object->fingerprint))
+(defun single-object->fingerprint (bytes)
+  (declare (optimize (speed 3) (safety 3))
+           (inline cl-avro.io.primitive::little-endian->uint64))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (cl-avro.io.primitive::little-endian->uint64 bytes 2)))
+(declaim (notinline single-object->fingerprint))
+
+(declaim
+ (ftype (function (schema:schema single-object)
+                  (values schema:object &optional))
+        deserialize-single-object)
+ (inline deserialize-single-object))
+(defun deserialize-single-object (schema bytes)
+  (declare (optimize (speed 3) (safety 3)))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    ;; to prevent copying bytes
+    ;; TODO should do this throughout
+    (let ((stream (make-instance 'io:memory-input-stream
+                                 :bytes bytes :position 10)))
+      (io:deserialize schema stream))))
+(declaim (notinline deserialize-single-object))

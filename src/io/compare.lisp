@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,203 +15,372 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.io.compare
+  (:use #:cl)
+  (:local-nicknames
+   (#:schema #:cl-avro.schema)
+   (#:stream #:cl-avro.io.memory-stream)
+   (#:block #:cl-avro.io.block-stream))
+  (:import-from #:cl-avro.io.base
+                #:deserialize)
+  (:export #:compare))
+(in-package #:cl-avro.io.compare)
 
+(deftype comparison ()
+  "The return type of compare."
+  '(integer -1 1))
+
+;; TODO be more permissive with bytes
 (defgeneric compare (schema left right)
+  (:method (schema (left simple-array) right)
+    (declare (optimize (speed 3) (safety 0)))
+    (check-type left (simple-array (unsigned-byte 8) (*)))
+    (let ((left (make-instance 'stream:memory-input-stream :bytes left)))
+      (the comparison (compare schema left right))))
+
+  (:method (schema left (right simple-array))
+    (declare (optimize (speed 3) (safety 0)))
+    (check-type right (simple-array (unsigned-byte 8) (*)))
+    (let ((right (make-instance 'stream:memory-input-stream :bytes right)))
+      (the comparison (compare schema left right))))
+
   (:documentation
    "Return 0, -1, or 1 if LEFT is equal to, less than, or greater than RIGHT.
 
-LEFT and RIGHT should be avro serialized data."))
+LEFT and RIGHT should be avro serialized data.
 
-(defmethod compare (schema (left sequence) right)
-  (let ((left (make-instance 'input-stream :bytes (coerce left 'vector))))
-    (compare schema left right)))
+LEFT and RIGHT may not necessarily be fully consumed."))
 
-(defmethod compare (schema left (right sequence))
-  (let ((right (make-instance 'input-stream :bytes (coerce right 'vector))))
-    (compare schema left right)))
+;;; null schema
 
-
-(defun compare-boolean (left-stream right-stream)
-  (- (read-byte left-stream) (read-byte right-stream)))
-
-(defun compare-number (left-number right-number)
-  (cond
-    ((= left-number right-number) 0)
-    ((< left-number right-number) -1)
-    (t 1)))
-
-(defun compare-int (left-stream right-stream)
-  (compare-number (read-number left-stream 32) (read-number right-stream 32)))
-
-(defun compare-long (left-stream right-stream)
-  (compare-number (read-number left-stream 64) (read-number right-stream 64)))
-
-(defun compare-float (left-stream right-stream)
-  (compare-number (read-float left-stream) (read-float right-stream)))
-
-(defun compare-double (left-stream right-stream)
-  (compare-number (read-double left-stream) (read-double right-stream)))
-
-(defun read-buf (stream num-bytes)
-  (let* ((buf (make-array num-bytes :element-type '(unsigned-byte 8)))
-         (bytes-read (read-sequence buf stream)))
-    (unless (= bytes-read num-bytes)
-      (error "Read ~A bytes instead of expected ~A" bytes-read num-bytes))
-    buf))
-
-(defun compare-buf (left-buf right-buf)
-  (loop
-     for x across left-buf
-     for y across right-buf
-
-     if (< x y)
-     return -1
-     else if (> x y)
-     return 1
-
-     finally (return (compare-number (length left-buf) (length right-buf)))))
-
-(defun compare-bytes (left-stream right-stream)
-  (let ((left-buf (read-buf left-stream (read-number left-stream 64)))
-        (right-buf (read-buf right-stream (read-number right-stream 64))))
-    (compare-buf left-buf right-buf)))
-
-(defun compare-string (left-stream right-stream)
-  (compare-bytes left-stream right-stream))
-
-(defun compare-fixed (fixed-schema left-stream right-stream)
-  (let* ((size (size fixed-schema))
-         (left-buf (read-buf left-stream size))
-         (right-buf (read-buf right-stream size)))
-    (compare-buf left-buf right-buf)))
-
-(defun compare-array (array-schema left-stream right-stream)
-  (loop
-     with item-schema = (item-schema array-schema)
-     with left-array-stream = (make-instance 'array-input-stream
-                                             :input-stream left-stream
-                                             :schema item-schema)
-     with right-array-stream = (make-instance 'array-input-stream
-                                              :input-stream right-stream
-                                              :schema item-schema)
-
-     for x = (stream-read-item left-array-stream)
-     for y = (stream-read-item right-array-stream)
-     until (or (eq x :eof) (eq y :eof))
-
-     ;; TODO get rid of this extra serializing
-     for compare = (compare item-schema
-                            (serialize nil item-schema x)
-                            (serialize nil item-schema y))
-     unless (zerop compare)
-     return compare
-
-     finally (return
-               (cond
-                 ((and (eq x :eof) (eq y :eof)) 0)
-                 ((eq x :eof) -1)
-                 (t 1)))))
-
-(defun compare-enum (left-stream right-stream)
-  (compare-int left-stream right-stream))
-
-(defun compare-union (union-schema left-stream right-stream)
-  (let* ((left-pos (read-number left-stream 64))
-         (right-pos (read-number right-stream 64))
-         (compare (compare-number left-pos right-pos)))
-    (if (not (zerop compare))
-        compare
-        (compare (elt (schemas union-schema) left-pos)
-                 left-stream
-                 right-stream))))
-
-(defun consume-maps (map-schema left-stream right-stream)
-  (let ((value-schema (value-schema map-schema)))
-    (loop
-       with map-stream = (make-instance 'map-input-stream
-                                        :input-stream left-stream
-                                        :schema value-schema)
-       for pair = (stream-read-item map-stream)
-       until (eq pair :eof))
-    (loop
-       with map-stream = (make-instance 'map-input-stream
-                                        :input-stream right-stream
-                                        :schema value-schema)
-       for pair = (stream-read-item map-stream)
-       until (eq pair :eof))))
-
-(defun compare-record (record-schema left-stream right-stream)
-  (loop
-     for field-schema across (field-schemas record-schema)
-
-     for order = (order field-schema)
-     for field-type = (field-type field-schema)
-
-     if (string= order "ignore")
-     do (if (typep field-type 'map-schema)
-            (consume-maps field-type left-stream right-stream)
-            (compare field-type left-stream right-stream))
-     else do (let ((compare (compare field-type left-stream right-stream)))
-               (unless (zerop compare)
-                 (return-from compare-record
-                   (if (string= "ascending" order)
-                       compare
-                       (* -1 compare)))))
-
-     finally (return 0)))
-
-
-(defmethod compare ((schema (eql 'null-schema))
-                    (left stream)
-                    (right stream))
+(defmethod compare
+    ((schema (eql 'schema:null)) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema left right))
   0)
 
+;;; boolean schema
+
+(defmethod compare
+    ((schema (eql 'schema:boolean)) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (let ((left (read-byte left))
+        (right (read-byte right)))
+    (declare ((integer 0 1) left right))
+    (- left right)))
+
+;;; numeric schemas
+
+(defmacro compare-number (left right)
+  (declare (symbol left right))
+  `(cond
+     ((= ,left ,right) 0)
+     ((< ,left ,right) -1)
+     (t 1)))
+
 (macrolet
-    ((def-compare-methods (&rest symbols)
-       (let* ((schema-function-pairs
-               (mapcar (lambda (symbol)
-                         (let ((compare (find-symbol (format nil "COMPARE-~A" symbol))))
-                           (unless compare
-                             (error "Could not find compare function for ~S" symbol))
-                           (multiple-value-bind (schema schemap)
-                               (find-symbol (format nil "~A-SCHEMA" symbol))
-                             (unless (eq schemap :external)
-                               (error "Could not find schema for ~S" symbol))
-                             (cons schema compare))))
-                       symbols))
-              (defmethods
-               (mapcar (lambda (pair)
-                         `(defmethod compare ((schema (eql ',(car pair)))
-                                              (left stream)
-                                              (right stream))
-                            (,(cdr pair) left right)))
-                       schema-function-pairs)))
-         `(progn
-            ,@defmethods))))
-  (def-compare-methods boolean int long float double bytes string))
+    ((defcompare (schema)
+       (declare (schema:primitive-schema schema))
+       `(defmethod compare
+            ((schema (eql ',schema)) (left stream) (right stream))
+          (declare (optimize (speed 3) (safety 0))
+                   (ignore schema))
+          (let ((left (deserialize ',schema left))
+                (right (deserialize ',schema right)))
+            (declare (,schema left right))
+            (compare-number left right)))))
+  (defcompare schema:int)
+  (defcompare schema:long)
+  (defcompare schema:float)
+  (defcompare schema:double))
 
-(defmethod compare ((schema fixed-schema)
-                    (left stream)
-                    (right stream))
-  (compare-fixed schema left right))
+;;; bytes schema
 
-(defmethod compare ((schema array-schema)
-                    (left stream)
-                    (right stream))
-  (compare-array schema left right))
+(declaim
+ (ftype (function ((simple-array (unsigned-byte 8) (*))
+                   (simple-array (unsigned-byte 8) (*)))
+                  (values comparison &optional))
+        compare-bytes)
+ (inline compare-bytes))
+(defun compare-bytes (left right)
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    with left-length = (length left)
+    and right-length = (length right)
 
-(defmethod compare ((schema enum-schema)
-                    (left stream)
-                    (right stream))
-  (compare-enum left right))
+    for lhs across left
+    for rhs across right
 
-(defmethod compare ((schema union-schema)
-                    (left stream)
-                    (right stream))
-  (compare-union schema left right))
+    if (< lhs rhs)
+      return -1
+    else if (> lhs rhs)
+      return 1
 
-(defmethod compare ((schema record-schema)
-                    (left stream)
-                    (right stream))
-  (compare-record schema left right))
+    finally
+       (return (compare-number left-length right-length))))
+(declaim (notinline compare-bytes))
+
+(defmethod compare
+    ((schema (eql 'schema:bytes)) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema)
+           (inline compare-bytes))
+  (let ((left (deserialize 'schema:bytes left))
+        (right (deserialize 'schema:bytes right)))
+    (compare-bytes left right)))
+
+;;; string schema
+
+(defmethod compare
+    ((schema (eql 'schema:string)) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (compare 'schema:bytes left right))
+
+;;; fixed schema
+
+(defmethod compare
+    ((schema schema:fixed) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline compare-bytes))
+  (let ((left (schema:bytes (deserialize schema left)))
+        (right (schema:bytes (deserialize schema right))))
+    (compare-bytes left right)))
+
+;;; array schema
+
+(defmethod compare
+    ((schema schema:array) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline block:incf-position))
+  (loop
+    with items = (schema:items schema)
+    and left = (make-instance 'block:binary-blocked-input-stream :stream left)
+    and right = (make-instance 'block:binary-blocked-input-stream :stream right)
+
+    for lhs = (block:read-item left)
+    for rhs = (block:read-item right)
+    until (or (eq lhs :eof)
+              (eq rhs :eof))
+
+    for comparison of-type comparison = (prog1 (compare items lhs rhs)
+                                          (block:incf-position left)
+                                          (block:incf-position right))
+    unless (zerop comparison)
+      return comparison
+
+    finally
+       (return
+         (cond
+           ((and (eq lhs :eof) (eq rhs :eof)) 0)
+           ((eq lhs :eof) -1)
+           (t 1)))))
+
+;;; enum schema
+
+(defmethod compare
+    ((schema schema:enum) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (compare 'schema:int left right))
+
+;;; union schema
+
+(defmethod compare
+    ((schema schema:union) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((left-position (deserialize 'schema:int left))
+         (right-position (deserialize 'schema:int right))
+         (comparison (compare-number left-position right-position)))
+    (declare (schema:int left-position right-position)
+             (comparison comparison))
+    (if (not (zerop comparison))
+        comparison
+        (let* ((schemas (schema:schemas schema))
+               (chosen-schema (elt schemas left-position)))
+          (declare ((simple-array schema:schema (*)) schemas))
+          (compare chosen-schema left right)))))
+
+;;; record schema
+
+;; skip
+
+(defgeneric skip (schema stream))
+
+(defgeneric skip-bytes (stream count)
+  (:method ((stream stream) (count integer))
+    (declare (optimize (speed 3) (safety 0))
+             (schema:long count))
+    (loop repeat count do (read-byte stream))
+    (values))
+
+  (:method ((stream stream:memory-input-stream) (count integer))
+    (declare (optimize (speed 3) (safety 0))
+             (schema:long count))
+    (with-slots (stream:position) stream
+      (incf (the schema:long stream:position) count))
+    (values)))
+
+(defmethod skip
+    ((schema (eql 'schema:null)) stream)
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema stream))
+  (values))
+
+(defmethod skip
+    ((schema (eql 'schema:boolean)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (skip-bytes stream 1))
+
+(defmethod skip
+    ((schema (eql 'schema:int)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (deserialize 'schema:int stream)
+  (values))
+
+(defmethod skip
+    ((schema (eql 'schema:long)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (deserialize 'schema:long stream)
+  (values))
+
+(defmethod skip
+    ((schema (eql 'schema:float)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (skip-bytes stream 4))
+
+(defmethod skip
+    ((schema (eql 'schema:double)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (skip-bytes stream 8))
+
+(defmethod skip
+    ((schema (eql 'schema:bytes)) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (let ((count (deserialize 'schema:int stream)))
+    (skip-bytes stream count)))
+
+(defmethod skip
+    ((schema (eql 'schema:string)) stream)
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (skip 'schema:bytes stream))
+
+(defmethod skip
+    ((schema schema:fixed) (stream stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((size (schema:size schema)))
+    ;; even though size is (integer 0), schema:long should be fine
+    (skip-bytes stream size)))
+
+(defmethod skip
+    ((schema schema:union) (stream stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((schemas (schema:schemas schema))
+         (position (deserialize 'schema:int stream))
+         (chosen-schema (elt schemas position)))
+    (declare ((simple-array schema:schema (*)) schemas))
+    (skip chosen-schema stream))
+  (values))
+
+(defmethod skip
+    ((schema schema:array) (stream stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    with items = (schema:items schema)
+    and blocked-stream = (make-instance 'block:binary-blocked-input-stream
+                                        :stream stream)
+
+    for block-stream = (block:read-item blocked-stream)
+    until (eq block-stream :eof)
+
+    for size = (block:block-size block-stream)
+    for count of-type schema:long = (block:block-count block-stream)
+
+    if size do
+      (skip-bytes stream size)
+    else do
+      (loop repeat count do (skip items stream))
+
+    do (block:incf-position blocked-stream count)
+
+    finally
+       (return (values))))
+
+(defmethod skip
+    ((schema schema:map) (stream stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    with values = (schema:values schema)
+    and blocked-stream = (make-instance 'block:binary-blocked-input-stream
+                                        :stream stream)
+
+    for block-stream = (block:read-item blocked-stream)
+    until (eq block-stream :eof)
+
+    for size = (block:block-size block-stream)
+    for count of-type schema:long = (block:block-count block-stream)
+
+    if size do
+      (skip-bytes stream size)
+    else do
+      (loop
+        repeat count
+        do
+           (skip 'schema:string stream)
+           (skip values stream))
+
+    do (block:incf-position blocked-stream count)
+
+    finally
+       (return (values))))
+
+(defmethod skip
+    ((schema schema:enum) (stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (ignore schema))
+  (deserialize 'schema:int stream)
+  (values))
+
+(defmethod skip
+    ((schema schema:record) (stream stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    for field across (schema:fields schema)
+    for type = (schema:type field)
+
+    do (skip type stream))
+  (values))
+
+;; compare
+
+(defmethod compare
+    ((schema schema:record) (left stream) (right stream))
+  (declare (optimize (speed 3) (safety 0)))
+  (loop
+    for field across (schema:fields schema)
+    for order = (schema:order field)
+    for type = (schema:type field)
+
+    if (eq order 'schema:ignore) do
+      (skip type left)
+      (skip type right)
+    else do
+      (let ((comparison (compare type left right)))
+        (declare (comparison comparison))
+        (unless (zerop comparison)
+          (return-from compare
+            (if (eq order 'schema:ascending)
+                comparison
+                (- comparison)))))
+
+    finally
+       (return 0)))

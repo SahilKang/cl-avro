@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -22,48 +22,44 @@
 
 (in-package #:test/single-object-encoding)
 
-(test check-predicate-with-turds
-  (is (not (avro:single-object-p nil)))
-  (is (not (avro:single-object-p #(2 4 6 8))))
-  (is (not (avro:single-object-p #(#xc3 #x01))))
-  (is (not (avro:single-object-p #(#xc3 #x01 2 4 6 8 'who-do-we-appreciate)))))
-
 (test null-object
   (let* ((expected nil)
-         (schema (avro:json->schema "\"null\""))
-         (single-object (avro:write-single-object schema expected)))
+         (schema (avro:schema-of expected))
+         (single-object (avro:write-single-object expected)))
     (is (avro:single-object-p single-object))
-    (destructuring-bind (fingerprint payload)
-        (avro:read-single-object single-object)
-      (is (= fingerprint (avro:fingerprint schema #'avro:avro-64bit-crc)))
-      (is (eq expected (avro:deserialize payload schema))))))
+    (is (= (avro:fingerprint64 schema)
+           (avro:single-object->fingerprint single-object)))
+    (is (eq expected (avro:deserialize-single-object schema single-object)))))
 
 (test int-object
   (let* ((expected 24601)
-         (schema (avro:json->schema "\"int\""))
-         (single-object (avro:write-single-object schema expected)))
+         (schema (avro:schema-of expected))
+         (single-object (avro:write-single-object expected)))
     (is (avro:single-object-p single-object))
-    (destructuring-bind (fingerprint payload)
-        (avro:read-single-object single-object)
-      (is (= fingerprint (avro:fingerprint schema #'avro:avro-64bit-crc)))
-      (is (= expected (avro:deserialize payload schema))))))
+    (is (= (avro:fingerprint64 schema)
+           (avro:single-object->fingerprint single-object)))
+    (is (= expected (avro:deserialize-single-object schema single-object)))))
 
 (test enum-object
   (let* ((expected "BAR")
-         (schema (avro:json->schema
+         (schema (avro:deserialize
+                  'avro:schema
                   "{type: \"enum\",
                     name: \"Name\",
                     symbols: [\"FOO\", \"BAR\", \"BAZ\"]}"))
-         (single-object (avro:write-single-object schema expected)))
+         (single-object (avro:write-single-object
+                         (make-instance schema :enum expected))))
     (is (avro:single-object-p single-object))
-    (destructuring-bind (fingerprint payload)
-        (avro:read-single-object single-object)
-      (is (= fingerprint (avro:fingerprint schema #'avro:avro-64bit-crc)))
-      (is (string= expected (avro:deserialize payload schema))))))
+    (is (= (avro:fingerprint64 schema)
+           (avro:single-object->fingerprint single-object)))
+    (is (string= expected
+                 (avro:which-one
+                  (avro:deserialize-single-object schema single-object))))))
 
 (test record-object
   (let* ((expected '("Hello" "World" "!" 2 4 6))
-         (schema (avro:json->schema
+         (schema (avro:deserialize
+                  'avro:schema
                   "{type: \"record\",
                     name: \"Name\",
                     fields: [
@@ -74,9 +70,19 @@
                       {type: \"int\", name: \"field5\"},
                       {type: \"int\", name: \"field6\"}
                     ]}"))
-         (single-object (avro:write-single-object schema expected)))
+         (single-object
+           (avro:write-single-object
+            (apply #'make-instance schema
+                   (mapcan (lambda (field-name value)
+                             (list (intern field-name 'keyword) value))
+                           (map 'list #'avro:name (avro:fields schema))
+                           expected)))))
     (is (avro:single-object-p single-object))
-    (destructuring-bind (fingerprint payload)
-        (avro:read-single-object single-object)
-      (is (= fingerprint (avro:fingerprint schema #'avro:avro-64bit-crc)))
-      (is (equal expected (coerce (avro:deserialize payload schema) 'list))))))
+    (is (= (avro:fingerprint64 schema)
+           (avro:single-object->fingerprint single-object)))
+    (is (equal expected
+               (let* ((record (avro:deserialize-single-object
+                               schema single-object)))
+                 (flet ((field (field)
+                          (avro:field record (avro:name field))))
+                   (map 'list #'field (avro:fields (class-of record)))))))))

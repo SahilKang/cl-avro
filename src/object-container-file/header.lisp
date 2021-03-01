@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2020 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,91 +15,155 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
+(defpackage #:cl-avro.object-container-file.header
+  (:use #:cl)
+  (:local-nicknames
+   (#:schema #:cl-avro.schema)
+   (#:io #:cl-avro.io))
+  (:shadowing-import-from #:cl-avro.schema
+                          #:null
+                          #:schema)
+  (:export #:header
+           #:magic
+           #:meta
+           #:sync
 
-(defgeneric schema (file-stream)
-  (:documentation
-   "Return avro schema used in FILE-STREAM."))
+           #:schema
+           #:codec
 
-(defgeneric codec (file-stream)
-  (:documentation
-   "Return codec used by FILE-STREAM."))
+           #:null
+           #:deflate
+           #:snappy
+           #:bzip2
+           #:xz
+           #:zstandard))
+(in-package #:cl-avro.object-container-file.header)
 
-(defgeneric metadata (file-stream)
-  (:documentation
-   "Return avro metadata from FILE-STREAM."))
+;;; magic
 
-(defgeneric sync (file-stream)
-  (:documentation
-   "Return 16-byte sync marker from FILE-STREAM."))
+(declaim ((simple-array (unsigned-byte 8) (4)) +magic+))
+(defconstant +magic+
+  (if (boundp '+magic+)
+      +magic+
+      (make-array 4 :element-type '(unsigned-byte 8)
+                    :initial-contents (nconc
+                                       (mapcar #'char-code '(#\O #\b #\j))
+                                       (list 1)))))
 
-(defgeneric read-block (stream)
-  (:documentation
-   "Return the next avro object container block from STREAM, or :EOF.
-
-The return value is a vector whose elements are the deserialized objects from
-the block."))
-
-(defgeneric write-block (stream block)
-  (:documentation
-   "Deserialize the elements of BLOCK into STREAM.
-
-Returns the number of bytes written to the object container file block."))
-
-(defgeneric skip-block (stream)
-  (:documentation
-   "Skip to the next avro object container block in STREAM.
-
-Returns NIL if there were no more blocks to skip and T otherwise."))
-
-
-(defparameter +magic+
-  (let ((chars (mapcar #'char-code '(#\O #\b #\j))))
-    (nconc chars (list 1))))
-
-(defclass header ()
-  ((sync-marker
-    :reader sync-marker
-    :type (typed-vector (unsigned-byte 8)))
-   (metadata
-    :reader metadata
-    :type hash-table)
-   (schema
-    :reader schema
-    :type avro-schema)
-   (codec
-    :reader codec
-    :type (enum "null" "deflate" "snappy"))))
+(defclass magic ()
+  ()
+  (:metaclass schema:fixed)
+  (:size 4)
+  (:default-initargs
+   :bytes +magic+))
 
 (defmethod initialize-instance :after
-    ((header header)
-     &key
-       (magic (error "Must supply :magic byte sequence"))
-       (meta (error "Must supply :meta hash-table"))
-       (sync (error "Must supply :sync byte sequence")))
-  (assert-magic magic)
-  (with-slots (sync-marker metadata schema codec) header
-    (let ((avro.schema (get-schema meta))
-          (avro.codec (get-codec meta)))
-      (setf sync-marker sync
-            metadata meta
-            schema avro.schema
-            codec avro.codec))))
+    ((instance magic) &key)
+  (let ((bytes (schema:bytes instance)))
+    (unless (equalp bytes +magic+)
+      (error "Incorrect header magic ~S, expected ~S" bytes +magic+))))
 
-(defun assert-magic (magic)
-  (unless (equal +magic+ (coerce magic 'list))
-    (error "~&Bad header magic ~A, expected ~A" magic +magic+)))
+;;; meta
 
-(defun get-schema (meta)
-  (multiple-value-bind (avro.schema existsp) (gethash "avro.schema" meta)
+(deftype codec ()
+  '(member null deflate snappy bzip2 xz zstandard))
+
+(defclass meta ()
+  ((schema
+    :reader schema
+    :type schema:schema)
+   (codec
+    :reader codec
+    :type codec))
+  (:metaclass schema:map)
+  (:values schema:bytes)
+  (:default-initargs
+   :map (make-hash-table :test #'equal)))
+
+(declaim
+ (ftype (function (hash-table) (values schema:schema &optional)) parse-schema))
+(defun parse-schema (meta)
+  (multiple-value-bind (bytes existsp)
+      (gethash "avro.schema" meta)
     (unless existsp
-      (error "~&Missing avro.schema in header"))
-    (json->schema (babel:octets-to-string avro.schema :encoding :utf-8))))
+      (error "Missing avro.schema in header meta"))
+    (let ((string (babel:octets-to-string bytes :encoding :utf-8)))
+      (io:deserialize 'schema:schema string))))
 
-(defun get-codec (meta)
-  (multiple-value-bind (avro.codec existsp) (gethash "avro.codec" meta)
-    (if existsp
-        (let ((string (babel:octets-to-string avro.codec :encoding :utf-8)))
-          (check-type string (enum "null" "deflate" "snappy"))
-          string)
-        "null")))
+(declaim
+ (ftype (function ((simple-array (unsigned-byte 8) (*)))
+                  (values codec &optional))
+        %parse-codec))
+(defun %parse-codec (bytes)
+  (let* ((string (babel:octets-to-string bytes :encoding :utf-8))
+         (symbol (find-symbol (string-upcase string)
+                              'cl-avro.object-container-file.header)))
+    (check-type symbol codec)
+    symbol))
+
+(declaim
+ (ftype (function (hash-table) (values codec &optional)) parse-codec))
+(defun parse-codec (meta)
+  (multiple-value-bind (bytes existsp)
+      (gethash "avro.codec" meta)
+    (if (not existsp)
+        'null
+        (%parse-codec bytes))))
+
+(defmethod initialize-instance :after
+    ((instance meta)
+     &key
+       map
+       ((:schema provided-schema) (parse-schema map) schema-provided-p)
+       ((:codec provided-codec) (parse-codec map)) codec-provided-p)
+  (with-slots (schema codec schema:map) instance
+    (setf schema provided-schema
+          codec provided-codec)
+    (when schema-provided-p
+      (setf (gethash "avro.schema" schema:map)
+            (babel:string-to-octets (io:serialize schema) :encoding :utf-8)))
+    (when codec-provided-p
+      (setf (gethash "avro.codec" schema:map)
+            (babel:string-to-octets (string-downcase (string codec))
+                                    :encoding :utf-8)))))
+
+;;; sync
+
+(defclass sync ()
+  ()
+  (:metaclass schema:fixed)
+  (:size 16)
+  (:default-initargs
+   :bytes (loop
+            with bytes = (make-array 16 :element-type '(unsigned-byte 8))
+
+            for i below 16
+            for byte = (random 256)
+            do (setf (elt bytes i) byte)
+
+            finally
+               (return bytes))))
+
+;;; header
+
+(defclass header ()
+  ((magic
+    :reader magic
+    :type magic)
+   (meta
+    :reader meta
+    :type meta)
+   (sync
+    :reader sync
+    :type sync))
+  (:metaclass schema:record)
+  (:default-initargs
+   :magic (make-instance 'magic)
+   :sync (make-instance 'sync)))
+
+(defmethod schema ((object header))
+  (schema (meta object)))
+
+(defmethod codec ((object header))
+  (codec (meta object)))
