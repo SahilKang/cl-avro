@@ -42,10 +42,7 @@
 (defmethod initialize-instance :after
     ((instance date-base) &key year month day)
   (when (or year month)
-    (local-time:adjust-timestamp! instance
-      (set :year year)
-      (set :month month)
-      (set :day day))))
+    (local-time:encode-timestamp 0 0 0 0 day month year :into instance)))
 
 (defgeneric year (date)
   (:documentation "Return year.")
@@ -84,7 +81,3 @@
 
 This represents a date on the calendar, with no reference to a
 particular timezone or time-of-day."))
-
-(defmethod initialize-instance :after
-    ((instance date) &key)
-  (check-type instance local-time:date))

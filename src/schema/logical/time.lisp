@@ -46,13 +46,6 @@
   (:documentation
    "Base class for avro time-of-day classes."))
 
-(defmethod initialize-instance :after
-    ((instance time-of-day) &key hour minute)
-  (when (or hour minute)
-    (local-time:adjust-timestamp! instance
-      (set :hour hour)
-      (set :minute minute))))
-
 (defclass time-millis-base (time-of-day)
   ()
   (:documentation
@@ -63,9 +56,8 @@
   (when (or hour minute millisecond)
     (multiple-value-bind (second remainder)
         (truncate millisecond 1000)
-      (local-time:adjust-timestamp! instance
-        (set :sec second)
-        (set :nsec (* remainder 1000 1000))))))
+      (local-time:encode-timestamp
+       (* remainder 1000 1000) second minute hour 1 1 1 :into instance))))
 
 (defclass time-micros-base (time-of-day)
   ()
@@ -77,9 +69,8 @@
   (when (or hour minute microsecond)
     (multiple-value-bind (second remainder)
         (truncate microsecond (* 1000 1000))
-      (local-time:adjust-timestamp! instance
-        (set :sec second)
-        (set :nsec (* remainder 1000))))))
+      (local-time:encode-timestamp
+       (* remainder 1000) second minute hour 1 1 1 :into instance))))
 
 (defgeneric hour (time-of-day)
   (:documentation "Return hour.")
@@ -127,12 +118,6 @@
 This represents a millisecond-precision time-of-day, with no reference
 to a particular calendar, timezone, or date."))
 
-(defmethod initialize-instance :after
-    ((instance time-millis) &key hour minute millisecond)
-  (when (or hour minute millisecond)
-    (setf (local-time:day-of instance) 0))
-  (check-type instance local-time:time-of-day))
-
 ;;; time-micros
 
 (defclass time-micros-schema (logical-schema)
@@ -155,9 +140,3 @@ to a particular calendar, timezone, or date."))
 
 This represents a microsecond-precision time-of-day, with no reference
 to a particular calendar, timezone, or date."))
-
-(defmethod initialize-instance :after
-    ((instance time-micros) &key hour minute microsecond)
-  (when (or hour minute microsecond)
-    (setf (local-time:day-of instance) 0))
-  (check-type instance local-time:time-of-day))

@@ -60,7 +60,7 @@
   (:documentation
    "Avro timestamp-millis schema."))
 
-(defclass timestamp-millis (time-millis-base date-base)
+(defclass timestamp-millis (date-base time-millis-base)
   ()
   (:metaclass timestamp-millis-schema)
   (:documentation
@@ -98,7 +98,12 @@ timeline, independent of a particular timezone or calendar."))
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-millis) &key)
+    ((instance timestamp-millis) &key year month day hour minute millisecond)
+  (when (or year month hour minute millisecond)
+    (multiple-value-bind (second remainder)
+        (truncate millisecond 1000)
+      (local-time:encode-timestamp
+       (* remainder 1000 1000) second minute hour day month year :into instance)))
   (unless (and (local-time:timestamp>= instance +min-timestamp-millis+)
                (local-time:timestamp<= instance +max-timestamp-millis+))
     (error "Timestamp out of bounds")))
@@ -113,7 +118,7 @@ timeline, independent of a particular timezone or calendar."))
   (:documentation
    "Avro timestamp-micros schema."))
 
-(defclass timestamp-micros (time-micros-base date-base)
+(defclass timestamp-micros (date-base time-micros-base)
   ()
   (:metaclass timestamp-micros-schema)
   (:documentation
@@ -151,7 +156,12 @@ timeline, independent of a particular timezone or calendar."))
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-micros) &key)
+    ((instance timestamp-micros) &key year month day hour minute microsecond)
+  (when (or year month hour minute microsecond)
+    (multiple-value-bind (second remainder)
+        (truncate microsecond (* 1000 1000))
+      (local-time:encode-timestamp
+       (* remainder 1000) second minute hour day month year :into instance)))
   (unless (and (local-time:timestamp>= instance +min-timestamp-micros+)
                (local-time:timestamp<= instance +max-timestamp-micros+))
     (error "Timestamp out of bounds")))
