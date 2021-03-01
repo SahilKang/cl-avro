@@ -111,22 +111,6 @@
         'null
         (%parse-codec bytes))))
 
-#+nil
-(defmethod initialize-instance :after
-    ((instance meta)
-     &key
-       map
-       (schema (parse-schema map) schemap)
-       (codec (parse-codec map) codecp))
-  (declare (ignore schema codec))
-  (with-slots (schema codec schema:map) instance
-    (when schemap
-      (setf (gethash "avro.schema" schema:map)
-            (babel:string-to-octets (io:serialize schema) :encoding :utf-8)))
-    (when codecp
-      (setf (gethash "avro.codec" schema:map)
-            (babel:string-to-octets (string-downcase (string codec))
-                                    :encoding :utf-8)))))
 (defmethod initialize-instance :after
     ((instance meta)
      &key

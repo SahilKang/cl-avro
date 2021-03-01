@@ -146,17 +146,3 @@
 (deftype object ()
   "An object adhering to an avro schema."
   '(or primitive-object complex-object))
-
-#+nil
-(defmacro find-schema (symbol &optional (validatep t))
-  "Return the avro schema named by SYMBOL."
-  (declare (symbol symbol)
-           (boolean validatep))
-  `(if (typep ,symbol 'primitive-schema)
-       ,symbol
-       ,(if validatep
-            (let ((schema (gensym)))
-              `(let ((,schema (find-class ,symbol)))
-                 (check-type ,schema schema)
-                 ,schema))
-            `(find-class ,symbol))))

@@ -51,11 +51,6 @@
   (:documentation
    "Base class for objects adhering to an avro fixed schema."))
 
-#+nil
-(defmethod print-object ((object fixed-object) stream)
-  (print-unreadable-object (object stream :type t :identity t)
-    (format stream ":BYTES ~S" (bytes object))))
-
 (defclass fixed (named-schema)
   ((size
     :initarg :size
@@ -79,11 +74,6 @@
              (type `(simple-array (unsigned-byte 8) (,size))))
         (call-next-method instance :bytes (coerce bytes type)))
       (call-next-method)))
-
-#+nil
-(defmethod print-object ((object fixed) stream)
-  (print-unreadable-object (object stream :type t :identity t)
-    (format stream ":SIZE ~S" (size object))))
 
 (declaim
  (ftype (function ((integer 0)) (values cons &optional)) make-bytes-slot))

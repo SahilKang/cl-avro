@@ -160,13 +160,11 @@
     ((instance field)
      &rest initargs
      &key
-       #+nil name
        type
        (aliases nil aliasesp)
        (order "ascending" orderp)
        (default nil defaultp))
   (setf (getf initargs :aliases) (parse-aliases aliases aliasesp))
-  #+nil(pushnew name (getf initargs :initargs))
   (when (and (symbolp type)
              (not (typep type 'schema)))
     (let ((schema (find-class type)))

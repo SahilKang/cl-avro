@@ -49,9 +49,6 @@
   (declare (optimize (speed 3) (safety 0)))
   (check-type bytes (simple-array (unsigned-byte 8) (*)))
   (let ((stream (make-instance 'stream:memory-input-stream :bytes bytes)))
-    ;; would need to work with method combination since bytes is the
-    ;; second arg
-    #+nil(call-next-method schema stream)
     (deserialize schema stream)))
 
 ;; TODO do the same thing with serialize but with a handler-case

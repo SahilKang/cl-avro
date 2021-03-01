@@ -56,19 +56,6 @@
     (logxor (ash fp -8) table-ref)))
 (declaim (notinline %fingerprint64))
 
-#+nil
-(declaim
- (ftype (function ((simple-array (unsigned-byte 8) (*)))
-                  (values (unsigned-byte 64) &optional)))
- (inline fingerprint64))
-#+nil
-(defun fingerprint64 (bytes)
-  (declare (optimize (speed 3) (safety 0))
-           (inline %fingerprint64))
-  (reduce #'%fingerprint64 bytes :initial-value +empty+))
-#+nil
-(declaim (notinline fingerprint64))
-
 ;; TODO clean this shit up
 (declaim
  (ftype (function ((or schema (simple-array (unsigned-byte 8) (*))))

@@ -72,38 +72,6 @@
 
 ;;; named-schema
 
-#+nil
-(defclass named-schema (complex-schema)
-  ((provided-name
-    :initarg :name
-    :reader provided-name
-    :type valid-fullname
-    :documentation "Provided schema name.")
-   (provided-namespace
-    :initarg :namespace
-    :type namespace
-    :documentation "Provided schema namespace.")
-   (deduced-name
-    :reader deduced-name
-    :type valid-name
-    :documentation "Namespace unqualified name of schema.")
-   (deduced-namespace
-    :reader deduced-namespace
-    :type namespace
-    :documentation "Namespace of schema.")
-   (fullname
-    :reader fullname
-    :type valid-fullname
-    :documentation "Namespace qualified name of schema.")
-   (aliases
-    :initarg :aliases
-    :reader aliases
-    :type (or null (simple-array valid-fullname (*)))
-    :documentation "A vector of aliases if provided, otherwise nil."))
-  (:default-initargs
-   :name (error "Must supply NAME"))
-  (:documentation
-   "Base class for avro named schemas."))
 (defclass named-schema (complex-schema)
   ((provided-name
     :reader provided-name
@@ -192,46 +160,12 @@
 
 ;; initialization
 
-#+nil
-(defmethod initialize-instance :around
-    ((instance named-schema) &rest initargs &key name (aliases nil aliasesp))
-  (let ((aliases (parse-aliases aliases aliasesp)))
-    (setf (getf initargs :aliases) aliases))
-  (when (symbolp name)
-    ;; during defclass
-    (setf (getf initargs :name) (string name)))
-  (apply #'call-next-method instance initargs))
 (defmethod initialize-instance :around
     ((instance named-schema) &rest initargs &key (aliases nil aliasesp))
   (let ((aliases (parse-aliases aliases aliasesp)))
     (setf (getf initargs :aliases) aliases))
   (apply #'call-next-method instance initargs))
 
-#+nil
-(defmethod initialize-instance :after
-    ((instance named-schema) &key enclosing-namespace)
-  (let ((provided-name (provided-name instance))
-        (provided-namespace (provided-namespace instance)))
-    (with-slots (deduced-name deduced-namespace fullname) instance
-      (setf deduced-name (fullname->name provided-name)
-            deduced-namespace (deduce-namespace
-                               provided-name provided-namespace enclosing-namespace)
-            fullname (deduce-fullname
-                      provided-name provided-namespace enclosing-namespace)))))
-#+nil
-(defmethod initialize-instance :after
-    ((instance named-schema)
-     &key
-       (name (error "Must supply NAME"))
-       enclosing-namespace)
-  (let ((provided-namespace (provided-namespace instance)))
-    (with-slots (provided-name deduced-name deduced-namespace fullname) instance
-      (setf provided-name (if (symbolp name) (string name) name)
-            deduced-name (fullname->name provided-name)
-            deduced-namespace (deduce-namespace
-                               provided-name provided-namespace enclosing-namespace)
-            fullname (deduce-fullname
-                      provided-name provided-namespace enclosing-namespace)))))
 (declaim
  (ftype (function (symbol list) (values t &optional)) %parse-name))
 (defun %parse-name (name initargs)

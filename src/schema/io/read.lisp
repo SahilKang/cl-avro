@@ -267,20 +267,14 @@ p suffixes for fields should exist."
   (with-fields (items) jso
     (if itemsp
         (make-instance 'array :items (parse-schema items))
-        (make-instance 'array)))
-  #+nil
-  (with-initargs (items) jso
-    (apply #'make-instance 'array initargs)))
+        (make-instance 'array))))
 
 (declaim (ftype (function (st-json:jso) (values map &optional)) parse-map))
 (defun parse-map (jso)
   (with-fields (values) jso
     (if valuesp
         (make-instance 'map :values (parse-schema values))
-        (make-instance 'map)))
-  #+nil
-  (with-initargs (values) jso
-    (apply #'make-instance 'map initargs)))
+        (make-instance 'map))))
 
 (declaim
  (ftype (function (st-json:jso) (values record &optional)) parse-record))
