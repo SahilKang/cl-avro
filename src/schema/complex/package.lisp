@@ -30,6 +30,7 @@
            #:object
            #:which-one
            #:default
+           #:raw-buffer
 
            #:complex-schema
            #:complex-object

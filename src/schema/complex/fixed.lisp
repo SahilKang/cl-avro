@@ -20,6 +20,8 @@
   (:use #:cl)
   (:local-nicknames
    (#:sequences #:org.shirakumo.trivial-extensible-sequences))
+  (:import-from #:cl-avro.schema.complex.common
+                #:raw-buffer)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass)
@@ -31,6 +33,7 @@
                 #:aliases)
   (:export #:fixed
            #:fixed-object
+           #:raw-buffer
            #:size
            #:name
            #:namespace
@@ -41,6 +44,7 @@
 (defclass fixed-object (#+sbcl sequence #-sbcl sequences:sequence)
   ((buffer
     :accessor buffer
+    :reader raw-buffer
     :type (simple-array (unsigned-byte 8) (*))))
   (:metaclass complex-schema)
   (:documentation

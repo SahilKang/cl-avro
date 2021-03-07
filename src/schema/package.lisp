@@ -42,6 +42,7 @@
            #:object
            #:which-one
            #:default
+           #:raw-buffer
 
            #:null
            #:boolean #:true #:false

@@ -21,12 +21,15 @@
   (:shadow #:array #:push #:pop)
   (:local-nicknames
    (#:sequences #:org.shirakumo.trivial-extensible-sequences))
+  (:import-from #:cl-avro.schema.complex.common
+                #:raw-buffer)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
   (:export #:array
            #:array-object
+           #:raw-buffer
            #:items
            #:push
            #:pop))
@@ -35,6 +38,7 @@
 (defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
   ((buffer
     :accessor buffer
+    :reader raw-buffer
     :type (vector schema)))
   (:metaclass complex-schema)
   (:documentation

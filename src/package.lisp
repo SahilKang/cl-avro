@@ -26,6 +26,7 @@
   (:export #:schema
            #:object
            #:schema-of
+           #:raw-buffer
 
            #:fingerprint
            #:fingerprint64

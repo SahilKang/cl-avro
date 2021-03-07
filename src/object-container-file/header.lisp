@@ -60,7 +60,7 @@
 
 (defmethod initialize-instance :after
     ((instance magic) &key)
-  (let ((bytes (cl-avro.schema.complex.fixed::buffer instance)))
+  (let ((bytes (schema:raw-buffer instance)))
     (unless (equalp bytes +magic+)
       (error "Incorrect header magic ~S, expected ~S" bytes +magic+))))
 

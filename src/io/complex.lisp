@@ -33,7 +33,7 @@
 (defmethod serialize ((object schema:fixed-object) &key stream)
   "Write fixed bytes into STREAM."
   (declare (optimize (speed 3) (safety 0)))
-  (write-sequence (cl-avro.schema.complex.fixed::buffer object) stream)
+  (write-sequence (schema:raw-buffer object) stream)
   (values))
 
 (defmethod deserialize ((schema schema:fixed) (stream stream) &key)
@@ -41,7 +41,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (let* ((size (schema:size schema))
          (bytes (make-instance schema)))
-    (unless (= (read-sequence (cl-avro.schema.complex.fixed::buffer bytes) stream) size)
+    (unless (= (read-sequence (schema:raw-buffer bytes) stream) size)
       (error 'end-of-file :stream *error-output*))
     bytes))
 
