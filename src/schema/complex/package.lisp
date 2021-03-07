@@ -30,6 +30,7 @@
            #:object
            #:which-one
            #:default
+           #:raw-buffer
 
            #:complex-schema
            #:complex-object
@@ -45,7 +46,8 @@
            #:array
            #:array-object
            #:items
-           #:objects
+           #:push
+           #:pop
 
            #:enum
            #:enum-object
@@ -54,7 +56,6 @@
            #:fixed
            #:fixed-object
            #:size
-           #:bytes
 
            #:map
            #:map-object

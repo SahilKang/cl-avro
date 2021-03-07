@@ -56,11 +56,11 @@
   (:metaclass schema:fixed)
   (:size 4)
   (:default-initargs
-   :bytes +magic+))
+   :initial-contents +magic+))
 
 (defmethod initialize-instance :after
     ((instance magic) &key)
-  (let ((bytes (schema:bytes instance)))
+  (let ((bytes (schema:raw-buffer instance)))
     (unless (equalp bytes +magic+)
       (error "Incorrect header magic ~S, expected ~S" bytes +magic+))))
 
@@ -135,15 +135,7 @@
   (:metaclass schema:fixed)
   (:size 16)
   (:default-initargs
-   :bytes (loop
-            with bytes = (make-array 16 :element-type '(unsigned-byte 8))
-
-            for i below 16
-            for byte = (random 256)
-            do (setf (elt bytes i) byte)
-
-            finally
-               (return bytes))))
+   :initial-contents (loop repeat 16 collect (random 256))))
 
 ;;; header
 

@@ -26,6 +26,7 @@
   (:export #:schema
            #:object
            #:schema-of
+           #:raw-buffer
 
            #:fingerprint
            #:fingerprint64
@@ -83,7 +84,8 @@
            #:array
            #:array-object
            #:items
-           #:objects
+           #:push
+           #:pop
 
            #:enum
            #:enum-object
@@ -94,7 +96,6 @@
            #:fixed
            #:fixed-object
            #:size
-           #:bytes
 
            #:map
            #:map-object

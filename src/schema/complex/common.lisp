@@ -20,7 +20,8 @@
   (:use #:cl)
   (:export #:assert-distinct
            #:which-one
-           #:default))
+           #:default
+           #:raw-buffer))
 (in-package #:cl-avro.schema.complex.common)
 
 ;;; assert-distinct
@@ -54,3 +55,7 @@
 ;;; default
 
 (defgeneric default (object))
+
+;;; raw-buffer
+
+(defgeneric raw-buffer (sequence))

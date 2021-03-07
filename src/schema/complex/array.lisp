@@ -18,26 +18,29 @@
 (in-package #:cl-user)
 (defpackage #:cl-avro.schema.complex.array
   (:use #:cl)
-  (:shadow #:array)
+  (:shadow #:array #:push #:pop)
+  (:local-nicknames
+   (#:sequences #:org.shirakumo.trivial-extensible-sequences))
+  (:import-from #:cl-avro.schema.complex.common
+                #:raw-buffer)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
   (:export #:array
            #:array-object
+           #:raw-buffer
            #:items
-           #:objects))
+           #:push
+           #:pop))
 (in-package #:cl-avro.schema.complex.array)
 
-(defclass array-object ()
-  ((objects
-    :initarg :objects
-    :reader objects
-    :type (simple-array schema (*))
-    :documentation "Array of objects."))
+(defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
+  ((buffer
+    :accessor buffer
+    :reader raw-buffer
+    :type (vector schema)))
   (:metaclass complex-schema)
-  (:default-initargs
-   :objects (error "Must supply OBJECTS"))
   (:documentation
    "Base class for objects adhering to an avro array schema."))
 
@@ -56,45 +59,155 @@
     ((class array) (superclass complex-schema))
   t)
 
-;; sbcl returns a copy of the array when the return type is
-;; specialized to schema instead of *
 (declaim
- (ftype (function (t schema) (values (simple-array * (*)) &optional))
-        parse-objects)
- (inline parse-objects))
-(defun parse-objects (objects schema)
+ (ftype (function (schema t) (values &optional)) assert-type)
+ (inline assert-type))
+(defun assert-type (schema object)
   (declare (optimize (speed 3) (safety 0)))
-  (let ((objects (coerce objects `(simple-array ,schema (*)))))
-    (if (subtypep (array-element-type objects) schema)
-        objects
-        (prog1 objects
-          ;; TODO maybe coerce will do this check already
-          (map nil
-               (lambda (object)
-                 (unless (typep object schema)
-                   (error "Expected type ~S, but got ~S for ~S"
-                          schema (type-of object) object)))
-               objects)))))
-(declaim (notinline parse-items))
+  (unless (typep object schema)
+    (error "Expected type ~S, but got ~S for ~S"
+           schema (type-of object) object))
+  (values))
+(declaim (notinline assert-type))
 
-(defmethod initialize-instance :around
-    ((instance array-object) &key (objects nil objectsp))
+(defmethod initialize-instance :after
+    ((instance array-object)
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p)
+       (length (length initial-contents)))
   (declare (optimize (speed 3) (safety 0))
-           (inline parse-objects))
-  (if objectsp
-      (let* ((schema (items (class-of instance)))
-             (objects (parse-objects objects schema)))
-        (call-next-method instance :objects objects))
-      (call-next-method)))
+           (inline assert-type))
+  (let* ((schema (items (class-of instance)))
+         (keyword-args (list :element-type schema :fill-pointer t :adjustable t)))
+    (when initial-element-p
+      (assert-type schema initial-element)
+      (cl:push initial-element keyword-args)
+      (cl:push :initial-element keyword-args))
+    (when initial-contents-p
+      (flet ((assert-type (object)
+               (assert-type schema object)))
+        (map nil #'assert-type initial-contents))
+      (cl:push initial-contents keyword-args)
+      (cl:push :initial-contents keyword-args))
+    (setf (buffer instance) (apply #'make-array length keyword-args))))
 
-(declaim (ftype (function (schema) (values cons &optional)) make-items-slot))
-(defun make-items-slot (items)
-  (list :name 'items
-        :type `(simple-array ,items (*))))
+(declaim (ftype (function (schema) (values cons &optional)) make-buffer-slot))
+(defun make-buffer-slot (items)
+  (list :name 'buffer
+        :type `(vector ,items)))
 
 (defmethod initialize-instance :around
     ((instance array) &rest initargs &key items)
-  (let ((items-slot (make-items-slot items)))
-    (push items-slot (getf initargs :direct-slots)))
+  (let ((buffer-slot (make-buffer-slot items)))
+    (cl:push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass array-object)
   (apply #'call-next-method instance initargs))
+
+(defmethod sequences:length
+    ((instance array-object))
+  (length (buffer instance)))
+
+(defmethod sequences:elt
+    ((instance array-object) (index integer))
+  (elt (buffer instance) index))
+
+(defmethod (setf sequences:elt)
+    (value (instance array-object) (index integer))
+  (let ((schema (items (class-of instance))))
+    (assert-type schema value))
+  (setf (elt (buffer instance) index) value))
+
+(defmethod sequences:adjust-sequence
+    ((instance array-object)
+     (length integer)
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p))
+  (let* ((schema (items (class-of instance)))
+         (keyword-args (list :element-type schema :fill-pointer t)))
+    (when initial-element-p
+      (assert-type schema initial-element)
+      (cl:push initial-element keyword-args)
+      (cl:push :initial-element keyword-args))
+    (when initial-contents-p
+      (flet ((assert-type (object)
+               (assert-type schema object)))
+        (map nil #'assert-type initial-contents))
+      (cl:push initial-contents keyword-args)
+      (cl:push :initial-contents keyword-args))
+    (setf (buffer instance)
+          (apply #'adjust-array (buffer instance) length keyword-args)))
+  instance)
+
+(defmethod sequences:make-sequence-like
+    ((instance array-object)
+     (length integer)
+     &rest keyword-args
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p))
+  (declare (ignore initial-element initial-contents))
+  (if (or initial-element-p initial-contents-p)
+      (apply #'make-instance (class-of instance)
+             (list* :length length keyword-args))
+      (if (slot-boundp instance 'buffer)
+          (make-instance (class-of instance)
+                         :length length :initial-contents (buffer instance))
+          (make-instance (class-of instance) :length length))))
+
+(deftype index ()
+  '(integer 0))
+
+(defmethod sequences:make-sequence-iterator
+    ((instance array-object) &key (start 0) (end (length instance)) from-end)
+  (let* ((end (or end (length instance)))
+         (iterator (if from-end (1- end) start))
+         (limit (if from-end (1- start) end)))
+    (values
+     iterator
+     limit
+     from-end
+     (if from-end
+         (lambda (sequence iterator from-end)
+           (declare (ignore sequence from-end)
+                    (index iterator))
+           (the index (1- iterator)))
+         (lambda (sequence iterator from-end)
+           (declare (ignore sequence from-end)
+                    (index iterator))
+           (the index (1+ iterator))))
+     (lambda (sequence iterator limit from-end)
+       (declare (ignore sequence from-end)
+                (index iterator)
+                ((or index null) limit))
+       (= iterator limit))
+     (lambda (sequence iterator)
+       (declare (array-object sequence)
+                (index iterator))
+       (elt sequence iterator))
+     (lambda (value sequence iterator)
+       (declare (array-object sequence)
+                (index iterator))
+       (setf (elt sequence iterator) value))
+     (lambda (sequence iterator)
+       (declare (ignore sequence)
+                (index iterator))
+       iterator)
+     (lambda (sequence iterator)
+       (declare (ignore sequence)
+                (index iterator))
+       iterator))))
+
+(defgeneric push (element array)
+  (:method (element (instance array-object))
+    (declare (optimize (speed 3) (safety 0))
+             (inline assert-type))
+    (let ((schema (items (class-of instance))))
+      (assert-type schema element))
+    (vector-push-extend element (buffer instance))))
+
+(defgeneric pop (array)
+  (:method ((instance array-object))
+    (declare (optimize (speed 3) (safety 0)))
+    (vector-pop (buffer instance))))

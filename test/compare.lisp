@@ -99,7 +99,7 @@ created from JSON and its two serialized arguments."
     (is (= 1 (compare "abc" "ab")))))
 
 (test fixed-compare
-  (with-compare ("{type: \"fixed\", name: \"foo\", size: 3}" :bytes)
+  (with-compare ("{type: \"fixed\", name: \"foo\", size: 3}" :initial-contents)
     (flet ((bytes (&rest bytes)
              (make-array (length bytes) :element-type '(unsigned-byte 8)
                                         :initial-contents bytes)))
@@ -118,7 +118,7 @@ created from JSON and its two serialized arguments."
            (make-instance enum :enum string))
          (enums (&rest enums)
            (avro:serialize
-            (make-instance array :objects (mapcar #'string->enum enums))))
+            (map array #'string->enum enums)))
          (compare (left right)
            (let ((left (apply #'enums left))
                  (right (apply #'enums right)))

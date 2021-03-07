@@ -42,6 +42,7 @@
            #:object
            #:which-one
            #:default
+           #:raw-buffer
 
            #:null
            #:boolean #:true #:false
@@ -61,7 +62,8 @@
            #:array
            #:array-object
            #:items
-           #:objects
+           #:push
+           #:pop
 
            #:enum
            #:enum-object
@@ -70,7 +72,6 @@
            #:fixed
            #:fixed-object
            #:size
-           #:bytes
 
            #:map
            #:map-object

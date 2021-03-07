@@ -422,5 +422,5 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
          (unscaled (read-twos-complement
                     (if (eq 'schema:bytes underlying)
                         bytes
-                        (schema:bytes bytes)))))
+                        (schema:raw-buffer bytes)))))
     (make-instance schema :unscaled unscaled)))
