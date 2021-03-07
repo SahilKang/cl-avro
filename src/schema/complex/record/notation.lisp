@@ -45,7 +45,7 @@
     (make-instance schema :object notation))
 
   (:method ((schema array) notation)
-    (make-instance schema :objects notation))
+    (make-instance schema :initial-contents notation))
 
   (:method ((schema map) notation)
     (make-instance schema :map notation)))

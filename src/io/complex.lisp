@@ -70,14 +70,12 @@
 (defmethod serialize ((object schema:array-object) &key stream)
   "Write array into STREAM."
   (declare (optimize (speed 3) (safety 0)))
-  (let* ((array (schema:objects object))
-         (count (length array)))
-    (declare ((simple-array schema:schema (*)) array))
+  (let ((count (length object)))
     (unless (zerop count)
       (serialize count :stream stream)
       (flet ((serialize (elt)
                (serialize elt :stream stream)))
-        (map nil #'serialize array))))
+        (map nil #'serialize object))))
   (serialize 0 :stream stream)
   (values))
 
@@ -88,15 +86,14 @@
     with array-stream = (make-instance 'stream:array-input-stream
                                        :schema (schema:items schema)
                                        :stream stream)
-    and vector = (make-array 0 :element-type (schema:items schema)
-                               :adjustable t :fill-pointer t)
+    and vector = (make-instance schema)
 
     for item = (stream:read-item array-stream)
     until (eq item :eof)
-    do (vector-push-extend item vector)
+    do (schema:push item vector)
 
     finally
-       (return (make-instance schema :objects vector))))
+       (return vector)))
 
 ;;; map schema
 

@@ -24,7 +24,6 @@
                 #:bytes)
   (:import-from #:cl-avro.schema.complex
                 #:array-object
-                #:objects
                 #:map-object
                 #:fixed-object
                 #:bytes
@@ -95,7 +94,7 @@
   (babel:octets-to-string (bytes fixed) :encoding :latin-1))
 
 (defmethod convert-to-st-json ((array array-object))
-  (cl:map 'simple-vector #'convert-to-st-json (objects array)))
+  (cl:map 'simple-vector #'convert-to-st-json array))
 
 (defmethod convert-to-st-json ((map map-object))
   (let* ((map (map map))

@@ -118,7 +118,7 @@ created from JSON and its two serialized arguments."
            (make-instance enum :enum string))
          (enums (&rest enums)
            (avro:serialize
-            (make-instance array :objects (mapcar #'string->enum enums))))
+            (map array #'string->enum enums)))
          (compare (left right)
            (let ((left (apply #'enums left))
                  (right (apply #'enums right)))

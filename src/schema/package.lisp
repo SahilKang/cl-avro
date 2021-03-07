@@ -61,7 +61,8 @@
            #:array
            #:array-object
            #:items
-           #:objects
+           #:push
+           #:pop
 
            #:enum
            #:enum-object

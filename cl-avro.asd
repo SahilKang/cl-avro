@@ -28,7 +28,8 @@
                #:st-json
                #:chipz
                #:salza2
-               #:closer-mop)
+               #:closer-mop
+               #:trivial-extensible-sequences)
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :pathname "src"
