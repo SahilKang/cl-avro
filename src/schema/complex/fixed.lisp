@@ -18,8 +18,8 @@
 (in-package #:cl-user)
 (defpackage #:cl-avro.schema.complex.fixed
   (:use #:cl)
-  (:import-from #:cl-avro.schema.primitive
-                #:bytes)
+  (:local-nicknames
+   (#:sequences #:org.shirakumo.trivial-extensible-sequences))
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass)
@@ -32,22 +32,17 @@
   (:export #:fixed
            #:fixed-object
            #:size
-           #:bytes
            #:name
            #:namespace
            #:fullname
            #:aliases))
 (in-package #:cl-avro.schema.complex.fixed)
 
-(defclass fixed-object ()
-  ((bytes
-    :initarg :bytes
-    :reader bytes
-    :type (simple-array (unsigned-byte 8) (*))
-    :documentation "Bytes for fixed object."))
+(defclass fixed-object (#+sbcl sequence #-sbcl sequences:sequence)
+  ((buffer
+    :accessor buffer
+    :type (simple-array (unsigned-byte 8) (*))))
   (:metaclass complex-schema)
-  (:default-initargs
-   :bytes (error "Must supply BYTES"))
   (:documentation
    "Base class for objects adhering to an avro fixed schema."))
 
@@ -66,24 +61,120 @@
     ((class fixed) (superclass named-schema))
   t)
 
-(defmethod initialize-instance :around
-    ((instance fixed-object) &key (bytes nil bytesp))
+(defmethod initialize-instance :after
+    ((instance fixed-object)
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p))
   (declare (optimize (speed 3) (safety 0)))
-  (if bytesp
-      (let* ((size (size (class-of instance)))
-             (type `(simple-array (unsigned-byte 8) (,size))))
-        (call-next-method instance :bytes (coerce bytes type)))
-      (call-next-method)))
+  (let ((size (size (class-of instance)))
+        (keyword-args (list :element-type '(unsigned-byte 8))))
+    (when initial-element-p
+      (cl:push initial-element keyword-args)
+      (cl:push :initial-element keyword-args))
+    (when initial-contents-p
+      (cl:push initial-contents keyword-args)
+      (cl:push :initial-contents keyword-args))
+    (setf (buffer instance) (apply #'make-array size keyword-args))))
 
 (declaim
- (ftype (function ((integer 0)) (values cons &optional)) make-bytes-slot))
-(defun make-bytes-slot (size)
-  (list :name 'bytes
+ (ftype (function ((integer 0)) (values cons &optional)) make-buffer-slot))
+(defun make-buffer-slot (size)
+  (list :name 'buffer
         :type `(simple-array (unsigned-byte 8) (,size))))
 
 (defmethod initialize-instance :around
     ((instance fixed) &rest initargs &key size)
-  (let ((bytes-slot (make-bytes-slot size)))
-    (push bytes-slot (getf initargs :direct-slots)))
+  (let ((buffer-slot (make-buffer-slot size)))
+    (push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass fixed-object)
   (apply #'call-next-method instance initargs))
+
+(defmethod sequences:length
+    ((instance fixed-object))
+  (length (buffer instance)))
+
+(defmethod sequences:elt
+    ((instance fixed-object) (index integer))
+  (elt (buffer instance) index))
+
+(defmethod (setf sequences:elt)
+    (value (instance fixed-object) (index integer))
+  (setf (elt (buffer instance) index) value))
+
+(defmethod sequences:adjust-sequence
+    ((instance fixed-object)
+     (length integer)
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p))
+  (let ((size (size (class-of instance)))
+        (keyword-args (list :element-type '(unsigned-byte 8))))
+    (unless (= length size)
+      (error "Cannot change size of fixed object from ~S to ~S" size length))
+    (when initial-element-p
+      (cl:push initial-element keyword-args)
+      (cl:push :initial-element keyword-args))
+    (when initial-contents-p
+      (cl:push initial-contents keyword-args)
+      (cl:push :initial-contents keyword-args))
+    (setf (buffer instance)
+          (apply #'adjust-array (buffer instance) length keyword-args)))
+  instance)
+
+(defmethod sequences:make-sequence-like
+    ((instance fixed-object)
+     (length integer)
+     &rest keyword-args
+     &key
+       (initial-element nil initial-element-p)
+       (initial-contents nil initial-contents-p))
+  (declare (ignore initial-element initial-contents))
+  (if (or initial-element-p initial-contents-p)
+      (apply #'make-instance (class-of instance) keyword-args)
+      (if (slot-boundp instance 'buffer)
+          (make-instance (class-of instance) :initial-contents (buffer instance))
+          (make-instance (class-of instance)))))
+
+(deftype index ()
+  '(integer 0))
+
+(defmethod sequences:make-sequence-iterator
+    ((instance fixed-object) &key (start 0) (end (length instance)) from-end)
+  (let* ((end (or end (length instance)))
+         (iterator (if from-end (1- end) start))
+         (limit (if from-end (1- start) end)))
+    (values
+     iterator
+     limit
+     from-end
+     (if from-end
+         (lambda (sequence iterator from-end)
+           (declare (ignore sequence from-end)
+                    (index iterator))
+           (the index (1- iterator)))
+         (lambda (sequence iterator from-end)
+           (declare (ignore sequence from-end)
+                    (index iterator))
+           (the index (1+ iterator))))
+     (lambda (sequence iterator limit from-end)
+       (declare (ignore sequence from-end)
+                (index iterator)
+                ((or index null) limit))
+       (= iterator limit))
+     (lambda (sequence iterator)
+       (declare (fixed-object sequence)
+                (index iterator))
+       (elt sequence iterator))
+     (lambda (value sequence iterator)
+       (declare (fixed-object sequence)
+                (index iterator))
+       (setf (elt sequence iterator) value))
+     (lambda (sequence iterator)
+       (declare (ignore sequence)
+                (index iterator))
+       iterator)
+     (lambda (sequence iterator)
+       (declare (ignore sequence)
+                (index iterator))
+       iterator))))

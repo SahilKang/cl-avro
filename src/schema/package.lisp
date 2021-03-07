@@ -71,7 +71,6 @@
            #:fixed
            #:fixed-object
            #:size
-           #:bytes
 
            #:map
            #:map-object

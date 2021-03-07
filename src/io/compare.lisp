@@ -145,8 +145,8 @@ LEFT and RIGHT may not necessarily be fully consumed."))
     ((schema schema:fixed) (left stream) (right stream))
   (declare (optimize (speed 3) (safety 0))
            (inline compare-bytes))
-  (let ((left (schema:bytes (deserialize schema left)))
-        (right (schema:bytes (deserialize schema right))))
+  (let ((left (cl-avro.schema.complex.fixed::buffer (deserialize schema left)))
+        (right (cl-avro.schema.complex.fixed::buffer (deserialize schema right))))
     (compare-bytes left right)))
 
 ;;; array schema

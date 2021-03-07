@@ -26,7 +26,6 @@
                 #:array-object
                 #:map-object
                 #:fixed-object
-                #:bytes
                 #:record-object
                 #:fields
                 #:name
@@ -91,7 +90,7 @@
       array))
 
 (defmethod convert-to-st-json ((fixed fixed-object))
-  (babel:octets-to-string (bytes fixed) :encoding :latin-1))
+  (babel:octets-to-string (cl-avro.schema.complex.fixed::buffer fixed) :encoding :latin-1))
 
 (defmethod convert-to-st-json ((array array-object))
   (cl:map 'simple-vector #'convert-to-st-json array))
