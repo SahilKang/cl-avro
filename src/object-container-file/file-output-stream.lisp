@@ -45,22 +45,13 @@
     ((instance file-output-stream)
      &key
        (output (error "Must supply OUTPUT"))
-       (schema (error "Must supply SCHEMA"))
-       (codec 'header:null)
-       (sync (make-instance 'header:sync))
-       (meta (make-hash-table :test #'equal)))
+       (meta (error "Must supply META"))
+       (sync (make-instance 'header:sync)))
   (with-slots (stream header) instance
     (setf stream (if (streamp output)
                      output
                      (make-instance 'io:memory-output-stream :bytes output))
-          header (make-instance
-                  'header:header
-                  :sync sync
-                  :meta (make-instance
-                         'header:meta
-                         :map meta
-                         :schema schema
-                         :codec codec)))))
+          header (make-instance 'header:header :sync sync :meta meta))))
 
 (declaim
  (ftype (function (file-output-stream (simple-array schema:schema (*)))

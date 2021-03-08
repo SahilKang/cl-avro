@@ -56,7 +56,9 @@
       (loop
         with in = (make-instance 'avro:file-input-stream :input stream)
         with out = (make-instance 'avro:file-output-stream
-                                  :schema (avro:schema (avro:header in))
+                                  :meta (make-instance
+                                         'avro:meta
+                                         :schema (avro:schema (avro:header in)))
                                   :output bytes)
         for block = (avro:read-block in)
         while block

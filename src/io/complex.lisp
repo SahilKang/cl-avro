@@ -100,14 +100,14 @@
 (defmethod serialize ((object schema:map-object) &key stream)
   "Write map into STREAM."
   (declare (optimize (speed 3) (safety 0)))
-  (let* ((hash-table (schema:map object))
-         (count (hash-table-count hash-table)))
+  (let ((count (schema:generic-hash-table-count object)))
+    (declare (fixnum count))
     (unless (zerop count)
       (serialize count :stream stream)
       (flet ((serialize (key value)
                (serialize key :stream stream)
                (serialize value :stream stream)))
-        (maphash #'serialize hash-table))))
+        (schema:hashmap #'serialize object))))
   (serialize 0 :stream stream)
   (values))
 
@@ -118,15 +118,15 @@
     with map-stream = (make-instance 'stream:map-input-stream
                                      :schema (schema:values schema)
                                      :stream stream)
-    and hash-table = (make-hash-table :test #'equal)
+    and hash-table = (make-instance schema)
 
     for pair = (stream:read-item map-stream)
     until (eq pair :eof)
     for (key . value) = pair
-    do (setf (gethash key hash-table) value)
+    do (setf (schema:hashref key hash-table) value)
 
     finally
-       (return (make-instance schema :map hash-table))))
+       (return hash-table)))
 
 ;;; enum schema
 

@@ -24,6 +24,8 @@
                 #:fixed)
   (:import-from #:cl-avro.schema.complex.enum
                 #:enum)
+  (:import-from #:cl-avro.schema.complex.map
+                #:hashref)
   (:shadowing-import-from #:cl-avro.schema.complex.union
                           #:union)
   (:shadowing-import-from #:cl-avro.schema.complex.array
@@ -48,7 +50,11 @@
     (make-instance schema :initial-contents notation))
 
   (:method ((schema map) notation)
-    (make-instance schema :map notation)))
+    (let ((map (make-instance schema :size (hash-table-count notation))))
+      (flet ((fill-map (key value)
+               (setf (hashref key map) value)))
+        (maphash #'fill-map notation))
+      map)))
 
 (macrolet
     ((specialize-parse-notation-for-primitives ()
