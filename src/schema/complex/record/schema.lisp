@@ -18,6 +18,9 @@
 (in-package #:cl-user)
 (defpackage #:cl-avro.schema.complex.record.schema
   (:use #:cl)
+  (:local-nicknames
+   (#:primitive #:cl-avro.schema.primitive)
+   (#:union #:cl-avro.schema.complex.union))
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass
@@ -53,7 +56,11 @@
    (name->field
     :reader name->field
     :type hash-table
-    :documentation "Field name to field slot map."))
+    :documentation "Field name to field slot map.")
+   (nullable-fields
+    :reader nullable-fields
+    :type hash-table
+    :documentation "Nullable fields."))
   (:documentation
    "Base class for avro record schemas."))
 
@@ -70,6 +77,7 @@
   (declare (optimize (speed 3) (safety 0)))
   (loop
     with fields of-type (simple-array field (*)) = (fields (class-of instance))
+    and nullable-fields of-type hash-table = (nullable-fields (class-of instance))
 
     for field of-type field across fields
 
@@ -77,23 +85,42 @@
     for type of-type schema = (type field)
     for value = (if (slot-boundp instance name)
                     (slot-value instance name)
-                    ;; TODO setting this to nil can cause a segfault
-                    (setf (slot-value instance name) nil))
+                    (if (gethash field nullable-fields)
+                        (setf (slot-value instance name)
+                              (when (typep type 'union:union)
+                                ;; TODO unions should be handled
+                                ;; implicitly like this everywhere
+                                (make-instance type :object nil)))
+                        (error "Field ~S is not optional" name)))
 
     unless (typep value type) do
       (error "Slot ~S has value ~S which is not of type ~S"
              name value type)))
 
-(defgeneric field (record-object field-name)
-  (:method ((instance record-object) (field-name simple-string))
-    "Return (values field-value field-slot)."
-    (declare (optimize (speed 3) (safety 0)))
-    (let ((field (gethash field-name (name->field (class-of instance)))))
-      (unless field
-        (error "No such field named ~S" field-name))
-      (let* ((name (nth-value 1 (name field)))
-             (value (slot-value instance name)))
-        (values value field)))))
+(defgeneric field (record-object field-name))
+
+(defmethod field
+    ((instance record-object) (field-name simple-string))
+  "Return (values field-value field-slot)."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((field (gethash field-name (name->field (class-of instance)))))
+    (unless field
+      (error "No such field named ~S" field-name))
+    (let* ((name (nth-value 1 (name field)))
+           (value (slot-value instance name)))
+      (values value field))))
+
+(defmethod (setf field)
+    (value (instance record-object) (field-name simple-string))
+  "Set FIELD-NAME to VALUE."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((field (nth-value 1 (field instance field-name)))
+         (type (type field))
+         (name (nth-value 1 (name field))))
+    (unless (typep value type)
+      (error "Expected type ~S, but got ~S for ~S"
+             type (type-of value) value))
+    (setf (slot-value instance name) value)))
 
 (declaim
  (ftype (function (list) (values list &optional)) add-default-initargs))
@@ -145,23 +172,44 @@
       (map nil #'process-field fields))
     name->field))
 
+(declaim
+ (ftype (function (field) (values boolean &optional)) nullable-field-p))
+(defun nullable-field-p (field)
+  (let ((type (type field)))
+    (or (eq type 'primitive:null)
+        (and (typep type 'union:union)
+             (not (null (find 'primitive:null (union:schemas type) :test #'eq)))))))
+
+(declaim
+ (ftype (function ((simple-array field (*))) (values hash-table &optional))
+        find-nullable-fields))
+(defun find-nullable-fields (fields)
+  (let ((nullable-fields (make-hash-table :test #'eq)))
+    (flet ((fill-table (field)
+             (when (nullable-field-p field)
+               (setf (gethash field nullable-fields) t))))
+      (map nil #'fill-table fields))
+    nullable-fields))
+
 (defmethod initialize-instance :after
     ((instance record) &key)
-  (with-slots (fields name->field) instance
+  (with-slots (fields name->field nullable-fields) instance
     (let ((slots (closer-mop:class-direct-slots instance)))
       (setf fields (make-array (length slots)
                                :element-type 'field
                                :initial-contents slots)
-            name->field (make-name->field fields)))))
+            name->field (make-name->field fields)
+            nullable-fields (find-nullable-fields fields)))))
 
 (defmethod reinitialize-instance :after
     ((instance record) &key)
-  (with-slots (fields name->field) instance
+  (with-slots (fields name->field nullable-fields) instance
     (let ((slots (closer-mop:class-direct-slots instance)))
       (setf fields (make-array (length slots)
                                :element-type 'field
                                :initial-contents slots)
-            name->field (make-name->field fields)))))
+            name->field (make-name->field fields)
+            nullable-fields (find-nullable-fields fields)))))
 
 (defmethod parse-notation
     ((schema record) (notation hash-table))
