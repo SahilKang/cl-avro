@@ -24,20 +24,33 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
+  (:import-from #:genhash
+                #:generic-hash-table-count
+                #:generic-hash-table-p
+                #:generic-hash-table-size
+                #:hashclr
+                #:hashmap
+                #:hashref
+                #:hashrem)
   (:export #:map
            #:map-object
-           #:values))
+           #:values
+           #:raw-hash-table
+           #:generic-hash-table-count
+           #:generic-hash-table-p
+           #:generic-hash-table-size
+           #:hashclr
+           #:hashmap
+           #:hashref
+           #:hashrem))
 (in-package #:cl-avro.schema.complex.map)
 
 (defclass map-object ()
-  ((map
-    :initarg :map
-    :reader map
+  ((hash-table
+    :reader raw-hash-table
     :type hash-table
     :documentation "Hash-table mapping strings to values."))
   (:metaclass complex-schema)
-  (:default-initargs
-   :map (error "Must supply MAP"))
   (:documentation
    "Base class for objects adhering to an avro map schema."))
 
@@ -56,113 +69,60 @@
     ((class map) (superclass complex-schema))
   t)
 
-(declaim
- (ftype (function (t t schema) (cl:values &optional)) assert-keyval)
- (inline assert-keyval))
-(defun assert-keyval (key value schema)
-  (declare (optimize (speed 3) (safety 0)))
-  (check-type key simple-string)
-  (unless (typep value schema)
-    (error "Expected type ~S, but got ~S for ~S"
-           schema (type-of value) value))
-  (cl:values))
-(declaim (notinline assert-keyval))
-
-(declaim
- (ftype (function (hash-table schema) (cl:values hash-table &optional))
-        parse-hash-table)
- (inline parse-hash-table))
-(defun parse-hash-table (map schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-keyval))
-  (let ((test (hash-table-test map)))
-    (unless (eq test 'equal)
-      (error "Expected test to be #'equal, not ~S" test)))
-  (flet ((assert-keyval (key value)
-           (assert-keyval key value schema)))
-    (maphash #'assert-keyval map))
-  map)
-(declaim (notinline parse-hash-table))
-
-(declaim
- (ftype (function (cons schema) (cl:values hash-table &optional)) parse-alist)
- (inline parse-alist))
-(defun parse-alist (map schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-keyval))
-  (loop
-    with hash-table = (make-hash-table :test #'equal)
-
-    for (k . v) in map
-    unless (nth-value 1 (gethash k hash-table)) do
-      (assert-keyval k v schema)
-      (setf (gethash k hash-table) v)
-
-    finally
-       (return hash-table)))
-(declaim (notinline parse-alist))
-
-(declaim
- (ftype (function (list schema) (cl:values hash-table &optional)) parse-plist)
- (inline parse-plist))
-(defun parse-plist (map schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-keyval))
-  (loop
-    with hash-table = (make-hash-table :test #'equal)
-
-    for remaining = map then (cddr remaining)
-    while remaining
-    for k = (car remaining)
-    for rest = (cdr remaining)
-    for v = (car rest)
-
-    unless rest do
-      (error "Odd number of key-value pairs: ~S" map)
-    unless (nth-value 1 (gethash k hash-table)) do
-      (assert-keyval k v schema)
-      (setf (gethash k hash-table) v)
-
-    finally
-       (return hash-table)))
-(declaim (notinline parse-plist))
-
-(declaim
- (ftype (function (list schema) (cl:values hash-table &optional)) parse-list)
- (inline parse-list))
-(defun parse-list (map schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline parse-alist parse-plist))
-  ;; as is normal with alist/plists, when there are duplicate keys,
-  ;; only the first value is taken
-  (if (consp (first map))
-      (parse-alist map schema)
-      (parse-plist map schema)))
-(declaim (notinline parse-list))
-
-(declaim
- (ftype (function (t schema) (cl:values hash-table &optional)) parse-map)
- (inline parse-map))
-(defun parse-map (map schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline parse-hash-table parse-list))
-  (etypecase map
-    (hash-table (parse-hash-table map schema))
-    (list (parse-list map schema))))
-(declaim (notinline parse-map))
-
-(defmethod initialize-instance :around
-    ((instance map-object) &rest initargs &key (map nil map-p))
-  (declare (optimize (speed 3) (safety 0))
-           (inline parse-map))
-  (if map-p
-      (let* ((schema (values (class-of instance)))
-             (map (parse-map map schema)))
-        (setf (getf initargs :map) map)
-        (apply #'call-next-method instance initargs))
-      (call-next-method)))
+(defmethod initialize-instance :after
+    ((instance map-object) &key size rehash-size rehash-threshold)
+  (let ((keyword-args (list :test #'equal)))
+    (when size
+      (push size keyword-args)
+      (push :size keyword-args))
+    (when rehash-size
+      (push rehash-size keyword-args)
+      (push :rehash-size keyword-args))
+    (when rehash-threshold
+      (push rehash-threshold keyword-args)
+      (push :rehash-threshold keyword-args))
+    (with-slots (hash-table) instance
+      (setf hash-table (apply #'make-hash-table keyword-args)))))
 
 (defmethod initialize-instance :around
     ((instance map) &rest initargs)
   (ensure-superclass map-object)
   (apply #'call-next-method instance initargs))
+
+(defmethod generic-hash-table-count
+    ((instance map-object))
+  (hash-table-count (raw-hash-table instance)))
+
+(defmethod generic-hash-table-p
+    ((instance map-object))
+  (hash-table-p (raw-hash-table instance)))
+
+(defmethod generic-hash-table-size
+    ((instance map-object))
+  (hash-table-size (raw-hash-table instance)))
+
+(defmethod hashclr
+    ((instance map-object))
+  (prog1 instance
+    (clrhash (raw-hash-table instance))))
+
+(defmethod hashmap
+    (function (instance map-object))
+  (maphash function (raw-hash-table instance)))
+
+(defmethod hashref
+    ((key simple-string) (instance map-object) &optional default)
+  (gethash key (raw-hash-table instance) default))
+
+(defmethod (setf hashref)
+    (value (key simple-string) (instance map-object) &optional default)
+  (declare (ignore default))
+  (let ((schema (values (class-of instance))))
+    (unless (typep value schema)
+      (error "Expected type ~S, but got ~S for ~S"
+             schema (type-of value) value)))
+  (setf (gethash key (raw-hash-table instance)) value))
+
+(defmethod hashrem
+    ((key simple-string) (instance map-object))
+  (remhash key (raw-hash-table instance)))

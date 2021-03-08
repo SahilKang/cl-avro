@@ -194,7 +194,11 @@ created from JSON and its two serialized arguments."
             record
             :field_1 (first fields)
             :field_2 (make-instance enum :enum (second fields))
-            :field_3 (make-instance map :map (third fields))))
+            :field_3 (loop
+                       with map = (make-instance map)
+                       for (key value) on (third fields) by #'cddr
+                       do (setf (avro:hashref key map) value)
+                       finally (return map))))
          (compare (left right)
            (let ((left (avro:serialize (to-record-object left)))
                  (right (avro:serialize (to-record-object right))))
@@ -206,6 +210,6 @@ created from JSON and its two serialized arguments."
       (is (= 1 (compare '(2 "ABC" ("foo" "bar")) '(2 "AB" ("foo" "bar"))))))))
 
 (test map-compare
-  (with-compare ("{type: \"map\", values: \"string\"}" :map)
+  (with-compare ("{type: \"map\", values: \"string\"}" :size)
     (signals error
       (compare nil nil))))

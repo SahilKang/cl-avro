@@ -100,6 +100,14 @@
            #:map
            #:map-object
            #:values
+           #:raw-hash-table
+           #:generic-hash-table-count
+           #:generic-hash-table-p
+           #:generic-hash-table-size
+           #:hashclr
+           #:hashmap
+           #:hashref
+           #:hashrem
 
            #:union
            #:union-object

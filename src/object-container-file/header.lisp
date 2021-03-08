@@ -71,25 +71,42 @@
 
 (defclass meta ()
   ((schema
-    :reader schema
+    :initarg :schema
     :type schema:schema)
    (codec
-    :reader codec
+    :initarg :codec
     :type codec))
   (:metaclass schema:map)
-  (:values schema:bytes)
-  (:default-initargs
-   :map (make-hash-table :test #'equal)))
+  (:values schema:bytes))
+
+(defmethod initialize-instance :after
+    ((instance meta) &key)
+  (when (slot-boundp instance 'schema)
+    (setf (schema:hashref "avro.schema" instance)
+          (babel:string-to-octets
+           (io:serialize (schema instance)) :encoding :utf-8)))
+  (when (slot-boundp instance 'codec)
+    (setf (schema:hashref "avro.codec" instance)
+          (babel:string-to-octets
+           (string-downcase (string (codec instance))) :encoding :utf-8))))
 
 (declaim
- (ftype (function (hash-table) (values schema:schema &optional)) parse-schema))
+ (ftype (function (schema:map-object) (values schema:schema &optional))
+        parse-schema))
 (defun parse-schema (meta)
   (multiple-value-bind (bytes existsp)
-      (gethash "avro.schema" meta)
+      (schema:hashref "avro.schema" meta)
     (unless existsp
       (error "Missing avro.schema in header meta"))
     (let ((string (babel:octets-to-string bytes :encoding :utf-8)))
       (io:deserialize 'schema:schema string))))
+
+(defgeneric schema (meta)
+  (:method ((instance meta))
+    (if (slot-boundp instance 'schema)
+        (slot-value instance 'schema)
+        (setf (slot-value instance 'schema)
+              (parse-schema instance)))))
 
 (declaim
  (ftype (function ((simple-array (unsigned-byte 8) (*)))
@@ -103,30 +120,20 @@
     symbol))
 
 (declaim
- (ftype (function (hash-table) (values codec &optional)) parse-codec))
+ (ftype (function (schema:map-object) (values codec &optional)) parse-codec))
 (defun parse-codec (meta)
   (multiple-value-bind (bytes existsp)
-      (gethash "avro.codec" meta)
+      (schema:hashref "avro.codec" meta)
     (if (not existsp)
         'null
         (%parse-codec bytes))))
 
-(defmethod initialize-instance :after
-    ((instance meta)
-     &key
-       map
-       ((:schema provided-schema) (parse-schema map) schema-provided-p)
-       ((:codec provided-codec) (parse-codec map)) codec-provided-p)
-  (with-slots (schema codec schema:map) instance
-    (setf schema provided-schema
-          codec provided-codec)
-    (when schema-provided-p
-      (setf (gethash "avro.schema" schema:map)
-            (babel:string-to-octets (io:serialize schema) :encoding :utf-8)))
-    (when codec-provided-p
-      (setf (gethash "avro.codec" schema:map)
-            (babel:string-to-octets (string-downcase (string codec))
-                                    :encoding :utf-8)))))
+(defgeneric codec (meta)
+  (:method ((instance meta))
+    (if (slot-boundp instance 'codec)
+        (slot-value instance 'codec)
+        (setf (slot-value instance 'codec)
+              (parse-codec instance)))))
 
 ;;; sync
 

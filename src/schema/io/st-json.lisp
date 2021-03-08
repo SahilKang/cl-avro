@@ -25,6 +25,8 @@
   (:import-from #:cl-avro.schema.complex
                 #:array-object
                 #:map-object
+                #:generic-hash-table-count
+                #:hashmap
                 #:fixed-object
                 #:raw-buffer
                 #:record-object
@@ -32,8 +34,6 @@
                 #:name
                 #:union-object
                 #:object)
-  (:shadowing-import-from #:cl-avro.schema.complex
-                          #:map)
   (:export #:convert-from-st-json
            #:convert-to-st-json))
 (in-package #:cl-avro.schema.io.st-json)
@@ -57,7 +57,7 @@
   'false)
 
 (defmethod convert-from-st-json ((list list))
-  (cl:map 'simple-vector #'convert-from-st-json list))
+  (map 'simple-vector #'convert-from-st-json list))
 
 (defmethod convert-from-st-json ((json-object st-json:jso))
   (let ((hash-table (make-hash-table :test #'equal)))
@@ -94,17 +94,16 @@
   (babel:octets-to-string (raw-buffer fixed) :encoding :latin-1))
 
 (defmethod convert-to-st-json ((array array-object))
-  (cl:map 'simple-vector #'convert-to-st-json array))
+  (map 'simple-vector #'convert-to-st-json array))
 
 (defmethod convert-to-st-json ((map map-object))
-  (let* ((map (map map))
-         (hash-table (make-hash-table
-                      :test #'equal :size (hash-table-count map))))
+  (let ((converted (make-hash-table
+                    :test #'equal :size (generic-hash-table-count map))))
     (flet ((convert (key value)
-             (setf (gethash key hash-table)
+             (setf (gethash key converted)
                    (convert-to-st-json value))))
-      (maphash #'convert map))
-    hash-table))
+      (hashmap #'convert map))
+    converted))
 
 (defmethod convert-to-st-json ((record record-object))
   (loop
