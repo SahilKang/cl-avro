@@ -84,16 +84,30 @@
       (error "Slot ~S has value ~S which is not of type ~S"
              name value type)))
 
-(defgeneric field (record-object field-name)
-  (:method ((instance record-object) (field-name simple-string))
-    "Return (values field-value field-slot)."
-    (declare (optimize (speed 3) (safety 0)))
-    (let ((field (gethash field-name (name->field (class-of instance)))))
-      (unless field
-        (error "No such field named ~S" field-name))
-      (let* ((name (nth-value 1 (name field)))
-             (value (slot-value instance name)))
-        (values value field)))))
+(defgeneric field (record-object field-name))
+
+(defmethod field
+    ((instance record-object) (field-name simple-string))
+  "Return (values field-value field-slot)."
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((field (gethash field-name (name->field (class-of instance)))))
+    (unless field
+      (error "No such field named ~S" field-name))
+    (let* ((name (nth-value 1 (name field)))
+           (value (slot-value instance name)))
+      (values value field))))
+
+(defmethod (setf field)
+    (value (instance record-object) (field-name simple-string))
+  "Set FIELD-NAME to VALUE."
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((field (nth-value 1 (field instance field-name)))
+         (type (type field))
+         (name (nth-value 1 (name field))))
+    (unless (typep value type)
+      (error "Expected type ~S, but got ~S for ~S"
+             type (type-of value) value))
+    (setf (slot-value instance name) value)))
 
 (declaim
  (ftype (function (list) (values list &optional)) add-default-initargs))
