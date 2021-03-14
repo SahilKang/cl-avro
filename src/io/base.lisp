@@ -19,8 +19,13 @@
 (defpackage #:cl-avro.io.base
   (:use #:cl)
   (:export #:serialize
-           #:deserialize))
+           #:deserialize
+           #:serialized-size))
 (in-package #:cl-avro.io.base)
+
+(defgeneric serialized-size (object)
+  (:documentation
+   "Determine the number of bytes OBJECT will be when serialized."))
 
 (defgeneric serialize (object &key stream &allow-other-keys)
   (:documentation

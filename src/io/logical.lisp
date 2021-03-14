@@ -23,12 +23,17 @@
    (#:endian #:cl-avro.io.primitive))
   (:import-from #:cl-avro.io.base
                 #:serialize
-                #:deserialize)
+                #:deserialize
+                #:serialized-size)
   (:export #:serialize
-           #:deserialize))
+           #:deserialize
+           #:serialized-size))
 (in-package #:cl-avro.io.logical)
 
 ;;; uuid schema
+
+(defmethod serialized-size ((object schema:uuid))
+  (serialized-size (schema:uuid object)))
 
 (defmethod serialize ((object schema:uuid) &key stream)
   "Write uuid string into STREAM."
@@ -55,6 +60,9 @@
     (declare (integer unix-time))
     (nth-value 0 (truncate unix-time (* 60 60 24)))))
 (declaim (notinline process-date))
+
+(defmethod serialized-size ((object schema:date))
+  (serialized-size (process-date object)))
 
 (defmethod serialize ((object schema:date) &key stream)
   "Write date into STREAM.
@@ -90,6 +98,9 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
        (* second 1000)
        (truncate nanosecond (* 1000 1000)))))
 (declaim (notinline process-time-millis))
+
+(defmethod serialized-size ((object schema:time-millis))
+  (serialized-size (process-time-millis object)))
 
 (defmethod serialize ((object schema:time-millis) &key stream)
   "Write time of day into STREAM.
@@ -134,6 +145,9 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
        (truncate nanosecond 1000))))
 (declaim (notinline process-time-micros))
 
+(defmethod serialized-size ((object schema:time-micros))
+  (serialized-size (process-time-micros object)))
+
 (defmethod serialize ((object schema:time-micros) &key stream)
   "Write time of day into STREAM.
 
@@ -175,6 +189,9 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
     (+ (* 1000 seconds-from-unix-epoch)
        (truncate nanoseconds (* 1000 1000)))))
 (declaim (notinline process-timestamp-millis))
+
+(defmethod serialized-size ((object schema:timestamp-millis))
+  (serialized-size (process-timestamp-millis object)))
 
 (defmethod serialize ((object schema:timestamp-millis) &key stream)
   "Write timestamp into STREAM.
@@ -221,6 +238,9 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
        (truncate nanoseconds 1000))))
 (declaim (notinline process-timestamp-micros))
 
+(defmethod serialized-size ((object schema:timestamp-micros))
+  (serialized-size (process-timestamp-micros object)))
+
 (defmethod serialize ((object schema:timestamp-micros) &key stream)
   "Write timestamp into STREAM.
 
@@ -265,6 +285,9 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
     (declare ((or integer double-float) seconds-from-epoch))
     (nth-value 0 (truncate (* seconds-from-epoch 1000)))))
 (declaim (notinline process-local-timestamp-millis))
+
+(defmethod serialized-size ((object schema:local-timestamp-millis))
+  (serialized-size (process-local-timestamp-millis object)))
 
 (defmethod serialize ((object schema:local-timestamp-millis) &key stream)
   "Write local timestamp into STREAM.
@@ -313,6 +336,9 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
     (nth-value 0 (truncate (* seconds-from-epoch 1000 1000)))))
 (declaim (notinline process-local-timestamp-micros))
 
+(defmethod serialized-size ((object schema:local-timestamp-micros))
+  (serialized-size (process-local-timestamp-micros object)))
+
 (defmethod serialize ((object schema:local-timestamp-micros) &key stream)
   "Write local timestamp into STREAM.
 
@@ -345,6 +371,9 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
    schema))
 
 ;;; duration schema
+
+(defmethod serialized-size ((object schema:duration-object))
+  12)
 
 (defmethod serialize ((object schema:duration-object) &key stream)
   "Write duration into STREAM."
@@ -456,6 +485,14 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
       (nth-value 0 (ceiling (1+ (integer-length unscaled)) 8))
       (schema:size schema)))
 (declaim (notinline min-buf-length))
+
+(defmethod serialized-size ((object schema:decimal-object))
+  (let* ((underlying (schema:underlying (class-of object)))
+         (buf-length (min-buf-length (schema:unscaled object) underlying)))
+    (if (eq underlying 'schema:bytes)
+        (+ (serialized-size buf-length)
+           buf-length)
+        buf-length)))
 
 (defmethod serialize ((object schema:decimal-object) &key stream)
   "Write decimal into STREAM."

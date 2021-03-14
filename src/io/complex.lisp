@@ -23,12 +23,17 @@
    (#:stream #:cl-avro.io.block-stream))
   (:import-from #:cl-avro.io.base
                 #:serialize
-                #:deserialize)
+                #:deserialize
+                #:serialized-size)
   (:export #:serialize
-           #:deserialize))
+           #:deserialize
+           #:serialized-size))
 (in-package #:cl-avro.io.complex)
 
 ;;; fixed schema
+
+(defmethod serialized-size ((object schema:fixed-object))
+  (length object))
 
 (defmethod serialize ((object schema:fixed-object) &key stream)
   "Write fixed bytes into STREAM."
@@ -46,6 +51,11 @@
     bytes))
 
 ;;; union schema
+
+(defmethod serialized-size ((object schema:union-object))
+  (let ((position (nth-value 1 (schema:which-one object))))
+    (+ (serialized-size position)
+       (serialized-size (schema:object object)))))
 
 (defmethod serialize ((object schema:union-object) &key stream)
   "Write tagged union into STREAM."
@@ -66,6 +76,15 @@
     (make-instance schema :object value)))
 
 ;;; array schema
+
+(defmethod serialized-size ((object schema:array-object))
+  (let ((count (length object)))
+    (if (zerop count)
+        1
+        (1+ (reduce (lambda (agg x)
+                      (+ agg (serialized-size x)))
+                    object
+                    :initial-value (serialized-size count))))))
 
 (defmethod serialize ((object schema:array-object) &key stream)
   "Write array into STREAM."
@@ -96,6 +115,17 @@
        (return vector)))
 
 ;;; map schema
+
+(defmethod serialized-size ((object schema:map-object))
+  (let ((count (schema:generic-hash-table-count object))
+        (result 1))
+    (unless (zerop count)
+      (incf result (serialized-size count))
+      (flet ((incf-result (key value)
+               (incf result (serialized-size key))
+               (incf result (serialized-size value))))
+        (schema:hashmap #'incf-result object)))
+    result))
 
 (defmethod serialize ((object schema:map-object) &key stream)
   "Write map into STREAM."
@@ -130,6 +160,10 @@
 
 ;;; enum schema
 
+(defmethod serialized-size ((object schema:enum-object))
+  (let ((position (nth-value 1 (schema:which-one object))))
+    (serialized-size position)))
+
 (defmethod serialize ((object schema:enum-object) &key stream)
   "Write enum into STREAM."
   (declare (optimize (speed 3) (safety 0)))
@@ -149,6 +183,13 @@
     (make-instance schema :enum chosen-enum)))
 
 ;;; record schema
+
+(defmethod serialized-size ((object schema:record-object))
+  (reduce (lambda (agg field)
+            (+ agg (serialized-size
+                    (schema:field object (schema:name field)))))
+          (schema:fields (class-of object))
+          :initial-value 0))
 
 (defmethod serialize ((object schema:record-object) &key stream)
   "Write record into STREAM."

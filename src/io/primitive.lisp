@@ -23,9 +23,11 @@
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
                 #:serialize
-                #:deserialize)
+                #:deserialize
+                #:serialized-size)
   (:export #:serialize
            #:deserialize
+           #:serialized-size
            #:little-endian->uint32
            #:uint32->little-endian))
 (in-package #:cl-avro.io.primitive)
@@ -60,6 +62,9 @@
 
 ;;; null schema
 
+(defmethod serialized-size ((object null))
+  0)
+
 (defmethod serialize ((object null) &key stream)
   "Write zero bytes into STREAM."
   (declare (optimize (speed 3) (safety 0))
@@ -73,6 +78,12 @@
   nil)
 
 ;;; boolean schema
+
+(defmethod serialized-size ((object (eql 'schema:true)))
+  1)
+
+(defmethod serialized-size ((object (eql 'schema:false)))
+  1)
 
 (defmethod serialize ((object (eql 'schema:true)) &key stream)
   "Write #o1 into STREAM."
@@ -137,6 +148,21 @@
   (declare (optimize (speed 3) (safety 0)))
   (logxor (ash long 1) (ash long -63)))
 (declaim (notinline long->zig-zag))
+
+;; serialized-size
+
+(defmethod serialized-size ((object integer))
+  (loop
+    with zig-zag = (etypecase object
+                     (schema:int (int->zig-zag object))
+                     (schema:long (long->zig-zag object)))
+
+    for integer = zig-zag then (ash integer -7)
+    until (zerop (logand integer (lognot #x7f)))
+    count integer into length
+
+    finally
+       (return (1+ length))))
 
 ;; variable length integers
 
@@ -295,6 +321,9 @@
 
 ;; float schema
 
+(defmethod serialized-size ((object single-float))
+  4)
+
 (defmethod serialize ((object single-float) &key stream)
   "Write single-precision float to STREAM."
   (declare (optimize (speed 3) (safety 0))
@@ -316,6 +345,9 @@
     (ieee-floats:decode-float32 (little-endian->uint32 bytes))))
 
 ;; double schema
+
+(defmethod serialized-size ((object double-float))
+  8)
 
 (defmethod serialize ((object double-float) &key stream)
   "Write double-precision float to STREAM."
@@ -339,6 +371,11 @@
 
 ;; bytes schema
 
+(defmethod serialized-size ((object vector))
+  (let ((length (length object)))
+    (+ (serialized-size length)
+       length)))
+
 (defmethod serialize ((object vector) &key stream)
   "Write byte vector into STREAM."
   (declare (optimize (speed 3) (safety 0)))
@@ -358,6 +395,11 @@
     bytes))
 
 ;; string schema
+
+(defmethod serialized-size ((object string))
+  (let ((length (babel:string-size-in-octets object :encoding :utf-8)))
+    (+ (serialized-size length)
+       length)))
 
 (defmethod serialize ((object string) &key stream)
   "Write utf-8 encoded string into STREAM."
