@@ -339,8 +339,8 @@
 
 ;; bytes schema
 
-(defmethod serialize ((object array) &key stream)
-  "Write byte array into STREAM."
+(defmethod serialize ((object vector) &key stream)
+  "Write byte vector into STREAM."
   (declare (optimize (speed 3) (safety 0)))
   (check-type object schema:bytes)
   (serialize (length object) :stream stream)
@@ -348,7 +348,7 @@
   (values))
 
 (defmethod deserialize ((schema (eql 'schema:bytes)) (stream stream) &key)
-  "Read an array of bytes from STREAM."
+  "Read a vector of bytes from STREAM."
   (declare (optimize (speed 3) (safety 0))
            (ignore schema))
   (let* ((size (deserialize 'schema:long stream))
