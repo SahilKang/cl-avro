@@ -46,15 +46,23 @@
 
 ;;; date schema
 
+(declaim
+ (ftype (function (schema:date) (values schema:int &optional)) process-date)
+ (inline process-date))
+(defun process-date (date)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((unix-time (local-time:timestamp-to-unix date)))
+    (declare (integer unix-time))
+    (nth-value 0 (truncate unix-time (* 60 60 24)))))
+(declaim (notinline process-date))
+
 (defmethod serialize ((object schema:date) &key stream)
   "Write date into STREAM.
 
 Serialized as the number of days from the ISO unix epoch 1970-01-01."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((unix-time (local-time:timestamp-to-unix object))
-         (days (truncate unix-time (* 60 60 24))))
-    (declare (integer unix-time))
-    (serialize days :stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-date))
+  (serialize (process-date object) :stream stream)
   (values))
 
 (defmethod deserialize ((schema schema:date-schema) (stream stream) &key)
@@ -68,20 +76,28 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
 
 ;;; time-millis schema
 
+(declaim
+ (ftype (function (schema:time-millis) (values schema:int &optional))
+        process-time-millis)
+ (inline process-time-millis))
+(defun process-time-millis (time-millis)
+  (declare (optimize (speed 3) (safety 0)))
+  (local-time:with-decoded-timestamp
+      (:hour hour :minute minute :sec second :nsec nanosecond)
+      time-millis
+    (+ (* hour 60 60 1000)
+       (* minute 60 1000)
+       (* second 1000)
+       (truncate nanosecond (* 1000 1000)))))
+(declaim (notinline process-time-millis))
+
 (defmethod serialize ((object schema:time-millis) &key stream)
   "Write time of day into STREAM.
 
 Serialized as the number of milliseconds after midnight, 00:00:00.000."
-  (declare (optimize (speed 3) (safety 0)))
-  (local-time:with-decoded-timestamp
-      (:hour hour :minute minute :sec second :nsec nanosecond)
-      object
-    (let ((milliseconds-after-midnight
-            (+ (* hour 60 60 1000)
-               (* minute 60 1000)
-               (* second 1000)
-               (truncate nanosecond (* 1000 1000)))))
-      (serialize milliseconds-after-midnight :stream stream)))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-time-millis))
+  (serialize (process-time-millis object) :stream stream)
   (values))
 
 (defmethod deserialize
@@ -103,20 +119,28 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
 
 ;;; time-micros schema
 
+(declaim
+ (ftype (function (schema:time-micros) (values schema:long &optional))
+        process-time-micros)
+ (inline process-time-micros))
+(defun process-time-micros (time-micros)
+  (declare (optimize (speed 3) (safety 0)))
+  (local-time:with-decoded-timestamp
+      (:hour hour :minute minute :sec second :nsec nanosecond)
+      time-micros
+    (+ (* hour 60 60 1000 1000)
+       (* minute 60 1000 1000)
+       (* second 1000 1000)
+       (truncate nanosecond 1000))))
+(declaim (notinline process-time-micros))
+
 (defmethod serialize ((object schema:time-micros) &key stream)
   "Write time of day into STREAM.
 
 Serialized as the number of microseconds after midnight, 00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0)))
-  (local-time:with-decoded-timestamp
-      (:hour hour :minute minute :sec second :nsec nanosecond)
-      object
-    (let ((microseconds-after-midnight
-            (+ (* hour 60 60 1000 1000)
-               (* minute 60 1000 1000)
-               (* second 1000 1000)
-               (truncate nanosecond 1000))))
-      (serialize microseconds-after-midnight :stream stream)))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-time-micros))
+  (serialize (process-time-micros object) :stream stream)
   (values))
 
 (defmethod deserialize
@@ -138,20 +162,27 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
 
 ;;; timestamp-millis schema
 
+(declaim
+ (ftype (function (schema:timestamp-millis) (values schema:long &optional))
+        process-timestamp-millis)
+ (inline process-timestamp-millis))
+(defun process-timestamp-millis (timestamp-millis)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-millis))
+        (nanoseconds (local-time:nsec-of timestamp-millis)))
+    (declare ((integer -9223372036854776 9223372036854775) seconds-from-unix-epoch)
+             ((integer 0 999999999) nanoseconds))
+    (+ (* 1000 seconds-from-unix-epoch)
+       (truncate nanoseconds (* 1000 1000)))))
+(declaim (notinline process-timestamp-millis))
+
 (defmethod serialize ((object schema:timestamp-millis) &key stream)
   "Write timestamp into STREAM.
 
 Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((seconds-from-unix-epoch (local-time:timestamp-to-unix object))
-         (nanoseconds (local-time:nsec-of object))
-         (milliseconds-from-unix-epoch
-           (+ (* 1000 seconds-from-unix-epoch)
-              (truncate nanoseconds (* 1000 1000)))))
-    (declare ((integer -9223372036854776 9223372036854775) seconds-from-unix-epoch)
-             ((integer 0 999999999) nanoseconds)
-             (schema:long milliseconds-from-unix-epoch))
-    (serialize milliseconds-from-unix-epoch :stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-timestamp-millis))
+  (serialize (process-timestamp-millis object) :stream stream)
   (values))
 
 (defmethod deserialize
@@ -176,20 +207,27 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
 
 ;;; timestamp-micros schema
 
+(declaim
+ (ftype (function (schema:timestamp-micros) (values schema:long &optional))
+        process-timestamp-micros)
+ (inline process-timestamp-micros))
+(defun process-timestamp-micros (timestamp-micros)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-micros))
+        (nanoseconds (local-time:nsec-of timestamp-micros)))
+    (declare ((integer -9223372036855 9223372036854) seconds-from-unix-epoch)
+             ((integer 0 999999999) nanoseconds))
+    (+ (* 1000 1000 seconds-from-unix-epoch)
+       (truncate nanoseconds 1000))))
+(declaim (notinline process-timestamp-micros))
+
 (defmethod serialize ((object schema:timestamp-micros) &key stream)
   "Write timestamp into STREAM.
 
 Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((seconds-from-unix-epoch (local-time:timestamp-to-unix object))
-         (nanoseconds (local-time:nsec-of object))
-         (microseconds-from-unix-epoch
-           (+ (* 1000 1000 seconds-from-unix-epoch)
-              (truncate nanoseconds 1000))))
-    (declare ((integer -9223372036855 9223372036854) seconds-from-unix-epoch)
-             ((integer 0 999999999) nanoseconds)
-             (schema:long microseconds-from-unix-epoch))
-    (serialize microseconds-from-unix-epoch :stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-timestamp-micros))
+  (serialize (process-timestamp-micros object) :stream stream)
   (values))
 
 (defmethod deserialize
@@ -214,16 +252,27 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
 
 ;;; local-timestamp-millis schema
 
+(declaim
+ (ftype (function (schema:local-timestamp-millis)
+                  (values schema:long &optional))
+        process-local-timestamp-millis)
+ (inline process-local-timestamp-millis))
+(defun process-local-timestamp-millis (local-timestamp-millis)
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+         (seconds-from-epoch (local-time:timestamp-difference
+                              epoch local-timestamp-millis)))
+    (declare ((or integer double-float) seconds-from-epoch))
+    (nth-value 0 (truncate (* seconds-from-epoch 1000)))))
+(declaim (notinline process-local-timestamp-millis))
+
 (defmethod serialize ((object schema:local-timestamp-millis) &key stream)
   "Write local timestamp into STREAM.
 
 Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
-         (seconds-from-epoch (local-time:timestamp-difference epoch object))
-         (milliseconds-from-epoch (truncate (* seconds-from-epoch 1000))))
-    (declare ((or integer double-float) seconds-from-epoch))
-    (serialize milliseconds-from-epoch :stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-local-timestamp-millis))
+  (serialize (process-local-timestamp-millis object) :stream stream)
   (values))
 
 (defmethod deserialize
@@ -250,16 +299,27 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
 
 ;;; local-timestamp-micros schema
 
+(declaim
+ (ftype (function (schema:local-timestamp-micros)
+                  (values schema:long &optional))
+        process-local-timestamp-micros)
+ (inline process-local-timestamp-micros))
+(defun process-local-timestamp-micros (local-timestamp-micros)
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+         (seconds-from-epoch (local-time:timestamp-difference
+                              epoch local-timestamp-micros)))
+    (declare ((or integer double-float) seconds-from-epoch))
+    (nth-value 0 (truncate (* seconds-from-epoch 1000 1000)))))
+(declaim (notinline process-local-timestamp-micros))
+
 (defmethod serialize ((object schema:local-timestamp-micros) &key stream)
   "Write local timestamp into STREAM.
 
 Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
-         (seconds-from-epoch (local-time:timestamp-difference epoch object))
-         (microseconds-from-epoch (truncate (* seconds-from-epoch 1000 1000))))
-    (declare ((or integer double-float) seconds-from-epoch))
-    (serialize microseconds-from-epoch :stream stream))
+  (declare (optimize (speed 3) (safety 0))
+           (inline process-local-timestamp-micros))
+  (serialize (process-local-timestamp-micros object) :stream stream)
   (values))
 
 (defmethod deserialize
