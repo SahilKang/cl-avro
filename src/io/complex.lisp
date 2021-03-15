@@ -22,10 +22,10 @@
    (#:schema #:cl-avro.schema)
    (#:stream #:cl-avro.io.block-stream))
   (:import-from #:cl-avro.io.base
-                #:serialize
+                #:serialize-into
                 #:deserialize
                 #:serialized-size)
-  (:export #:serialize
+  (:export #:serialize-into
            #:deserialize
            #:serialized-size))
 (in-package #:cl-avro.io.complex)
@@ -35,11 +35,15 @@
 (defmethod serialized-size ((object schema:fixed-object))
   (length object))
 
-(defmethod serialize ((object schema:fixed-object) &key stream)
-  "Write fixed bytes into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (write-sequence (schema:raw-buffer object) stream)
-  (values))
+(defmethod serialize-into
+    ((object schema:fixed-object) (vector simple-array) (start fixnum))
+  "Write fixed bytes into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let ((raw-buffer (schema:raw-buffer object)))
+    (declare ((simple-array (unsigned-byte 8) (*)) raw-buffer))
+    (replace vector raw-buffer :start1 start)
+    (length raw-buffer)))
 
 (defmethod deserialize ((schema schema:fixed) (stream stream) &key)
   "Read a fixed number of bytes from STREAM."
@@ -57,13 +61,19 @@
     (+ (serialized-size position)
        (serialized-size (schema:object object)))))
 
-(defmethod serialize ((object schema:union-object) &key stream)
-  "Write tagged union into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((position (nth-value 1 (schema:which-one object))))
-    (serialize position :stream stream))
-  (serialize (schema:object object) :stream stream)
-  (values))
+(defmethod serialize-into
+    ((object schema:union-object) (vector simple-array) (start fixnum))
+  "Write tagged union into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let* ((position (nth-value 1 (schema:which-one object)))
+         (bytes-written (serialize-into position vector start)))
+    (declare (fixnum bytes-written))
+    (the fixnum
+         (+ bytes-written
+            (the fixnum
+                 (serialize-into
+                  (schema:object object) vector (the fixnum (+ start bytes-written))))))))
 
 (defmethod deserialize ((schema schema:union) (stream stream) &key)
   "Read a tagged union from STREAM."
@@ -86,17 +96,28 @@
                     object
                     :initial-value (serialized-size count))))))
 
-(defmethod serialize ((object schema:array-object) &key stream)
-  "Write array into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((count (length object)))
+(defmethod serialize-into
+    ((object schema:array-object) (vector simple-array) (start fixnum))
+  "Write array into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let* ((raw-buffer (schema:raw-buffer object))
+         (count (length raw-buffer))
+         (bytes-written 0))
+    (declare (vector raw-buffer))
     (unless (zerop count)
-      (serialize count :stream stream)
-      (flet ((serialize (elt)
-               (serialize elt :stream stream)))
-        (map nil #'serialize object))))
-  (serialize 0 :stream stream)
-  (values))
+      (incf (the fixnum bytes-written)
+            (the fixnum (serialize-into count vector start)))
+      (flet ((serialize-into (elt)
+               (incf (the fixnum bytes-written)
+                     (the fixnum
+                          (serialize-into
+                           elt vector (the fixnum (+ start bytes-written)))))))
+        (map nil #'serialize-into raw-buffer)))
+    (the fixnum
+         (+ bytes-written
+            (the fixnum
+                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
 
 (defmethod deserialize ((schema schema:array) (stream stream) &key)
   "Read an array from STREAM."
@@ -127,19 +148,32 @@
         (schema:hashmap #'incf-result object)))
     result))
 
-(defmethod serialize ((object schema:map-object) &key stream)
-  "Write map into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((count (schema:generic-hash-table-count object)))
-    (declare (fixnum count))
+(defmethod serialize-into
+    ((object schema:map-object) (vector simple-array) (start fixnum))
+  "Write map into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let* ((raw-hash-table (schema:raw-hash-table object))
+         (count (hash-table-count raw-hash-table))
+         (bytes-written 0))
     (unless (zerop count)
-      (serialize count :stream stream)
-      (flet ((serialize (key value)
-               (serialize key :stream stream)
-               (serialize value :stream stream)))
-        (schema:hashmap #'serialize object))))
-  (serialize 0 :stream stream)
-  (values))
+      (incf (the fixnum bytes-written)
+            (the fixnum (serialize-into count vector start)))
+      (flet ((serialize-into (key value)
+               (declare (simple-string key))
+               (incf (the fixnum bytes-written)
+                     (the fixnum
+                          (serialize-into
+                           key vector (the fixnum (+ start bytes-written)))))
+               (incf (the fixnum bytes-written)
+                     (the fixnum
+                          (serialize-into
+                           value vector (the fixnum (+ start bytes-written)))))))
+        (maphash #'serialize-into raw-hash-table)))
+    (the fixnum
+         (+ bytes-written
+            (the fixnum
+                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
 
 (defmethod deserialize ((schema schema:map) (stream stream) &key)
   "Read a map from STREAM."
@@ -164,12 +198,13 @@
   (let ((position (nth-value 1 (schema:which-one object))))
     (serialized-size position)))
 
-(defmethod serialize ((object schema:enum-object) &key stream)
-  "Write enum into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
+(defmethod serialize-into
+    ((object schema:enum-object) (vector simple-array) (start fixnum))
+  "Write enum into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((position (nth-value 1 (schema:which-one object))))
-    (serialize position :stream stream))
-  (values))
+    (serialize-into position vector start)))
 
 (defmethod deserialize ((schema schema:enum) (stream stream) &key)
   "Read an enum from STREAM."
@@ -191,20 +226,26 @@
           (schema:fields (class-of object))
           :initial-value 0))
 
-(defmethod serialize ((object schema:record-object) &key stream)
-  "Write record into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
+(defmethod serialize-into
+    ((object schema:record-object) (vector simple-array) (start fixnum))
+  "Write record into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (loop
     with fields of-type (simple-array schema:field (*)) = (schema:fields
                                                            (class-of object))
+    and bytes-written of-type fixnum = 0
 
     for field of-type schema:field across fields
     for value = (schema:field object (schema:name field))
 
-    do (serialize value :stream stream)
+    do (incf (the fixnum bytes-written)
+             (the fixnum
+                  (serialize-into
+                   value vector (the fixnum (+ start bytes-written)))))
 
     finally
-       (return (values))))
+       (return bytes-written)))
 
 (defmethod deserialize ((schema schema:record) (stream stream) &key)
   "Read a record from STREAM."

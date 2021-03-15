@@ -22,10 +22,10 @@
    (#:schema #:cl-avro.schema)
    (#:endian #:cl-avro.io.primitive))
   (:import-from #:cl-avro.io.base
-                #:serialize
+                #:serialize-into
                 #:deserialize
                 #:serialized-size)
-  (:export #:serialize
+  (:export #:serialize-into
            #:deserialize
            #:serialized-size))
 (in-package #:cl-avro.io.logical)
@@ -35,11 +35,12 @@
 (defmethod serialized-size ((object schema:uuid))
   (serialized-size (schema:uuid object)))
 
-(defmethod serialize ((object schema:uuid) &key stream)
-  "Write uuid string into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (serialize (schema:uuid object) :stream stream)
-  (values))
+(defmethod serialize-into
+    ((object schema:uuid) (vector simple-array) (start fixnum))
+  "Write uuid string into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (schema:uuid object) vector start))
 
 (defmethod deserialize ((schema schema:uuid-schema) (stream stream) &key)
   "Read a uuid string from STREAM."
@@ -64,14 +65,15 @@
 (defmethod serialized-size ((object schema:date))
   (serialized-size (process-date object)))
 
-(defmethod serialize ((object schema:date) &key stream)
-  "Write date into STREAM.
+(defmethod serialize-into
+    ((object schema:date) (vector simple-array) (start fixnum))
+  "Write date into VECTOR.
 
 Serialized as the number of days from the ISO unix epoch 1970-01-01."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-date))
-  (serialize (process-date object) :stream stream)
-  (values))
+           (inline process-date)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-date object) vector start))
 
 (defmethod deserialize ((schema schema:date-schema) (stream stream) &key)
   "Read a date from STREAM."
@@ -102,14 +104,15 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
 (defmethod serialized-size ((object schema:time-millis))
   (serialized-size (process-time-millis object)))
 
-(defmethod serialize ((object schema:time-millis) &key stream)
-  "Write time of day into STREAM.
+(defmethod serialize-into
+    ((object schema:time-millis) (vector simple-array) (start fixnum))
+  "Write time of day into VECTOR.
 
 Serialized as the number of milliseconds after midnight, 00:00:00.000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-time-millis))
-  (serialize (process-time-millis object) :stream stream)
-  (values))
+           (inline process-time-millis)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-time-millis object) vector start))
 
 (defmethod deserialize
     ((schema schema:time-millis-schema) (stream stream) &key)
@@ -148,14 +151,15 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
 (defmethod serialized-size ((object schema:time-micros))
   (serialized-size (process-time-micros object)))
 
-(defmethod serialize ((object schema:time-micros) &key stream)
-  "Write time of day into STREAM.
+(defmethod serialize-into
+    ((object schema:time-micros) (vector simple-array) (start fixnum))
+  "Write time of day into VECTOR.
 
 Serialized as the number of microseconds after midnight, 00:00:00.000000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-time-micros))
-  (serialize (process-time-micros object) :stream stream)
-  (values))
+           (inline process-time-micros)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-time-micros object) vector start))
 
 (defmethod deserialize
     ((schema schema:time-micros-schema) (stream stream) &key)
@@ -193,14 +197,15 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
 (defmethod serialized-size ((object schema:timestamp-millis))
   (serialized-size (process-timestamp-millis object)))
 
-(defmethod serialize ((object schema:timestamp-millis) &key stream)
-  "Write timestamp into STREAM.
+(defmethod serialize-into
+    ((object schema:timestamp-millis) (vector simple-array) (start fixnum))
+  "Write timestamp into VECTOR.
 
 Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-timestamp-millis))
-  (serialize (process-timestamp-millis object) :stream stream)
-  (values))
+           (inline process-timestamp-millis)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-timestamp-millis object) vector start))
 
 (defmethod deserialize
     ((schema schema:timestamp-millis-schema) (stream stream) &key)
@@ -241,14 +246,15 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
 (defmethod serialized-size ((object schema:timestamp-micros))
   (serialized-size (process-timestamp-micros object)))
 
-(defmethod serialize ((object schema:timestamp-micros) &key stream)
-  "Write timestamp into STREAM.
+(defmethod serialize-into
+    ((object schema:timestamp-micros) (vector simple-array) (start fixnum))
+  "Write timestamp into VECTOR.
 
 Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-timestamp-micros))
-  (serialize (process-timestamp-micros object) :stream stream)
-  (values))
+           (inline process-timestamp-micros)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-timestamp-micros object) vector start))
 
 (defmethod deserialize
     ((schema schema:timestamp-micros-schema) (stream stream) &key)
@@ -289,14 +295,15 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
 (defmethod serialized-size ((object schema:local-timestamp-millis))
   (serialized-size (process-local-timestamp-millis object)))
 
-(defmethod serialize ((object schema:local-timestamp-millis) &key stream)
-  "Write local timestamp into STREAM.
+(defmethod serialize-into
+    ((object schema:local-timestamp-millis) (vector simple-array) (start fixnum))
+  "Write local timestamp into VECTOR.
 
 Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-local-timestamp-millis))
-  (serialize (process-local-timestamp-millis object) :stream stream)
-  (values))
+           (inline process-local-timestamp-millis)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-local-timestamp-millis object) vector start))
 
 (defmethod deserialize
     ((schema schema:local-timestamp-millis-schema) (stream stream) &key)
@@ -339,14 +346,15 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
 (defmethod serialized-size ((object schema:local-timestamp-micros))
   (serialized-size (process-local-timestamp-micros object)))
 
-(defmethod serialize ((object schema:local-timestamp-micros) &key stream)
-  "Write local timestamp into STREAM.
+(defmethod serialize-into
+    ((object schema:local-timestamp-micros) (vector simple-array) (start fixnum))
+  "Write local timestamp into VECTOR.
 
 Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
   (declare (optimize (speed 3) (safety 0))
-           (inline process-local-timestamp-micros))
-  (serialize (process-local-timestamp-micros object) :stream stream)
-  (values))
+           (inline process-local-timestamp-micros)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (serialize-into (process-local-timestamp-micros object) vector start))
 
 (defmethod deserialize
     ((schema schema:local-timestamp-micros-schema) (stream stream) &key)
@@ -375,16 +383,16 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defmethod serialized-size ((object schema:duration-object))
   12)
 
-(defmethod serialize ((object schema:duration-object) &key stream)
-  "Write duration into STREAM."
+(defmethod serialize-into
+    ((object schema:duration-object) (vector simple-array) (start fixnum))
+  "Write duration into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (inline endian:uint32->little-endian))
-  (let ((bytes (make-array 12 :element-type '(unsigned-byte 8))))
-    (endian:uint32->little-endian (schema:months object) bytes 0)
-    (endian:uint32->little-endian (schema:days object) bytes 4)
-    (endian:uint32->little-endian (schema:milliseconds object) bytes 8)
-    (write-sequence bytes stream))
-  (values))
+           (inline endian:uint32->little-endian)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (endian:uint32->little-endian (schema:months object) vector start)
+  (endian:uint32->little-endian (schema:days object) vector (+ start 4))
+  (endian:uint32->little-endian (schema:milliseconds object) vector (+ start 8))
+  12)
 
 (defmethod deserialize ((schema schema:duration) (stream stream) &key)
   "Read duration from STREAM."
@@ -425,16 +433,17 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (declaim (notinline big-endian->integer))
 
 (declaim
- (ftype (function ((integer 0) (simple-array (unsigned-byte 8) (*)))
-                  (values &optional))
+ (ftype (function
+         ((integer 0) (simple-array (unsigned-byte 8) (*)) fixnum fixnum)
+         (values &optional))
         integer->big-endian)
  (inline integer->big-endian))
-(defun integer->big-endian (integer bytes)
+(defun integer->big-endian (integer bytes start end)
   (declare (optimize (speed 3) (safety 0)))
   (loop
-    for offset from (1- (length bytes)) downto 0
-    for byte of-type (unsigned-byte 8) = (logand #xff (ash integer
-                                                           (- (* offset 8))))
+    for offset from (1- end) downto start
+    for shift = (* 8 (the fixnum (- offset start)))
+    for byte of-type (unsigned-byte 8) = (logand #xff (ash integer (- shift)))
     do (setf (elt bytes offset) byte)
 
     finally
@@ -459,17 +468,17 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (declaim (notinline read-twos-complement))
 
 (declaim
- (ftype (function (integer (simple-array (unsigned-byte 8) (*)))
+ (ftype (function (integer (simple-array (unsigned-byte 8) (*)) fixnum fixnum)
                   (values &optional))
         write-twos-complement)
  (inline write-twos-complement))
-(defun write-twos-complement (integer bytes)
+(defun write-twos-complement (integer bytes start end)
   (declare (optimize (speed 3) (safety 0))
            (inline integer->big-endian))
   (let ((value (if (minusp integer)
                    (1+ (lognot (abs integer)))
                    integer)))
-    (integer->big-endian value bytes)))
+    (integer->big-endian value bytes start end)))
 (declaim (notinline write-twos-complement))
 
 ;; serialize
@@ -494,19 +503,26 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
            buf-length)
         buf-length)))
 
-(defmethod serialize ((object schema:decimal-object) &key stream)
-  "Write decimal into STREAM."
+(defmethod serialize-into
+    ((object schema:decimal-object) (vector simple-array) (start fixnum))
+  "Write decimal into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (inline min-buf-length write-twos-complement))
+           (inline min-buf-length write-twos-complement)
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((underlying (schema:underlying (class-of object)))
          (unscaled (schema:unscaled object))
-         (min-length (min-buf-length unscaled underlying))
-         (bytes (make-array min-length :element-type '(unsigned-byte 8))))
-    (write-twos-complement unscaled bytes)
+         (min-length (min-buf-length unscaled underlying)))
     (if (eq underlying 'schema:bytes)
-        (serialize bytes :stream stream)
-        (write-sequence bytes stream)))
-  (values))
+        (let* ((bytes-written (serialize-into min-length vector start))
+               (new-start (+ start bytes-written))
+               (end (+ new-start min-length)))
+          (declare (fixnum bytes-written new-start end))
+          (write-twos-complement unscaled vector new-start end)
+          (the fixnum (- end start)))
+        (let ((end (+ start min-length)))
+          (declare (fixnum end))
+          (write-twos-complement unscaled vector start end)
+          (the fixnum (- end start))))))
 
 ;; deserialize
 

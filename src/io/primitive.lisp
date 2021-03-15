@@ -22,30 +22,15 @@
    (#:stream #:cl-avro.io.memory-stream)
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:serialize
+                #:serialize-into
                 #:deserialize
                 #:serialized-size)
-  (:export #:serialize
+  (:export #:serialize-into
            #:deserialize
            #:serialized-size
            #:little-endian->uint32
            #:uint32->little-endian))
 (in-package #:cl-avro.io.primitive)
-
-;; TODO be more permissive with the bytes
-(defmethod serialize :around (object &rest initargs &key stream)
-  (declare (optimize (speed 3) (safety 0)))
-  (if (or stream (typep object 'schema:schema))
-      (call-next-method)
-      (let ((stream (make-instance 'stream:memory-output-stream)))
-        (setf (getf initargs :stream) stream)
-        (apply #'call-next-method object initargs)
-        (let ((bytes (stream:bytes stream)))
-          (declare ((vector (unsigned-byte 8)) bytes))
-          (coerce bytes '(simple-array (unsigned-byte 8) (*))))
-        ;; TODO make this return a simple-array...do the resizing manually
-        #+nil
-        (stream:bytes stream))))
 
 (defmethod deserialize (schema (bytes simple-array) &key)
   (declare (optimize (speed 3) (safety 0)))
@@ -65,11 +50,12 @@
 (defmethod serialized-size ((object null))
   0)
 
-(defmethod serialize ((object null) &key stream)
-  "Write zero bytes into STREAM."
+(defmethod serialize-into
+    ((object null) (vector simple-array) (start fixnum))
+  "Write zero bytes into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (ignore object stream))
-  (values))
+           (ignore object vector start))
+  0)
 
 (defmethod deserialize ((schema (eql 'schema:null)) (stream stream) &key)
   "Read zero bytes from STREAM and return nil."
@@ -85,19 +71,23 @@
 (defmethod serialized-size ((object (eql 'schema:false)))
   1)
 
-(defmethod serialize ((object (eql 'schema:true)) &key stream)
-  "Write #o1 into STREAM."
+(defmethod serialize-into
+    ((object (eql 'schema:true)) (vector simple-array) (start fixnum))
+  "Write #o1 into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (ignore object))
-  (write-byte 1 stream)
-  (values))
+           (ignore object)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (setf (elt vector start) 1)
+  1)
 
-(defmethod serialize ((object (eql 'schema:false)) &key stream)
-  "Write #o0 into STREAM."
+(defmethod serialize-into
+    ((object (eql 'schema:false)) (vector simple-array) (start fixnum))
+  "Write #o0 into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (ignore object))
-  (write-byte 0 stream)
-  (values))
+           (ignore object)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (setf (elt vector start) 0)
+  1)
 
 (defmethod deserialize ((schema (eql 'schema:boolean)) (stream stream) &key)
   "Read a byte from STREAM and return TRUE if it's 1, or FALSE if it's 0."
@@ -189,31 +179,34 @@
        finally
           (error ,error-message))))
 
-(defmacro write-variable-length-integer (bits stream integer)
-  (declare (symbol stream)
+(defmacro write-variable-length-integer (bits integer vector start)
+  (declare (symbol vector start)
            ((member 32 64) bits))
   `(loop
      for integer of-type (unsigned-byte ,bits) = ,integer then (ash integer -7)
+     for index of-type fixnum = ,start then (1+ index)
      until (zerop (logand integer (lognot #x7f)))
      for byte = (logior (logand integer #x7f) #x80)
 
-     do (write-byte byte ,stream)
+     do (setf (elt ,vector index) byte)
 
      finally
-        (write-byte (logand integer #xff) ,stream)))
+        (setf (elt ,vector index) (logand integer #xff))
+        (return (the fixnum (1+ (- index start))))))
 
 ;; serialize
 
-(defmethod serialize ((object integer) &key stream)
-  "Write OBJECT into STREAM as a variable-length zig-zag integer."
+(defmethod serialize-into
+    ((object integer) (vector simple-array) (start fixnum))
+  "Write OBJECT into VECTOR as a variable-length zig-zag integer."
   (declare (optimize (speed 3) (safety 0))
-           (inline int->zig-zag long->zig-zag))
+           (inline int->zig-zag long->zig-zag)
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (etypecase object
     (schema:int
-     (write-variable-length-integer 32 stream (int->zig-zag object)))
+     (write-variable-length-integer 32 (int->zig-zag object) vector start))
     (schema:long
-     (write-variable-length-integer 64 stream (long->zig-zag object))))
-  (values))
+     (write-variable-length-integer 64 (long->zig-zag object) vector start))))
 
 ;; deserialize int
 
@@ -324,15 +317,15 @@
 (defmethod serialized-size ((object single-float))
   4)
 
-(defmethod serialize ((object single-float) &key stream)
-  "Write single-precision float to STREAM."
+(defmethod serialize-into
+    ((object single-float) (vector simple-array) (start fixnum))
+  "Write single-precision float into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (inline uint32->little-endian ieee-floats:encode-float32))
-  (let ((integer (ieee-floats:encode-float32 object))
-        (bytes (make-array 4 :element-type '(unsigned-byte 8))))
-    (uint32->little-endian integer bytes)
-    (write-sequence bytes stream))
-  (values))
+           (inline uint32->little-endian ieee-floats:encode-float32)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let ((integer (ieee-floats:encode-float32 object)))
+    (uint32->little-endian integer vector start))
+  4)
 
 (defmethod deserialize ((schema (eql 'schema:float)) (stream stream) &key)
   "Read a single-precision float from STREAM."
@@ -349,15 +342,15 @@
 (defmethod serialized-size ((object double-float))
   8)
 
-(defmethod serialize ((object double-float) &key stream)
+(defmethod serialize-into
+    ((object double-float) (vector simple-array) (start fixnum))
   "Write double-precision float to STREAM."
   (declare (optimize (speed 3) (safety 0))
-           (inline uint64->little-endian ieee-floats:encode-float64))
-  (let ((integer (ieee-floats:encode-float64 object))
-        (bytes (make-array 8 :element-type '(unsigned-byte 8))))
-    (uint64->little-endian integer bytes)
-    (write-sequence bytes stream))
-  (values))
+           (inline uint64->little-endian ieee-floats:encode-float64)
+           ((simple-array (unsigned-byte 8) (*)) vector))
+  (let ((integer (ieee-floats:encode-float64 object)))
+    (uint64->little-endian integer vector start))
+  8)
 
 (defmethod deserialize ((schema (eql 'schema:double)) (stream stream) &key)
   "Read a double-precision float from STREAM."
@@ -376,13 +369,16 @@
     (+ (serialized-size length)
        length)))
 
-(defmethod serialize ((object vector) &key stream)
-  "Write byte vector into STREAM."
-  (declare (optimize (speed 3) (safety 0)))
+(defmethod serialize-into
+    ((object vector) (vector simple-array) (start fixnum))
+  "Write byte vector into VECTOR."
+  (declare (optimize (speed 3) (safety 0))
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (check-type object schema:bytes)
-  (serialize (length object) :stream stream)
-  (write-sequence object stream)
-  (values))
+  (let ((bytes-written (serialize-into (length object) vector start)))
+    (declare (fixnum bytes-written))
+    (replace vector object :start1 (+ start bytes-written))
+    (the fixnum (+ bytes-written (length object)))))
 
 (defmethod deserialize ((schema (eql 'schema:bytes)) (stream stream) &key)
   "Read a vector of bytes from STREAM."
@@ -401,12 +397,14 @@
     (+ (serialized-size length)
        length)))
 
-(defmethod serialize ((object string) &key stream)
-  "Write utf-8 encoded string into STREAM."
+(defmethod serialize-into
+    ((object string) (vector simple-array) (start fixnum))
+  "Write utf-8 encoded string into VECTOR."
   (declare (optimize (speed 3) (safety 0))
-           (inline babel:string-to-octets))
+           (inline babel:string-to-octets)
+           ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
-    (serialize bytes :stream stream)))
+    (serialize-into bytes vector start)))
 
 (defmethod deserialize ((schema (eql 'schema:string)) (stream stream) &key)
   "Read a utf-8 encoded string from STREAM."

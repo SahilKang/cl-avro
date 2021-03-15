@@ -33,15 +33,6 @@
 
 ;;; serialize
 
-(defmacro call-next-method-with-string-stream-if-needed
-    (schema initargs stream)
-  (declare (symbol initargs stream))
-  `(if ,stream
-       (call-next-method)
-       (with-output-to-string (,stream)
-         (setf (getf ,initargs :stream) ,stream)
-         (apply #'call-next-method ,schema ,initargs))))
-
 (eval-when (:compile-toplevel)
   (defparameter +serialize-docstring+
     "Write json representation of SCHEMA into STREAM.
@@ -49,48 +40,31 @@
 If CANONICAL-FORM-P is true, then the Canonical Form is written.
 If STREAM is nil, then the json string is returned, instead."))
 
-;; primitive
-
 (macrolet
-    ((defprimaries ()
+    ((defprimitives ()
        (flet ((make-defmethod (schema)
                 `(defmethod serialize
                      ((schema (eql ',schema)) &key stream canonical-form-p)
                    ,+serialize-docstring+
                    (declare (ignore schema))
-                   (schema->json ',schema stream canonical-form-p))))
+                   (if stream
+                       (schema->json ',schema stream canonical-form-p)
+                       (with-output-to-string (stream)
+                         (schema->json ',schema stream canonical-form-p))))))
          (let* ((primitives (mapcar #'car +primitive->name+))
                 (defmethods (mapcar #'make-defmethod primitives)))
            `(progn
               ,@defmethods))))
-     (defarounds ()
-       (flet ((make-defmethod (schema)
-                `(defmethod serialize :around
-                     ((schema (eql ',schema)) &rest initargs &key stream)
-                   (declare (ignore schema))
-                   (call-next-method-with-string-stream-if-needed
-                    ',schema initargs stream))))
-         (let* ((primitives (mapcar #'car +primitive->name+))
-                (defmethods (mapcar #'make-defmethod primitives)))
-           `(progn
-              ,@defmethods)))))
-  (defprimaries)
-  (defarounds))
-
-;; complex
-
-(defmethod serialize :around
-    ((schema complex-schema) &rest initargs &key stream)
-  (call-next-method-with-string-stream-if-needed
-   schema initargs stream))
-
-(macrolet
-    ((make-defmethod ()
+     (defcomplex ()
        `(defmethod serialize
             ((schema complex-schema) &key stream canonical-form-p)
           ,+serialize-docstring+
-          (schema->json schema stream canonical-form-p))))
-  (make-defmethod))
+          (if stream
+              (schema->json schema stream canonical-form-p)
+              (with-output-to-string (stream)
+                (schema->json schema stream canonical-form-p))))))
+  (defprimitives)
+  (defcomplex))
 
 ;;; deserialize
 

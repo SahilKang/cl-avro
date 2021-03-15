@@ -67,11 +67,7 @@
       (declare (optimize (speed 3) (safety 0)))
     (let* ((fingerprint (schema:fingerprint
                          (schema:schema-of object) #'schema:crc-64-avro))
-           ;; TODO remove this copying once io:memory-output-stream is
-           ;; taken care of
-           (payload (coerce (the (vector (unsigned-byte 8))
-                                 (io:serialize object))
-                            '(simple-array (unsigned-byte 8) (*))))
+           (payload (io:serialize object))
            (bytes (make-array
                    (+ (length +marker+) (length fingerprint) (length payload))
                    :element-type '(unsigned-byte 8))))

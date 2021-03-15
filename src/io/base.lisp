@@ -20,18 +20,33 @@
   (:use #:cl)
   (:export #:serialize
            #:deserialize
-           #:serialized-size))
+           #:serialized-size
+           #:serialize-into))
 (in-package #:cl-avro.io.base)
 
 (defgeneric serialized-size (object)
   (:documentation
    "Determine the number of bytes OBJECT will be when serialized."))
 
-(defgeneric serialize (object &key stream &allow-other-keys)
+(defgeneric serialize-into (object vector start)
   (:documentation
-   "Serialize OBJECT into STREAM.
+   "Serialize OBJECT into VECTOR and return the number of serialized bytes."))
 
-If STREAM is nil, then the serialized object is returned, instead."))
+(defgeneric serialize (object &key &allow-other-keys)
+  (:method (object &key into (start 0))
+    "Serialize OBJECT into vector supplied by INTO, starting at START.
+
+If INTO is nil, then a new vector will be allocated.
+
+Return (values vector number-of-serialized-bytes)"
+    (let* ((size (serialized-size object))
+           (into (or into (make-array size :element-type '(unsigned-byte 8)))))
+      (check-type into (simple-array (unsigned-byte 8) (*)))
+      (check-type start (and (integer 0) fixnum))
+      (when (> size (- (length into) start))
+        (error "Not enough room in vector"))
+      (serialize-into object into start)
+      (values into size))))
 
 (defgeneric deserialize (schema input &key &allow-other-keys)
   (:documentation

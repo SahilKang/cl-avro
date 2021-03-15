@@ -50,8 +50,7 @@
            actual))))
 
 (test write-file
-  (let ((bytes (make-array 0 :element-type '(unsigned-byte 8)
-                             :adjustable t :fill-pointer 0)))
+  (let ((bytes (make-instance 'avro::memory-output-stream)))
     (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
       (loop
         with in = (make-instance 'avro:file-input-stream :input stream)
@@ -72,8 +71,9 @@
                     with records = nil
                     with stream = (make-instance
                                    'avro:file-input-stream
+                                   ;; TODO require this to be a stream as well
                                    :input (coerce
-                                           bytes
+                                           (avro:bytes bytes)
                                            '(simple-array (unsigned-byte 8) (*))))
                     for block = (avro:read-block stream)
                     while block

@@ -48,16 +48,14 @@
        (meta (error "Must supply META"))
        (sync (make-instance 'header:sync)))
   (with-slots (stream header) instance
-    (setf stream (if (streamp output)
-                     output
-                     (make-instance 'io:memory-output-stream :bytes output))
+    (check-type output stream)
+    (setf stream output
           header (make-instance 'header:header :sync sync :meta meta))))
 
 (declaim
  (ftype (function (file-output-stream (simple-array schema:schema (*)))
-                  (values &optional))
+                  (values block:file-block &optional))
         write-block))
-;; TODO maybe return file-block
 (defun write-block (file-output-stream objects)
   (with-accessors
         ((header header:header)
@@ -65,9 +63,10 @@
          (wrote-header-p wrote-header-p))
       file-output-stream
     (unless wrote-header-p
-      (io:serialize header :stream stream)
+      (write-sequence (io:serialize header) stream)
       (setf wrote-header-p t))
-    (io:serialize
-     (block:make-file-block-objects :header header :objects objects)
-     :stream stream))
-  (values))
+    (let ((file-block (block:to-file-block
+                       (block:make-file-block-objects
+                        :header header :objects objects))))
+      (write-sequence (io:serialize file-block) stream)
+      file-block)))
