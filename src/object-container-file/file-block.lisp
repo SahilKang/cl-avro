@@ -32,7 +32,8 @@
            #:file-block-objects
            #:make-file-block-objects
            #:file-block-objects-header
-           #:file-block-objects-objects))
+           #:file-block-objects-objects
+           #:to-file-block))
 (in-package #:cl-avro.object-container-file.file-block)
 
 (defclass file-block ()
@@ -130,44 +131,37 @@
 (declaim (notinline compress))
 
 (declaim
- (ftype (function ((vector (unsigned-byte 8)))
-                  (values (simple-array (unsigned-byte 8) (*)) &optional))
-        coerce-vector)
- (inline coerce-vector))
-(defun coerce-vector (vector)
-  (declare (optimize (speed 3) (safety 0)))
-  ;; TODO this copying sucks...see todo for memory-output-stream
-  (coerce vector '(simple-array (unsigned-byte 8) (*))))
-(declaim (notinline coerce-vector))
-
-(declaim
  (ftype (function (file-block-objects) (values file-block &optional))
         to-file-block)
  (inline to-file-block))
 (defun to-file-block (file-block-objects)
   (declare (optimize (speed 3) (safety 0))
-           (inline compress coerce-vector))
+           (inline compress))
   (loop
     with header = (file-block-objects-header file-block-objects)
     and objects = (file-block-objects-objects file-block-objects)
-    and stream = (make-instance 'io:memory-output-stream)
+    with vector = (make-array
+                   (reduce (lambda (agg object)
+                             (declare (fixnum agg))
+                             (the fixnum
+                                  (+ agg
+                                     (the fixnum
+                                          (io::serialized-size object)))))
+                           objects
+                           :initial-value 0)
+                   :element-type '(unsigned-byte 8))
 
     for object across objects
-    do (io:serialize object :stream stream)
+    for start of-type fixnum = (nth-value 1 (io:serialize object :into vector))
+      then (+ start
+              (the fixnum
+                   (nth-value 1 (io:serialize object :into vector :start start))))
 
     finally
        (return
          (make-instance
           'file-block
           :count (length objects)
-          :bytes (compress (header:codec header)
-                           (coerce-vector (io:bytes stream)))
+          :bytes (compress (header:codec header) vector)
           :sync (header:sync header)))))
 (declaim (notinline to-file-block))
-
-(defmethod io:serialize
-    ((object file-block-objects) &key stream)
-  (declare (optimize (speed 3) (safety 0))
-           (inline to-file-block))
-  (io:serialize (to-file-block object) :stream stream)
-  (values))
