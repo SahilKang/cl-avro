@@ -35,34 +35,29 @@
 
 (eval-when (:compile-toplevel)
   (defparameter +serialize-docstring+
-    "Write json representation of SCHEMA into STREAM.
+    "Return json string representation of SCHEMA.
 
-If CANONICAL-FORM-P is true, then the Canonical Form is written.
-If STREAM is nil, then the json string is returned, instead."))
+If CANONICAL-FORM-P is true, then the Canonical Form is returned."))
 
 (macrolet
     ((defprimitives ()
        (flet ((make-defmethod (schema)
                 `(defmethod serialize
-                     ((schema (eql ',schema)) &key stream canonical-form-p)
+                     ((schema (eql ',schema)) &key canonical-form-p)
                    ,+serialize-docstring+
                    (declare (ignore schema))
-                   (if stream
-                       (schema->json ',schema stream canonical-form-p)
-                       (with-output-to-string (stream)
-                         (schema->json ',schema stream canonical-form-p))))))
+                   (with-output-to-string (stream)
+                     (schema->json ',schema stream canonical-form-p)))))
          (let* ((primitives (mapcar #'car +primitive->name+))
                 (defmethods (mapcar #'make-defmethod primitives)))
            `(progn
               ,@defmethods))))
      (defcomplex ()
        `(defmethod serialize
-            ((schema complex-schema) &key stream canonical-form-p)
+            ((schema complex-schema) &key canonical-form-p)
           ,+serialize-docstring+
-          (if stream
-              (schema->json schema stream canonical-form-p)
-              (with-output-to-string (stream)
-                (schema->json schema stream canonical-form-p))))))
+          (with-output-to-string (stream)
+            (schema->json schema stream canonical-form-p)))))
   (defprimitives)
   (defcomplex))
 
