@@ -21,15 +21,17 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:deserialize)
-  (:import-from #:cl-avro.io.resolution.assert-match
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from
+                #:resolve
                 #:assert-match)
   (:import-from #:cl-avro.io.resolution.resolve
-                #:resolve
                 #:resolved
                 #:reader
                 #:writer)
-  (:export #:deserialize
+  (:export #:deserialize-from-vector
+           #:deserialize-from-stream
            #:resolve
            #:assert-match))
 (in-package #:cl-avro.io.resolution.logical)
@@ -114,15 +116,18 @@
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-date :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-date) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((timestamp (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :year (schema:year timestamp)
-     :month (schema:month timestamp)
-     :day (schema:day timestamp))))
+(define-deserialize-from resolved-date
+  `(multiple-value-bind (timestamp bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :year (schema:year timestamp)
+       :month (schema:month timestamp)
+       :day (schema:day timestamp))
+      bytes-read)))
 
 ;; time-millis schema
 
@@ -158,16 +163,19 @@
     (+ (* second 1000) millisecond)))
 (declaim (notinline get-millisecond))
 
-(defmethod deserialize
-    ((schema resolved-time-millis) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-millisecond))
-  (let ((time-micros (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :hour (schema:hour time-micros)
-     :minute (schema:minute time-micros)
-     :millisecond (get-millisecond time-micros))))
+(define-deserialize-from resolved-time-millis
+  (declare (inline get-millisecond))
+  `(multiple-value-bind (time-micros bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :hour (schema:hour time-micros)
+       :minute (schema:minute time-micros)
+       :millisecond (get-millisecond time-micros))
+      bytes-read)))
 
 ;; time-micros schema
 
@@ -204,16 +212,19 @@
     (+ (* second 1000 1000) microsecond)))
 (declaim (notinline get-microsecond))
 
-(defmethod deserialize
-    ((schema resolved-time-micros) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-microsecond))
-  (let ((time-millis (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :hour (schema:hour time-millis)
-     :minute (schema:minute time-millis)
-     :microsecond (get-microsecond time-millis))))
+(define-deserialize-from resolved-time-micros
+  (declare (inline get-microsecond))
+  `(multiple-value-bind (time-millis bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :hour (schema:hour time-millis)
+       :minute (schema:minute time-millis)
+       :microsecond (get-microsecond time-millis))
+      bytes-read)))
 
 ;; timestamp-millis schema
 
@@ -238,19 +249,22 @@
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-timestamp-millis :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-timestamp-millis) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-millisecond))
-  (let ((timestamp-micros (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :year (schema:year timestamp-micros)
-     :month (schema:month timestamp-micros)
-     :day (schema:day timestamp-micros)
-     :hour (schema:hour timestamp-micros)
-     :minute (schema:minute timestamp-micros)
-     :millisecond (get-millisecond timestamp-micros))))
+(define-deserialize-from resolved-timestamp-millis
+  (declare (inline get-millisecond))
+  `(multiple-value-bind (timestamp-micros bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :year (schema:year timestamp-micros)
+       :month (schema:month timestamp-micros)
+       :day (schema:day timestamp-micros)
+       :hour (schema:hour timestamp-micros)
+       :minute (schema:minute timestamp-micros)
+       :millisecond (get-millisecond timestamp-micros))
+      bytes-read)))
 
 ;; timestamp-micros schema
 
@@ -275,19 +289,22 @@
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-timestamp-micros :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-timestamp-micros) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-microsecond))
-  (let ((timestamp-millis (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :year (schema:year timestamp-millis)
-     :month (schema:month timestamp-millis)
-     :day (schema:day timestamp-millis)
-     :hour (schema:hour timestamp-millis)
-     :minute (schema:minute timestamp-millis)
-     :microsecond (get-microsecond timestamp-millis))))
+(define-deserialize-from resolved-timestamp-micros
+  (declare (inline get-microsecond))
+  `(multiple-value-bind (timestamp-millis bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :year (schema:year timestamp-millis)
+       :month (schema:month timestamp-millis)
+       :day (schema:day timestamp-millis)
+       :hour (schema:hour timestamp-millis)
+       :minute (schema:minute timestamp-millis)
+       :microsecond (get-microsecond timestamp-millis))
+      bytes-read)))
 
 ;; local-timestamp-millis schema
 
@@ -313,19 +330,22 @@
   (make-instance 'resolved-local-timestamp-millis
                  :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-local-timestamp-millis) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-millisecond))
-  (let ((local-timestamp-micros (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :year (schema:year local-timestamp-micros)
-     :month (schema:month local-timestamp-micros)
-     :day (schema:day local-timestamp-micros)
-     :hour (schema:hour local-timestamp-micros)
-     :minute (schema:minute local-timestamp-micros)
-     :millisecond (get-millisecond local-timestamp-micros))))
+(define-deserialize-from resolved-local-timestamp-millis
+  (declare (inline get-millisecond))
+  `(multiple-value-bind (local-timestamp-micros bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :year (schema:year local-timestamp-micros)
+       :month (schema:month local-timestamp-micros)
+       :day (schema:day local-timestamp-micros)
+       :hour (schema:hour local-timestamp-micros)
+       :minute (schema:minute local-timestamp-micros)
+       :millisecond (get-millisecond local-timestamp-micros))
+      bytes-read)))
 
 ;; local-timestamp-micros schema
 
@@ -351,19 +371,22 @@
   (make-instance 'resolved-local-timestamp-micros
                  :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-local-timestamp-micros) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-microsecond))
-  (let ((local-timestamp-millis (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :year (schema:year local-timestamp-millis)
-     :month (schema:month local-timestamp-millis)
-     :day (schema:day local-timestamp-millis)
-     :hour (schema:hour local-timestamp-millis)
-     :minute (schema:minute local-timestamp-millis)
-     :microsecond (get-microsecond local-timestamp-millis))))
+(define-deserialize-from resolved-local-timestamp-micros
+  (declare (inline get-microsecond))
+  `(multiple-value-bind (local-timestamp-millis bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :year (schema:year local-timestamp-millis)
+       :month (schema:month local-timestamp-millis)
+       :day (schema:day local-timestamp-millis)
+       :hour (schema:hour local-timestamp-millis)
+       :minute (schema:minute local-timestamp-millis)
+       :microsecond (get-microsecond local-timestamp-millis))
+      bytes-read)))
 
 ;; decimal schema
 
@@ -394,13 +417,16 @@
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-decimal :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-decimal) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((decimal (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :unscaled (schema:unscaled decimal))))
+(define-deserialize-from resolved-decimal
+  `(multiple-value-bind (decimal bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :unscaled (schema:unscaled decimal))
+      bytes-read)))
 
 ;; duration schema
 
@@ -421,12 +447,15 @@
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-duration :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-duration) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((duration (deserialize (writer schema) stream)))
-    (make-instance
-     (reader schema)
-     :months (schema:months duration)
-     :days (schema:days duration)
-     :milliseconds (schema:milliseconds duration))))
+(define-deserialize-from resolved-duration
+  `(multiple-value-bind (duration bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values
+      (make-instance
+       (reader schema)
+       :months (schema:months duration)
+       :days (schema:days duration)
+       :milliseconds (schema:milliseconds duration))
+      bytes-read)))

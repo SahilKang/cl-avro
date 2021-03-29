@@ -33,7 +33,8 @@
            #:make-file-block-objects
            #:file-block-objects-header
            #:file-block-objects-objects
-           #:to-file-block))
+           #:to-file-block
+           #:from-file-block))
 (in-package #:cl-avro.object-container-file.file-block)
 
 (defclass file-block ()
@@ -80,7 +81,7 @@
 
 (declaim
  (ftype (function (header:header file-block)
-                  (values io:memory-input-stream &optional))
+                  (values (simple-array (unsigned-byte 8) (*)) &optional))
         decompress)
  (inline decompress))
 (defun decompress (header file-block)
@@ -88,7 +89,7 @@
            (inline %decompress))
   (let ((codec (header:codec header))
         (bytes (bytes file-block)))
-    (make-instance 'io:memory-input-stream :bytes (%decompress codec bytes))))
+    (%decompress codec bytes)))
 (declaim (notinline decompress))
 
 (defstruct (file-block-objects (:copier nil)
@@ -98,25 +99,33 @@
   (objects (error "Must supply OBJECTS")
    :type (simple-array schema:schema (*)) :read-only t))
 
-(defmethod io:deserialize
-    ((header header:header) (file-block file-block) &key)
+(declaim
+ (ftype (function (header:header file-block)
+                  (values file-block-objects &optional))
+        from-file-block)
+ (inline from-file-block))
+(defun from-file-block (header file-block)
   "Read a vector of objects from FILE-BLOCK."
   (declare (optimize (speed 3) (safety 0))
            (inline assert-valid-sync-marker decompress))
   (assert-valid-sync-marker header file-block)
   (loop
     with count = (count file-block)
-    and stream = (decompress header file-block)
+    and bytes = (decompress header file-block)
     and schema = (header:schema header)
+    and total-bytes-read = 0
     with vector = (make-array count :element-type schema)
 
     for i below count
-    for object = (io:deserialize schema stream)
-    do (setf (elt vector i) object)
+    for (object bytes-read) = (multiple-value-list
+                               (io:deserialize schema bytes :start total-bytes-read))
+    do
+       (incf total-bytes-read bytes-read)
+       (setf (elt vector i) object)
 
     finally
-       (return
-         (make-file-block-objects :header header :objects vector))))
+       (return (make-file-block-objects :header header :objects vector))))
+(declaim (notinline from-file-block))
 
 (declaim
  (ftype (function (header:codec (simple-array (unsigned-byte 8) (*)))

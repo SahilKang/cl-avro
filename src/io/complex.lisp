@@ -19,15 +19,17 @@
 (defpackage #:cl-avro.io.complex
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema)
-   (#:stream #:cl-avro.io.block-stream))
+   (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
                 #:serialize-into
-                #:deserialize
-                #:serialized-size)
+                #:serialized-size
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from)
   (:export #:serialize-into
-           #:deserialize
-           #:serialized-size))
+           #:serialized-size
+           #:deserialize-from-vector
+           #:deserialize-from-stream))
 (in-package #:cl-avro.io.complex)
 
 ;;; fixed schema
@@ -45,14 +47,19 @@
     (replace vector raw-buffer :start1 start)
     (length raw-buffer)))
 
-(defmethod deserialize ((schema schema:fixed) (stream stream) &key)
-  "Read a fixed number of bytes from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((size (schema:size schema))
+;; Read a fixed number of bytes from STREAM.
+(define-deserialize-from schema:fixed
+  `(let ((size (schema:size schema))
          (bytes (make-instance schema)))
-    (unless (= (read-sequence (schema:raw-buffer bytes) stream) size)
-      (error 'end-of-file :stream *error-output*))
-    bytes))
+     ,@(when vectorp
+         `((unless (>= (- (length vector) start) size)
+             (error "Not enough bytes"))))
+     ,(if vectorp
+          `(replace (schema:raw-buffer bytes) vector
+                    :start2 start :end2 (+ start size))
+          `(unless (= (read-sequence (schema:raw-buffer bytes) stream) size)
+             (error 'end-of-file :stream *error-output*)))
+     (values bytes size)))
 
 ;;; union schema
 
@@ -75,15 +82,22 @@
                  (serialize-into
                   (schema:object object) vector (the fixnum (+ start bytes-written))))))))
 
-(defmethod deserialize ((schema schema:union) (stream stream) &key)
-  "Read a tagged union from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((schemas (schema:schemas schema))
-         (position (deserialize 'schema:int stream))
-         (chosen-schema (elt schemas position))
-         (value (deserialize chosen-schema stream)))
-    (declare ((simple-array schema:schema (*)) schemas))
-    (make-instance schema :object value)))
+;; Read a tagged union from STREAM.
+(define-deserialize-from schema:union
+  `(let ((schemas (schema:schemas schema)))
+     (declare ((simple-array schema:schema (*)) schemas))
+     (multiple-value-bind (position bytes-read)
+         ,(if vectorp
+              `(deserialize-from-vector 'schema:int vector start)
+              `(deserialize-from-stream 'schema:int stream))
+       (let ((chosen-schema (elt schemas position)))
+         (multiple-value-bind (value more-bytes-read)
+             ,(if vectorp
+                  `(deserialize-from-vector chosen-schema vector (+ start bytes-read))
+                  `(deserialize-from-stream chosen-schema stream))
+           (values
+            (make-instance schema :object value)
+            (+ bytes-read more-bytes-read)))))))
 
 ;;; array schema
 
@@ -119,21 +133,42 @@
             (the fixnum
                  (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
 
-(defmethod deserialize ((schema schema:array) (stream stream) &key)
-  "Read an array from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (loop
-    with array-stream = (make-instance 'stream:array-input-stream
-                                       :schema (schema:items schema)
-                                       :stream stream)
-    and vector = (make-instance schema)
+;; Read an array from STREAM.
+(define-deserialize-from schema:array
+  `(loop
+     with total-bytes-read = 0
+     and item-schema = (schema:items schema)
+     and output = (make-instance schema)
 
-    for item = (stream:read-item array-stream)
-    until (eq item :eof)
-    do (schema:push item vector)
+     for (count bytes-read)
+       = (multiple-value-list
+          ,(if vectorp
+               `(deserialize-from-vector 'schema:long vector (+ start total-bytes-read))
+               `(deserialize-from-stream 'schema:long stream)))
+     do (incf total-bytes-read bytes-read)
+     until (zerop count)
 
-    finally
-       (return vector)))
+     when (minusp count) do
+       (setf count (abs count))
+       (incf total-bytes-read
+             (nth-value 1 ,(if vectorp
+                               `(deserialize-from-vector
+                                 'schema:long vector (+ start total-bytes-read))
+                               `(deserialize-from-stream 'schema:long stream))))
+
+     do (loop
+          repeat count
+          for (item bytes-read)
+            = (multiple-value-list
+               ,(if vectorp
+                    `(deserialize-from-vector item-schema vector (+ start total-bytes-read))
+                    `(deserialize-from-stream item-schema stream)))
+          do
+             (incf total-bytes-read bytes-read)
+             (schema:push item output))
+
+     finally
+        (return (values output total-bytes-read))))
 
 ;;; map schema
 
@@ -175,22 +210,49 @@
             (the fixnum
                  (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
 
-(defmethod deserialize ((schema schema:map) (stream stream) &key)
-  "Read a map from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (loop
-    with map-stream = (make-instance 'stream:map-input-stream
-                                     :schema (schema:values schema)
-                                     :stream stream)
-    and hash-table = (make-instance schema)
+;; Read a map from STREAM.
+(define-deserialize-from schema:map
+  `(loop
+     with total-bytes-read = 0
+     and value-schema = (schema:values schema)
+     and output = (make-instance schema)
 
-    for pair = (stream:read-item map-stream)
-    until (eq pair :eof)
-    for (key . value) = pair
-    do (setf (schema:hashref key hash-table) value)
+     for (count bytes-read)
+       = (multiple-value-list
+          ,(if vectorp
+               `(deserialize-from-vector 'schema:long vector (+ start total-bytes-read))
+               `(deserialize-from-stream 'schema:long stream)))
+     do (incf total-bytes-read bytes-read)
+     until (zerop count)
 
-    finally
-       (return hash-table)))
+     when (minusp count) do
+       (setf count (abs count))
+       (incf total-bytes-read
+             (nth-value 1 ,(if vectorp
+                               `(deserialize-from-vector
+                                 'schema:long vector (+ start total-bytes-read))
+                               `(deserialize-from-stream 'schema:long stream))))
+
+     do (loop
+          repeat count
+          for (key bytes-read)
+            = (multiple-value-list
+               ,(if vectorp
+                    `(deserialize-from-vector
+                      'schema:string vector (+ start total-bytes-read))
+                    `(deserialize-from-stream 'schema:string stream)))
+          for (value more-bytes-read)
+            = (multiple-value-list
+               ,(if vectorp
+                    `(deserialize-from-vector
+                      value-schema vector (+ start total-bytes-read bytes-read))
+                    `(deserialize-from-stream value-schema stream)))
+          do
+             (incf total-bytes-read (+ bytes-read more-bytes-read))
+             (setf (schema:hashref key output) value))
+
+     finally
+        (return (values output total-bytes-read))))
 
 ;;; enum schema
 
@@ -206,16 +268,16 @@
   (let ((position (nth-value 1 (schema:which-one object))))
     (serialize-into position vector start)))
 
-(defmethod deserialize ((schema schema:enum) (stream stream) &key)
-  "Read an enum from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  ;; TODO should just have a factory method on the class/schema
-  ;; i.e intern enum objects on the class/schema
-  (let* ((symbols (schema:symbols schema))
-         (position (deserialize 'schema:int stream))
-         (chosen-enum (elt symbols position)))
-    (declare ((simple-array schema:name (*)) symbols))
-    (make-instance schema :enum chosen-enum)))
+;; Read an enum from STREAM.
+(define-deserialize-from schema:enum
+  `(multiple-value-bind (position bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:int vector start)
+            `(deserialize-from-stream 'schema:int stream))
+     (let* ((symbols (schema:symbols schema))
+            (chosen-enum (elt symbols position)))
+       (declare ((simple-array schema:name (*)) symbols))
+       (values (make-instance schema :enum chosen-enum) bytes-read))))
 
 ;;; record schema
 
@@ -247,19 +309,25 @@
     finally
        (return bytes-written)))
 
-(defmethod deserialize ((schema schema:record) (stream stream) &key)
-  "Read a record from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (loop
-    with fields of-type (simple-array schema:field (*)) = (schema:fields schema)
-    and initargs of-type list = nil
+;; Read a record from STREAM.
+(define-deserialize-from schema:record
+  `(loop
+     with fields of-type (simple-array schema:field (*)) = (schema:fields schema)
+     and initargs of-type list = nil
+     and total-bytes-read = 0
 
-    for field of-type schema:field across fields
-    for value = (deserialize (schema:type field) stream)
+     for field of-type schema:field across fields
+     for (value bytes-read)
+       = (multiple-value-list
+          ,(if vectorp
+               `(deserialize-from-vector
+                 (schema:type field) vector (+ start total-bytes-read))
+               `(deserialize-from-stream (schema:type field) stream)))
 
-    do
-       (push value initargs)
-       (push (intern (schema:name field) 'keyword) initargs)
+     do
+        (push value initargs)
+        (push (intern (schema:name field) 'keyword) initargs)
+        (incf total-bytes-read bytes-read)
 
-    finally
-       (return (apply #'make-instance schema initargs))))
+     finally
+        (return (values (apply #'make-instance schema initargs) total-bytes-read))))

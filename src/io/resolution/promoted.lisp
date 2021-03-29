@@ -21,15 +21,17 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:deserialize)
-  (:import-from #:cl-avro.io.resolution.assert-match
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from
+                #:resolve
                 #:assert-match)
   (:import-from #:cl-avro.io.resolution.resolve
-                #:resolve
                 #:resolved
                 #:reader
                 #:writer)
-  (:export #:deserialize
+  (:export #:deserialize-from-vector
+           #:deserialize-from-stream
            #:resolve
            #:assert-match))
 (in-package #:cl-avro.io.resolution.promoted)
@@ -43,11 +45,12 @@
      (writer
       :type schema:primitive-schema))))
 
-(defmethod deserialize
-    ((schema promoted) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((value (deserialize (writer schema) stream)))
-    (coerce value (reader schema))))
+(define-deserialize-from promoted
+  `(multiple-value-bind (value bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (values (coerce value (reader schema)) bytes-read)))
 
 ;; promoted-string-or-bytes
 
@@ -58,10 +61,10 @@
      (writer
       :type (or schema:string schema:bytes)))))
 
-(defmethod deserialize
-    ((schema promoted-string-or-bytes) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (deserialize (reader schema) stream))
+(define-deserialize-from promoted-string-or-bytes
+  (if vectorp
+      `(deserialize-from-vector (reader schema) vector start)
+      `(deserialize-from-stream (reader schema) stream)))
 
 ;; promote
 

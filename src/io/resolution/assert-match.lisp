@@ -20,6 +20,8 @@
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema))
+  (:import-from #:cl-avro.io.base
+                #:assert-match)
   (:export #:assert-match))
 (in-package #:cl-avro.io.resolution.assert-match)
 
@@ -75,16 +77,6 @@
            reader writer))
   (values))
 (declaim (notinline assert-matching-names))
-
-;;; assert-match
-
-(defgeneric assert-match (reader writer)
-  (:method (reader writer)
-    (declare (optimize (speed 3) (safety 0)))
-    (error "Reader schema ~S does not match writer schema ~S" reader writer))
-
-  (:documentation
-   "Asserts that schemas match for schema resolution."))
 
 ;; primitive schemas
 

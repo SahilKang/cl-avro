@@ -19,15 +19,19 @@
 (defpackage #:cl-avro.io.resolution.resolve
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema)
-   (#:match #:cl-avro.io.resolution.assert-match))
+   (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:deserialize)
-  (:export #:deserialize
-           #:resolve
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from
+                #:assert-match
+                #:resolve)
+  (:export #:resolve
            #:resolved
            #:reader
-           #:writer))
+           #:writer
+           #:deserialize-from-vector
+           #:deserialize-from-stream))
 (in-package #:cl-avro.io.resolution.resolve)
 
 (defclass resolved ()
@@ -44,28 +48,6 @@
   (:default-initargs
    :reader (error "Must supply READER")
    :writer (error "Must supply WRITER")))
-
-(defgeneric resolve (reader writer)
-  (:method :before (reader writer)
-    (declare (optimize (speed 3) (safety 0)))
-    (match:assert-match reader writer))
-
-  (:method (reader writer)
-    (declare (optimize (speed 3) (safety 0))
-             (ignore writer))
-    reader)
-
-  (:documentation
-   "Return a schema that resolves the differences between the inputs."))
-
-(defmethod deserialize :around
-    (reader-schema input &key writer-schema)
-  "If WRITER-SCHEMA is non-nil, then schema resolution is performed
-before deserialization."
-  (declare (optimize (speed 3) (safety 0)))
-  (if writer-schema
-      (call-next-method (resolve reader-schema writer-schema) input)
-      (call-next-method)))
 
 ;; array schema
 
@@ -125,21 +107,24 @@ before deserialization."
   (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-enum :reader reader :writer writer))
 
-(defmethod deserialize
-    ((schema resolved-enum) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((known-symbols (known-symbols schema))
-        (default (schema:default (reader schema)))
-        (symbol (schema:which-one
-                 (deserialize (writer schema) stream))))
-    (unless (or (gethash symbol known-symbols)
-                default)
-      (error "Reader enum has no default for unknown writer symbol ~S" symbol))
-    (make-instance
-     (reader schema)
-     :enum (if (gethash symbol known-symbols)
-               symbol
-               default))))
+(define-deserialize-from resolved-enum
+  `(multiple-value-bind (enum bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (let ((known-symbols (known-symbols schema))
+           (default (schema:default (reader schema)))
+           (symbol (schema:which-one enum)))
+       (unless (or (gethash symbol known-symbols)
+                   default)
+         (error "Reader enum has no default for unknown writer symbol ~S" symbol))
+       (values
+        (make-instance
+         (reader schema)
+         :enum (if (gethash symbol known-symbols)
+                   symbol
+                   default))
+        bytes-read))))
 
 ;; record schema
 
@@ -251,13 +236,16 @@ before deserialization."
        (return initargs)))
 (declaim (notinline make-initargs))
 
-(defmethod deserialize
-    ((schema resolved-record) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline make-initargs))
-  (let* ((object (deserialize (writer schema) stream))
-         (initargs (make-initargs schema object)))
-    (apply #'make-instance (reader schema) initargs)))
+(define-deserialize-from resolved-record
+  (declare (inline make-initargs))
+  `(multiple-value-bind (object bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector (writer schema) vector start)
+            `(deserialize-from-stream (writer schema) stream))
+     (let ((initargs (make-initargs schema object)))
+       (values
+        (apply #'make-instance (reader schema) initargs)
+        bytes-read))))
 
 ;; union schema
 
@@ -275,7 +263,7 @@ before deserialization."
   (declare (optimize (speed 3) (safety 0)))
   (handler-case
       (progn
-        (match:assert-match reader writer)
+        (assert-match reader writer)
         t)
     (error ()
       nil)))
@@ -306,31 +294,33 @@ before deserialization."
   (let ((reader-union (make-instance 'schema:union :schemas reader)))
     (make-instance 'resolved-union :reader reader-union :writer writer)))
 
-(declaim
- (ftype (function (resolved-union stream) (values schema:schema &optional))
-        read-chosen-schema)
- (inline read-chosen-schema))
-(defun read-chosen-schema (schema stream)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((schemas (schema:schemas (writer schema)))
-        (position (deserialize 'schema:int stream)))
-    (declare ((simple-array schema:schema (*)) schemas))
-    (elt schemas position)))
-(declaim (notinline read-chosen-schema))
-
-(defmethod deserialize
-    ((schema resolved-union) (stream stream) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline matchp read-chosen-schema))
-  (let* ((writer-schema (read-chosen-schema schema stream))
-         (reader-schemas (schema:schemas (reader schema)))
-         (first-match (find-if (lambda (reader-schema)
-                                 (matchp reader-schema writer-schema))
-                               reader-schemas)))
-    (declare ((simple-array schema:schema (*)) reader-schemas))
-    (unless first-match
-      (deserialize writer-schema stream) ; consume stream
-      (error "None of the reader union's schemas match the writer schema"))
-    (let* ((resolved-schema (resolve first-match writer-schema))
-           (value (deserialize resolved-schema stream)))
-      (make-instance (reader schema) :object value))))
+(define-deserialize-from resolved-union
+  (declare (inline matchp))
+  `(let* ((total-bytes-read 0)
+          (writer-schema
+            (let ((schemas (schema:schemas (writer schema))))
+              (declare ((simple-array schema:schema (*)) schemas))
+              (multiple-value-bind (position bytes-read)
+                  ,(if vectorp
+                       `(deserialize-from-vector 'schema:int vector start)
+                       `(deserialize-from-stream 'schema:int stream))
+                (incf total-bytes-read bytes-read)
+                (elt schemas position))))
+          (reader-schemas (schema:schemas (reader schema)))
+          (first-match
+            (find-if (lambda (reader-schema)
+                       (matchp reader-schema writer-schema))
+                     reader-schemas)))
+     (declare ((simple-array schema:schema (*)) reader-schemas))
+     (unless first-match
+       ,@(when streamp
+           ;; consume stream
+           `((deserialize-from-stream writer-schema stream)))
+       (error "None of the reader union's schemas match the writer schema"))
+     (let ((resolved-schema (resolve first-match writer-schema)))
+       (multiple-value-bind (value bytes-read)
+           ,(if vectorp
+                `(deserialize-from-vector resolved-schema vector (+ start total-bytes-read))
+                `(deserialize-from-stream resolved-schema stream))
+         (incf total-bytes-read bytes-read)
+         (values (make-instance (reader schema) :object value) total-bytes-read)))))
