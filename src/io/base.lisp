@@ -72,11 +72,11 @@ Return (values vector number-of-serialized-bytes)"
     (declare (optimize (speed 3) (safety 0)))
     (assert-match reader writer))
 
-  (:method (reader (writer symbol))
+  (:method ((reader symbol) writer)
     (declare (optimize (speed 3) (safety 0)))
-    (if (typep writer 'schema:primitive-schema)
+    (if (typep reader 'schema:primitive-schema)
         (call-next-method)
-        (apply #'resolve reader (find-class writer))))
+        (resolve (find-class reader) writer)))
 
   (:method (reader writer)
     (declare (optimize (speed 3) (safety 0))
@@ -107,23 +107,23 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
         (call-next-method)
         (apply #'deserialize (find-class schema) input keyword-args)))
 
-  (:method (schema (input simple-array) &key writer-schema (start 0))
+  (:method (schema (input simple-array) &key reader-schema (start 0))
     (check-type input (simple-array (unsigned-byte 8) (*)))
     (check-type start (and (integer 0) fixnum))
     (deserialize-from-vector
-     (if writer-schema (resolve schema writer-schema) schema)
+     (if reader-schema (resolve reader-schema schema) schema)
      input
      start))
 
-  (:method (schema (input stream) &key writer-schema)
+  (:method (schema (input stream) &key reader-schema)
     (deserialize-from-stream
-     (if writer-schema (resolve schema writer-schema) schema)
+     (if reader-schema (resolve reader-schema schema) schema)
      input))
 
   (:documentation
    "Deserialize an instance of SCHEMA from INPUT.
 
-If WRITER-SCHEMA is provided, then deserialization is performed on the
+If READER-SCHEMA is provided, then deserialization is performed on the
 resolved schema."))
 
 ;; macro

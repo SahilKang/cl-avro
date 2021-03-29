@@ -36,22 +36,21 @@
                           symbols: [\"FOO\", \"BAR\"],
                           default: \"FOO\"}")))
 
-    ;; TODO switch around reader and writer schema
     (is (string=
          "BAR"
          (avro:which-one
           (avro:deserialize
-           reader-schema
+           writer-schema
            (avro:serialize (make-instance writer-schema :enum "BAR"))
-           :writer-schema writer-schema))))
+           :reader-schema reader-schema))))
 
     (is (string=
          "FOO"
          (avro:which-one
           (avro:deserialize
-           reader-schema
+           writer-schema
            (avro:serialize (make-instance writer-schema :enum "BAZ"))
-           :writer-schema writer-schema))))))
+           :reader-schema reader-schema))))))
 
 (test resolve-record
   (let ((writer-schema (avro:deserialize
@@ -81,13 +80,13 @@
      (equal
       '(2 "foo" "bar")
       (let ((object (avro:deserialize
-                     reader-schema
+                     writer-schema
                      (avro:serialize (make-instance
                                       writer-schema
                                       :|Field_1| "foo"
                                       :|Field_2| 2
                                       :|UnknownField| "ignored"))
-                     :writer-schema writer-schema)))
+                     :reader-schema reader-schema)))
         (list
          (avro:field object "Field_2")
          (avro:field object "Field_11")
