@@ -23,11 +23,14 @@
    (#:endian #:cl-avro.io.primitive))
   (:import-from #:cl-avro.io.base
                 #:serialize-into
-                #:deserialize
-                #:serialized-size)
+                #:serialized-size
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from)
   (:export #:serialize-into
-           #:deserialize
-           #:serialized-size))
+           #:serialized-size
+           #:deserialize-from-vector
+           #:deserialize-from-stream))
 (in-package #:cl-avro.io.logical)
 
 ;;; uuid schema
@@ -42,11 +45,13 @@
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (schema:uuid object) vector start))
 
-(defmethod deserialize ((schema schema:uuid-schema) (stream stream) &key)
-  "Read a uuid string from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((uuid (deserialize 'schema:string stream)))
-    (make-instance schema :uuid uuid)))
+;; Read a uuid string from STREAM.
+(define-deserialize-from schema:uuid-schema
+  `(multiple-value-bind (uuid bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:string vector start)
+            `(deserialize-from-stream 'schema:string stream))
+     (values (make-instance schema :uuid uuid) bytes-read)))
 
 ;; TODO add symbol/class-name specializations (eql 'schema:uuid)
 
@@ -75,14 +80,16 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-date object) vector start))
 
-(defmethod deserialize ((schema schema:date-schema) (stream stream) &key)
-  "Read a date from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (change-class
-   (let ((days (deserialize 'schema:int stream)))
-     (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
-       (offset :day days)))
-   schema))
+;; Read a date from STREAM.
+(define-deserialize-from schema:date-schema
+  `(multiple-value-bind (days bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:int vector start)
+            `(deserialize-from-stream 'schema:int stream))
+     (let ((timestamp
+             (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+               (offset :day days))))
+       (values (change-class timestamp schema) bytes-read))))
 
 ;;; time-millis schema
 
@@ -114,22 +121,25 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-time-millis object) vector start))
 
-(defmethod deserialize
-    ((schema schema:time-millis-schema) (stream stream) &key)
-  "Read time of day from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((milliseconds-after-midnight (deserialize 'schema:int stream))
-         (hour (multiple-value-bind (hour remainder)
-                   (truncate milliseconds-after-midnight (* 60 60 1000))
-                 (setf milliseconds-after-midnight remainder)
-                 hour))
-         (minute (multiple-value-bind (minute remainder)
-                     (truncate milliseconds-after-midnight (* 60 1000))
+;; Read time of day from STREAM.
+(define-deserialize-from schema:time-millis-schema
+  `(multiple-value-bind (milliseconds-after-midnight bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:int vector start)
+            `(deserialize-from-stream 'schema:int stream))
+     (declare ((and (integer 0) schema:int) milliseconds-after-midnight))
+     (let ((hour (multiple-value-bind (hour remainder)
+                     (truncate milliseconds-after-midnight (* 60 60 1000))
                    (setf milliseconds-after-midnight remainder)
-                   minute)))
-    (declare ((and (integer 0) schema:int) milliseconds-after-midnight))
-    (make-instance schema :hour hour :minute minute
-                          :millisecond milliseconds-after-midnight)))
+                   hour))
+           (minute (multiple-value-bind (minute remainder)
+                       (truncate milliseconds-after-midnight (* 60 1000))
+                     (setf milliseconds-after-midnight remainder)
+                     minute)))
+       (values
+        (make-instance schema :hour hour :minute minute
+                              :millisecond milliseconds-after-midnight)
+        bytes-read))))
 
 ;;; time-micros schema
 
@@ -161,22 +171,25 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-time-micros object) vector start))
 
-(defmethod deserialize
-    ((schema schema:time-micros-schema) (stream stream) &key)
-  "Read time of day from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((microseconds-after-midnight (deserialize 'schema:long stream))
-         (hour (multiple-value-bind (hour remainder)
-                   (truncate microseconds-after-midnight (* 60 60 1000 1000))
-                 (setf microseconds-after-midnight remainder)
-                 hour))
-         (minute (multiple-value-bind (minute remainder)
-                     (truncate microseconds-after-midnight (* 60 1000 1000))
+;; Read time of day from STREAM.
+(define-deserialize-from schema:time-micros-schema
+  `(multiple-value-bind (microseconds-after-midnight bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
+     (declare ((and (integer 0) schema:long) microseconds-after-midnight))
+     (let ((hour (multiple-value-bind (hour remainder)
+                     (truncate microseconds-after-midnight (* 60 60 1000 1000))
                    (setf microseconds-after-midnight remainder)
-                   minute)))
-    (declare ((and (integer 0) schema:long) microseconds-after-midnight))
-    (make-instance schema :hour hour :minute minute
-                   :microsecond microseconds-after-midnight)))
+                   hour))
+           (minute (multiple-value-bind (minute remainder)
+                       (truncate microseconds-after-midnight (* 60 1000 1000))
+                     (setf microseconds-after-midnight remainder)
+                     minute)))
+       (values
+        (make-instance schema :hour hour :minute minute
+                              :microsecond microseconds-after-midnight)
+        bytes-read))))
 
 ;;; timestamp-millis schema
 
@@ -207,25 +220,25 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-timestamp-millis object) vector start))
 
-(defmethod deserialize
-    ((schema schema:timestamp-millis-schema) (stream stream) &key)
-  "Read a timestamp from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (change-class
-   (let* ((milliseconds-from-unix-epoch
-            (deserialize 'schema:long stream))
-          (seconds-from-unix-epoch
-            (multiple-value-bind (seconds remainder)
-                (truncate milliseconds-from-unix-epoch 1000)
-              (setf milliseconds-from-unix-epoch remainder)
-              seconds))
-          (nanoseconds-from-unix-epoch
-            (* milliseconds-from-unix-epoch 1000 1000)))
+;; Read a timestamp from STREAM.
+(define-deserialize-from schema:timestamp-millis-schema
+  `(multiple-value-bind (milliseconds-from-unix-epoch bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
      (declare (schema:long milliseconds-from-unix-epoch))
-     (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
-       (offset :sec seconds-from-unix-epoch)
-       (offset :nsec nanoseconds-from-unix-epoch)))
-   schema))
+     (let* ((seconds-from-unix-epoch
+              (multiple-value-bind (seconds remainder)
+                  (truncate milliseconds-from-unix-epoch 1000)
+                (setf milliseconds-from-unix-epoch remainder)
+                seconds))
+            (nanoseconds-from-unix-epoch
+              (* milliseconds-from-unix-epoch 1000 1000))
+            (timestamp
+              (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+                (offset :sec seconds-from-unix-epoch)
+                (offset :nsec nanoseconds-from-unix-epoch))))
+       (values (change-class timestamp schema) bytes-read))))
 
 ;;; timestamp-micros schema
 
@@ -256,25 +269,25 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-timestamp-micros object) vector start))
 
-(defmethod deserialize
-    ((schema schema:timestamp-micros-schema) (stream stream) &key)
-  "Read timestamp from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (change-class
-   (let* ((microseconds-from-unix-epoch
-            (deserialize 'schema:long stream))
-          (seconds-from-unix-epoch
-            (multiple-value-bind (seconds remainder)
-                (truncate microseconds-from-unix-epoch (* 1000 1000))
-              (setf microseconds-from-unix-epoch remainder)
-              seconds))
-          (nanoseconds-from-unix-epoch
-            (* microseconds-from-unix-epoch 1000)))
+;; Read timestamp from STREAM.
+(define-deserialize-from schema:timestamp-micros-schema
+  `(multiple-value-bind (microseconds-from-unix-epoch bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
      (declare (schema:long microseconds-from-unix-epoch))
-     (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
-       (offset :sec seconds-from-unix-epoch)
-       (offset :nsec nanoseconds-from-unix-epoch)))
-   schema))
+     (let* ((seconds-from-unix-epoch
+              (multiple-value-bind (seconds remainder)
+                  (truncate microseconds-from-unix-epoch (* 1000 1000))
+                (setf microseconds-from-unix-epoch remainder)
+                seconds))
+            (nanoseconds-from-unix-epoch
+              (* microseconds-from-unix-epoch 1000))
+            (timestamp
+              (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+                (offset :sec seconds-from-unix-epoch)
+                (offset :nsec nanoseconds-from-unix-epoch))))
+       (values (change-class timestamp schema) bytes-read))))
 
 ;;; local-timestamp-millis schema
 
@@ -305,27 +318,27 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-local-timestamp-millis object) vector start))
 
-(defmethod deserialize
-    ((schema schema:local-timestamp-millis-schema) (stream stream) &key)
-  "Read local timestamp from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (change-class
-   (let* ((milliseconds-from-epoch
-            (deserialize 'schema:long stream))
-          (seconds-from-epoch
-            (multiple-value-bind (seconds remainder)
-                (truncate milliseconds-from-epoch 1000)
-              (setf milliseconds-from-epoch remainder)
-              seconds))
-          (nanoseconds-from-epoch
-            (* milliseconds-from-epoch 1000 1000))
-          (epoch
-            (local-time:encode-timestamp 0 0 0 0 1 1 1970)))
+;; Read local timestamp from STREAM.
+(define-deserialize-from schema:local-timestamp-millis-schema
+  `(multiple-value-bind (milliseconds-from-epoch bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
      (declare (schema:long milliseconds-from-epoch))
-     (local-time:adjust-timestamp! epoch
-       (offset :sec seconds-from-epoch)
-       (offset :nsec nanoseconds-from-epoch)))
-   schema))
+     (let* ((seconds-from-epoch
+              (multiple-value-bind (seconds remainder)
+                  (truncate milliseconds-from-epoch 1000)
+                (setf milliseconds-from-epoch remainder)
+                seconds))
+            (nanoseconds-from-epoch
+              (* milliseconds-from-epoch 1000 1000))
+            (epoch
+              (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+            (timestamp
+              (local-time:adjust-timestamp! epoch
+                (offset :sec seconds-from-epoch)
+                (offset :nsec nanoseconds-from-epoch))))
+       (values (change-class timestamp schema) bytes-read))))
 
 ;;; local-timestamp-micros schema
 
@@ -356,27 +369,27 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-local-timestamp-micros object) vector start))
 
-(defmethod deserialize
-    ((schema schema:local-timestamp-micros-schema) (stream stream) &key)
-  "Read local timestamp from STREAM."
-  (declare (optimize (speed 3) (safety 0)))
-  (change-class
-   (let* ((microseconds-from-epoch
-            (deserialize 'schema:long stream))
-          (seconds-from-epoch
-            (multiple-value-bind (seconds remainder)
-                (truncate microseconds-from-epoch (* 1000 1000))
-              (setf microseconds-from-epoch remainder)
-              seconds))
-          (nanoseconds-from-epoch
-            (* microseconds-from-epoch 1000))
-          (epoch
-            (local-time:encode-timestamp 0 0 0 0 1 1 1970)))
+;; Read local timestamp from STREAM.
+(define-deserialize-from schema:local-timestamp-micros-schema
+  `(multiple-value-bind (microseconds-from-epoch bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
      (declare (schema:long microseconds-from-epoch))
-     (local-time:adjust-timestamp! epoch
-       (offset :sec seconds-from-epoch)
-       (offset :nsec nanoseconds-from-epoch)))
-   schema))
+     (let* ((seconds-from-epoch
+              (multiple-value-bind (seconds remainder)
+                  (truncate microseconds-from-epoch (* 1000 1000))
+                (setf microseconds-from-epoch remainder)
+                seconds))
+            (nanoseconds-from-epoch
+              (* microseconds-from-epoch 1000))
+            (epoch
+              (local-time:encode-timestamp 0 0 0 0 1 1 1970))
+            (timestamp
+              (local-time:adjust-timestamp! epoch
+                (offset :sec seconds-from-epoch)
+                (offset :nsec nanoseconds-from-epoch))))
+       (values (change-class timestamp schema) bytes-read))))
 
 ;;; duration schema
 
@@ -394,18 +407,23 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
   (endian:uint32->little-endian (schema:milliseconds object) vector (+ start 8))
   12)
 
-(defmethod deserialize ((schema schema:duration) (stream stream) &key)
-  "Read duration from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (inline endian:little-endian->uint32))
-  (let ((bytes (make-array 12 :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence bytes stream) 12)
-      (error 'end-of-file :stream *error-output*))
-    (make-instance
-     schema
-     :months (endian:little-endian->uint32 bytes 0)
-     :days (endian:little-endian->uint32 bytes 4)
-     :milliseconds (endian:little-endian->uint32 bytes 8))))
+;; Read duration from STREAM.
+(define-deserialize-from schema:duration
+  (declare (inline endian:little-endian->uint32))
+  `(let ((bytes ,(if vectorp
+                     'vector
+                     `(make-array 12 :element-type '(unsigned-byte 8))))
+         ,@(when streamp '((start 0))))
+     ,@(when streamp
+         `((unless (= (read-sequence bytes stream) 12)
+             (error 'end-of-file :stream *error-output*))))
+     (values
+      (make-instance
+       schema
+       :months (endian:little-endian->uint32 bytes start)
+       :days (endian:little-endian->uint32 bytes (+ start 4))
+       :milliseconds (endian:little-endian->uint32 bytes (+ start 8)))
+      12)))
 
 ;;; decimal schema
 
@@ -526,14 +544,16 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 
 ;; deserialize
 
-(defmethod deserialize ((schema schema:decimal) (stream stream) &key)
-  "Read decimal from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (inline read-twos-complement))
-  (let* ((underlying (schema:underlying schema))
-         (bytes (deserialize underlying stream))
-         (unscaled (read-twos-complement
-                    (if (eq 'schema:bytes underlying)
-                        bytes
-                        (schema:raw-buffer bytes)))))
-    (make-instance schema :unscaled unscaled)))
+;; Read decimal from STREAM.
+(define-deserialize-from schema:decimal
+  (declare (inline read-twos-complement))
+  `(let ((underlying (schema:underlying schema)))
+     (multiple-value-bind (bytes bytes-read)
+         ,(if vectorp
+              `(deserialize-from-vector underlying vector start)
+              `(deserialize-from-stream underlying stream))
+       (let ((unscaled (read-twos-complement
+                        (if (eq 'schema:bytes underlying)
+                            bytes
+                            (schema:raw-buffer bytes)))))
+         (values (make-instance schema :unscaled unscaled) bytes-read)))))

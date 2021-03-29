@@ -131,4 +131,4 @@
         (file-block (skip-block file-input-stream)))
     (when file-block
       (block:file-block-objects-objects
-       (io:deserialize header file-block)))))
+       (block:from-file-block header file-block)))))

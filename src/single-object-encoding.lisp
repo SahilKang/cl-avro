@@ -101,9 +101,5 @@
   (declare (optimize (speed 3) (safety 3)))
   (locally
       (declare (optimize (speed 3) (safety 0)))
-    ;; to prevent copying bytes
-    ;; TODO should do this throughout
-    (let ((stream (make-instance 'io:memory-input-stream
-                                 :bytes bytes :position 10)))
-      (io:deserialize schema stream))))
+    (nth-value 0 (io:deserialize schema bytes :start 10))))
 (declaim (notinline deserialize-single-object))

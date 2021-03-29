@@ -21,4 +21,5 @@
   (:use #:cl-avro.io.resolution.resolve
         #:cl-avro.io.resolution.logical
         #:cl-avro.io.resolution.promoted)
-  (:export #:deserialize))
+  (:export #:deserialize-from-vector
+           #:deserialize-from-stream))

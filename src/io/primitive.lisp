@@ -19,31 +19,20 @@
 (defpackage #:cl-avro.io.primitive
   (:use #:cl)
   (:local-nicknames
-   (#:stream #:cl-avro.io.memory-stream)
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
                 #:serialize-into
-                #:deserialize
-                #:serialized-size)
+                #:serialized-size
+                #:deserialize-from-vector
+                #:deserialize-from-stream
+                #:define-deserialize-from)
   (:export #:serialize-into
-           #:deserialize
            #:serialized-size
+           #:deserialize-from-vector
+           #:deserialize-from-stream
            #:little-endian->uint32
            #:uint32->little-endian))
 (in-package #:cl-avro.io.primitive)
-
-(defmethod deserialize (schema (bytes simple-array) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (check-type bytes (simple-array (unsigned-byte 8) (*)))
-  (let ((stream (make-instance 'stream:memory-input-stream :bytes bytes)))
-    (deserialize schema stream)))
-
-;; TODO do the same thing with serialize but with a handler-case
-(defmethod deserialize ((schema symbol) input &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (if (typep schema 'schema:primitive-schema)
-      (call-next-method)
-      (deserialize (find-class schema) input)))
 
 ;;; null schema
 
@@ -57,11 +46,10 @@
            (ignore object vector start))
   0)
 
-(defmethod deserialize ((schema (eql 'schema:null)) (stream stream) &key)
-  "Read zero bytes from STREAM and return nil."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema stream))
-  nil)
+;; Read zero bytes from STREAM and return nil.
+(define-deserialize-from (eql 'schema:null)
+  `(declare (ignore schema ,@(if vectorp '(vector start) '(stream))))
+  `(values nil 0))
 
 ;;; boolean schema
 
@@ -89,13 +77,16 @@
   (setf (elt vector start) 0)
   1)
 
-(defmethod deserialize ((schema (eql 'schema:boolean)) (stream stream) &key)
-  "Read a byte from STREAM and return TRUE if it's 1, or FALSE if it's 0."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
-  (ecase (read-byte stream)
-    (0 'schema:false)
-    (1 'schema:true)))
+;; Read a byte from STREAM and return TRUE if it's 1, or FALSE if it's 0.
+(define-deserialize-from (eql 'schema:boolean)
+  (declare (ignore schema))
+  `(values
+    (ecase ,(if vectorp
+                `(elt vector start)
+                `(read-byte stream))
+      (0 'schema:false)
+      (1 'schema:true))
+    1))
 
 ;;; int and long schemas
 
@@ -156,8 +147,8 @@
 
 ;; variable length integers
 
-(defmacro read-variable-length-integer (stream bits)
-  (declare (symbol stream)
+(defmacro read-variable-length-integer (input bits &optional (start 0))
+  (declare ((member stream vector) input)
            ((member 32 64) bits))
   (let* ((max-bytes (ceiling bits 7))
          (type (ecase bits (32 "int") (64 "long")))
@@ -168,13 +159,17 @@
        with value of-type (unsigned-byte ,bits) = 0
 
        for offset of-type fixnum below ,max-bytes
-       for byte of-type (unsigned-byte 8) = (read-byte ,stream)
+       ,@(when (eq input 'vector)
+           `(for index of-type fixnum = ,start then (1+ index)))
+       for byte of-type (unsigned-byte 8) = ,(if (eq input 'vector)
+                                                 `(elt ,input index)
+                                                 `(read-byte ,input))
 
        do (setf value (logior value (ash (logand byte #x7f)
                                          (* 7 offset))))
 
        when (zerop (logand byte #x80))
-         return value
+         return (values value (1+ offset))
 
        finally
           (error ,error-message))))
@@ -210,21 +205,25 @@
 
 ;; deserialize int
 
-(defmethod deserialize ((schema (eql 'schema:int)) (stream stream) &key)
-  "Read a 32-bit variable-length zig-zag integer from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema)
+;; Read a 32-bit variable-length zig-zag integer from STREAM.
+(define-deserialize-from (eql 'schema:int)
+  (declare (ignore schema)
            (inline zig-zag->int))
-  (zig-zag->int (read-variable-length-integer stream 32)))
+  `(multiple-value-bind (zig-zag bytes-read)
+       (read-variable-length-integer
+           ,(if vectorp 'vector 'stream) 32 ,@(when vectorp '(start)))
+     (values (zig-zag->int zig-zag) bytes-read)))
 
 ;; deserialize long
 
-(defmethod deserialize ((schema (eql 'schema:long)) (stream stream) &key)
-  "Read a 64-bit variable-length zig-zag integer from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema)
+;; Read a 64-bit variable-length zig-zag integer from STREAM.
+(define-deserialize-from (eql 'schema:long)
+  (declare (ignore schema)
            (inline zig-zag->long))
-  (zig-zag->long (read-variable-length-integer stream 64)))
+  `(multiple-value-bind (zig-zag bytes-read)
+       (read-variable-length-integer
+           ,(if vectorp 'vector 'stream) 64 ,@(when vectorp '(start)))
+     (values (zig-zag->long zig-zag) bytes-read)))
 
 ;;; float and double schemas
 
@@ -327,15 +326,21 @@
     (uint32->little-endian integer vector start))
   4)
 
-(defmethod deserialize ((schema (eql 'schema:float)) (stream stream) &key)
-  "Read a single-precision float from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema)
+;; Read a single-precision float from STREAM.
+(define-deserialize-from (eql 'schema:float)
+  (declare (ignore schema)
            (inline little-endian->uint32 ieee-floats:decode-float32))
-  (let ((bytes (make-array 4 :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence bytes stream) 4)
-      (error 'end-of-file :stream *error-output*))
-    (ieee-floats:decode-float32 (little-endian->uint32 bytes))))
+  `(values
+    (ieee-floats:decode-float32
+     (little-endian->uint32
+      ,(if vectorp
+           'vector
+           `(let ((bytes (make-array 4 :element-type '(unsigned-byte 8))))
+              (unless (= (read-sequence bytes stream) 4)
+                (error 'end-of-file :stream *error-output*))
+              bytes))
+      ,@(when vectorp '(start))))
+    4))
 
 ;; double schema
 
@@ -352,15 +357,21 @@
     (uint64->little-endian integer vector start))
   8)
 
-(defmethod deserialize ((schema (eql 'schema:double)) (stream stream) &key)
-  "Read a double-precision float from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema)
+;; Read a double-precision float from STREAM.
+(define-deserialize-from (eql 'schema:double)
+  (declare (ignore schema)
            (inline little-endian->uint64 ieee-floats:decode-float64))
-  (let ((bytes (make-array 8 :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence bytes stream) 8)
-      (error 'end-of-file :stream *error-output*))
-    (ieee-floats:decode-float64 (little-endian->uint64 bytes))))
+  `(values
+    (ieee-floats:decode-float64
+     (little-endian->uint64
+      ,(if vectorp
+           'vector
+           `(let ((bytes (make-array 8 :element-type '(unsigned-byte 8))))
+              (unless (= (read-sequence bytes stream) 8)
+                (error 'end-of-file :stream *error-output*))
+              bytes))
+      ,@(when vectorp '(start))))
+    8))
 
 ;; bytes schema
 
@@ -380,15 +391,23 @@
     (replace vector object :start1 (+ start bytes-written))
     (the fixnum (+ bytes-written (length object)))))
 
-(defmethod deserialize ((schema (eql 'schema:bytes)) (stream stream) &key)
-  "Read a vector of bytes from STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
-  (let* ((size (deserialize 'schema:long stream))
-         (bytes (make-array size :element-type '(unsigned-byte 8))))
-    (unless (= (read-sequence bytes stream) size)
-      (error 'end-of-file :stream *error-output*))
-    bytes))
+;; Read a vector of bytes from STREAM.
+(define-deserialize-from (eql 'schema:bytes)
+  (declare (ignore schema))
+  `(multiple-value-bind (size bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
+     ,@(when vectorp
+         `((unless (>= (- (length vector) start bytes-read) size)
+              (error "Not enough bytes in vector"))))
+     (let ((bytes (make-array size :element-type '(unsigned-byte 8))))
+       ,(if vectorp
+            ;; would returning a displaced array be better than copying?
+            `(replace bytes vector :start2 (+ start bytes-read))
+            `(unless (= (read-sequence bytes stream) size)
+               (error 'end-of-file :stream *error-output*)))
+       (values bytes (+ bytes-read size)))))
 
 ;; string schema
 
@@ -406,9 +425,26 @@
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
     (serialize-into bytes vector start)))
 
-(defmethod deserialize ((schema (eql 'schema:string)) (stream stream) &key)
-  "Read a utf-8 encoded string from STREAM."
-  (declare (optimize (speed 3) (safety 0))
+;; Read a utf-8 encoded string from STREAM.
+(define-deserialize-from (eql 'schema:string)
+  (declare (ignore schema)
            (inline babel:octets-to-string))
-  (let ((bytes (deserialize 'schema:bytes stream)))
-    (babel:octets-to-string bytes :encoding :utf-8)))
+  `(multiple-value-bind (size bytes-read)
+       ,(if vectorp
+            `(deserialize-from-vector 'schema:long vector start)
+            `(deserialize-from-stream 'schema:long stream))
+     ,@(when vectorp
+         `((unless (>= (- (length vector) start bytes-read) size)
+             (error "Not enough bytes in vector"))))
+     (values
+      (babel:octets-to-string
+       ,(if vectorp
+            'vector
+            `(let ((bytes (make-array size :element-type '(unsigned-byte 8))))
+               (unless (= (read-sequence bytes stream) size)
+                 (error 'end-of-file :stream *error-output*))
+               bytes))
+       :encoding :utf-8
+       ,@(when vectorp
+           '(:start (+ start bytes-read) :end (+ start bytes-read size))))
+      (+ bytes-read size))))
