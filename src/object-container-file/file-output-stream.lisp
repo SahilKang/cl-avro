@@ -48,7 +48,6 @@
        (meta (error "Must supply META"))
        (sync (make-instance 'header:sync)))
   (with-slots (stream header) instance
-    (check-type output stream)
     (setf stream output
           header (make-instance 'header:header :sync sync :meta meta))))
 

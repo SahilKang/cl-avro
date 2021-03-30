@@ -28,59 +28,11 @@
            #:read-block))
 (in-package #:cl-avro.object-container-file.file-input-stream)
 
-;;; peekable binary stream
-
-(defclass peekable-binary-input-stream
-    (trivial-gray-streams:fundamental-binary-input-stream)
-  ((next
-    :reader peek
-    :type (or null (unsigned-byte 8)))
-   (stream
-    :initarg :stream
-    :type stream))
-  (:default-initargs
-   :stream (error "Must supply STREAM")))
-
-(defmethod initialize-instance :after
-    ((instance peekable-binary-input-stream) &key)
-  (declare (optimize (speed 3) (safety 0)))
-  (with-slots (next stream) instance
-    (setf next (read-byte stream nil nil))))
-
-(defmethod stream-element-type
-    ((instance peekable-binary-input-stream))
-  '(unsigned-byte 8))
-
-(defmethod trivial-gray-streams:stream-read-byte
-    ((instance peekable-binary-input-stream))
-  (declare (optimize (speed 3) (safety 0)))
-  (with-slots (next stream) instance
-    (if (null next)
-        :eof
-        (prog1 next
-          (setf next (read-byte stream nil nil))))))
-
-(defmethod trivial-gray-streams:stream-read-sequence
-    ((instance peekable-binary-input-stream)
-     (vector simple-array)
-     (start integer)
-     (end integer)
-     &key)
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (with-slots (next stream) instance
-    (if (null next)
-        start
-        (prog1 (read-sequence vector stream :start (1+ start) :end end)
-          (setf (elt vector start) next
-                next (read-byte stream nil nil))))))
-
-;;; file input stream
-
 (defclass file-input-stream ()
   ((stream
     :reader wrapped-stream
-    :type peekable-binary-input-stream)
+    :type (or flexi-streams:flexi-input-stream
+              flexi-streams:in-memory-input-stream))
    (header
     :reader header:header
     :type header:header)
@@ -93,11 +45,9 @@
 (defmethod initialize-instance :after
     ((instance file-input-stream) &key (input (error "Must supply INPUT")))
   (with-slots (stream header file-block) instance
-    (setf stream (make-instance
-                  'peekable-binary-input-stream
-                  :stream (if (streamp input)
-                              input
-                              (make-instance 'io:memory-input-stream :bytes input)))
+    (setf stream (if (streamp input)
+                     (flexi-streams:make-flexi-stream input :element-type '(unsigned-byte 8))
+                     (flexi-streams:make-in-memory-input-stream input))
           header (io:deserialize (find-class 'header:header) stream)
           file-block (io:deserialize (find-class 'block:file-block) stream))))
 
@@ -109,7 +59,7 @@
          (file-block file-block))
       file-input-stream
     (setf file-block
-          (when (peek stream)
+          (when (flexi-streams:peek-byte stream nil nil nil)
             (io:deserialize (find-class 'block:file-block) stream))))
   (values))
 

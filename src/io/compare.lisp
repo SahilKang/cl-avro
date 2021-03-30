@@ -19,9 +19,7 @@
 (defpackage #:cl-avro.io.compare
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema)
-   (#:stream #:cl-avro.io.memory-stream)
-   (#:block #:cl-avro.io.block-stream))
+   (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
                 #:deserialize)
   (:export #:compare))
@@ -36,13 +34,13 @@
   (:method (schema (left simple-array) right)
     (declare (optimize (speed 3) (safety 0)))
     (check-type left (simple-array (unsigned-byte 8) (*)))
-    (let ((left (make-instance 'stream:memory-input-stream :bytes left)))
+    (let ((left (flexi-streams:make-in-memory-input-stream left)))
       (the comparison (compare schema left right))))
 
   (:method (schema left (right simple-array))
     (declare (optimize (speed 3) (safety 0)))
     (check-type right (simple-array (unsigned-byte 8) (*)))
-    (let ((right (make-instance 'stream:memory-input-stream :bytes right)))
+    (let ((right (flexi-streams:make-in-memory-input-stream right)))
       (the comparison (compare schema left right))))
 
   (:documentation
@@ -151,31 +149,50 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 ;;; array schema
 
+(declaim
+ (ftype (function (stream)
+                  (values schema:long (or null schema:long) &optional))
+        read-count-and-size)
+ (inline read-count-and-size))
+(defun read-count-and-size (stream)
+  (declare (optimize (speed 3) (safety 0)))
+  (let ((count (deserialize 'schema:long stream)))
+    (if (minusp count)
+        (values (abs count) (deserialize 'schema:long stream))
+        (values count nil))))
+(declaim (notinline read-count-and-size))
+
 (defmethod compare
     ((schema schema:array) (left stream) (right stream))
   (declare (optimize (speed 3) (safety 0))
-           (inline block:incf-position))
+           (inline read-count-and-size))
   (loop
     with items = (schema:items schema)
-    and left = (make-instance 'block:binary-blocked-input-stream :stream left)
-    and right = (make-instance 'block:binary-blocked-input-stream :stream right)
 
-    for lhs = (block:read-item left)
-    for rhs = (block:read-item right)
-    until (or (eq lhs :eof)
-              (eq rhs :eof))
+    for left-count = (read-count-and-size left)
+      then (if (zerop (decf left-count min-count))
+               (read-count-and-size left)
+               left-count)
+    for right-count = (read-count-and-size right)
+      then (if (zerop (decf right-count min-count))
+               (read-count-and-size right)
+               right-count)
+    for min-count = (min left-count right-count)
 
-    for comparison of-type comparison = (prog1 (compare items lhs rhs)
-                                          (block:incf-position left)
-                                          (block:incf-position right))
-    unless (zerop comparison)
-      return comparison
+    until (or (zerop left-count)
+              (zerop right-count))
+
+    do (loop
+         repeat min-count
+         for comparison of-type comparison = (compare items left right)
+         unless (zerop comparison) do
+           (return-from compare comparison))
 
     finally
        (return
          (cond
-           ((and (eq lhs :eof) (eq rhs :eof)) 0)
-           ((eq lhs :eof) -1)
+           ((and (zerop left-count) (zerop right-count)) 0)
+           ((zerop left-count) -1)
            (t 1)))))
 
 ;;; enum schema
@@ -216,11 +233,10 @@ LEFT and RIGHT may not necessarily be fully consumed."))
     (loop repeat count do (read-byte stream))
     (values))
 
-  (:method ((stream stream:memory-input-stream) (count integer))
+  (:method ((stream flexi-streams:in-memory-input-stream) (count integer))
     (declare (optimize (speed 3) (safety 0))
              (schema:long count))
-    (with-slots (stream:position) stream
-      (incf (the schema:long stream:position) count))
+    (file-position stream (+ (file-position stream) count))
     (values)))
 
 (defmethod skip
@@ -296,21 +312,14 @@ LEFT and RIGHT may not necessarily be fully consumed."))
   (declare (optimize (speed 3) (safety 0)))
   (loop
     with items = (schema:items schema)
-    and blocked-stream = (make-instance 'block:binary-blocked-input-stream
-                                        :stream stream)
 
-    for block-stream = (block:read-item blocked-stream)
-    until (eq block-stream :eof)
+    for count = (deserialize 'schema:long stream)
+    until (zerop count)
 
-    for size = (block:block-size block-stream)
-    for count of-type schema:long = (block:block-count block-stream)
-
-    if size do
-      (skip-bytes stream size)
+    if (minusp count) do
+      (skip-bytes stream (deserialize 'schema:long stream))
     else do
       (loop repeat count do (skip items stream))
-
-    do (block:incf-position blocked-stream count)
 
     finally
        (return (values))))
@@ -320,25 +329,18 @@ LEFT and RIGHT may not necessarily be fully consumed."))
   (declare (optimize (speed 3) (safety 0)))
   (loop
     with values = (schema:values schema)
-    and blocked-stream = (make-instance 'block:binary-blocked-input-stream
-                                        :stream stream)
 
-    for block-stream = (block:read-item blocked-stream)
-    until (eq block-stream :eof)
+    for count = (deserialize 'schema:long stream)
+    until (zerop count)
 
-    for size = (block:block-size block-stream)
-    for count of-type schema:long = (block:block-count block-stream)
-
-    if size do
-      (skip-bytes stream size)
+    if (minusp count) do
+      (skip-bytes stream (deserialize 'schema:long stream))
     else do
       (loop
         repeat count
         do
            (skip 'schema:string stream)
            (skip values stream))
-
-    do (block:incf-position blocked-stream count)
 
     finally
        (return (values))))
