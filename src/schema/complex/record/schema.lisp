@@ -74,7 +74,6 @@
 
 (defmethod initialize-instance :after
     ((instance record-object) &key)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with fields of-type (simple-array field (*)) = (fields (class-of instance))
     and nullable-fields of-type hash-table = (nullable-fields (class-of instance))
@@ -102,7 +101,6 @@
 (defmethod field
     ((instance record-object) (field-name simple-string))
   "Return (values field-value field-slot)."
-  (declare (optimize (speed 3) (safety 0)))
   (let ((field (gethash field-name (name->field (class-of instance)))))
     (unless field
       (error "No such field named ~S" field-name))
@@ -113,7 +111,6 @@
 (defmethod (setf field)
     (value (instance record-object) (field-name simple-string))
   "Set FIELD-NAME to VALUE."
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((field (nth-value 1 (field instance field-name)))
          (type (type field))
          (name (nth-value 1 (name field))))

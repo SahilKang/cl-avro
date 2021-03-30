@@ -92,7 +92,6 @@
 (defgeneric object (union-object)
   (:method ((instance union-object))
     "Return the chosen union object."
-    (declare (optimize (speed 3) (safety 0)))
     (unwrap (wrapped-object instance))))
 
 ;; TODO change doc to class metaobject class for avro union schemas
@@ -119,7 +118,6 @@
         schema-key)
  (inline schema-key))
 (defun schema-key (schema)
-  (declare (optimize (speed 3) (safety 0)))
   (if (symbolp schema)
       schema
       (if (subtypep (class-of schema) 'named-schema)
@@ -129,8 +127,7 @@
 
 (defmethod which-one ((instance union-object))
   "Return (values schema-name position schema)."
-  (declare (optimize (speed 3) (safety 0))
-           (inline schema-key))
+  (declare (inline schema-key))
   (let* ((position (position (class-of (wrapped-object instance))))
          (schemas (schemas (class-of instance)))
          (schema (elt schemas position))
@@ -143,7 +140,6 @@
         find-wrapper-class)
  (inline find-wrapper-class))
 (defun find-wrapper-class (union object)
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((schemas (schemas union))
          (wrapper-classes (wrapper-classes union))
          (position (cl:position object schemas :test #'typep)))
@@ -157,8 +153,7 @@
  (ftype (function (union t) (values wrapper-object &optional)) wrap)
  (inline wrap))
 (defun wrap (union object)
-  (declare (optimize (speed 3) (safety 0))
-           (inline find-wrapper-class))
+  (declare (inline find-wrapper-class))
   (let ((wrapper-class (find-wrapper-class union object)))
     (unless wrapper-class
       (error "Object ~S must be one of ~S" object (schemas union)))
@@ -167,8 +162,7 @@
 
 (defmethod initialize-instance :after
     ((instance union-object) &key (object (error "Must supply OBJECT")))
-  (declare (optimize (speed 3) (safety 0))
-           (inline wrap))
+  (declare (inline wrap))
   (with-slots (wrapped-object) instance
     (setf wrapped-object (wrap (class-of instance) object))))
 

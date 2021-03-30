@@ -53,7 +53,6 @@
 
 (defmethod resolve
     ((reader schema:array) (writer schema:array))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((resolved (resolve (schema:items reader)
                            (schema:items writer))))
     (make-instance reader :items resolved)))
@@ -62,7 +61,6 @@
 
 (defmethod resolve
     ((reader schema:map) (writer schema:map))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((resolved (resolve (schema:values reader)
                            (schema:values writer))))
     (make-instance reader :values resolved)))
@@ -83,7 +81,6 @@
         get-known-symbols)
  (inline get-known-symbols))
 (defun get-known-symbols (enum)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with symbols of-type (simple-array schema:name (*)) = (schema:symbols enum)
     with known-symbols = (make-hash-table :test #'equal :size (length symbols))
@@ -97,14 +94,12 @@
 
 (defmethod initialize-instance :after
     ((instance resolved-enum) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline get-known-symbols))
+  (declare (inline get-known-symbols))
   (with-slots (reader writer known-symbols) instance
     (setf known-symbols (get-known-symbols reader))))
 
 (defmethod resolve
     ((reader schema:enum) (writer schema:enum))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-enum :reader reader :writer writer))
 
 (define-deserialize-from resolved-enum
@@ -149,7 +144,6 @@
         resolve-records)
  (inline resolve-records))
 (defun resolve-records (reader writer)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with name->reader-field = (schema:name->field reader)
 
@@ -185,8 +179,7 @@
 
 (defmethod initialize-instance :after
     ((instance resolved-record) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline resolve-records))
+  (declare (inline resolve-records))
   (with-slots (reader writer defaulted-initargs needed-fields) instance
     (loop
       with name->writer-field = (schema:name->field writer)
@@ -212,7 +205,6 @@
 
 (defmethod resolve
     ((reader schema:record) (writer schema:record))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-record :reader reader :writer writer))
 
 (declaim
@@ -221,7 +213,6 @@
         make-initargs)
  (inline make-initargs))
 (defun make-initargs (schema object)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with initargs = (defaulted-initargs schema)
 
@@ -260,7 +251,6 @@
         matchp)
  (inline matchp))
 (defun matchp (reader writer)
-  (declare (optimize (speed 3) (safety 0)))
   (handler-case
       (progn
         (assert-match reader writer)
@@ -271,13 +261,11 @@
 
 (defmethod resolve
     ((reader schema:union) (writer schema:union))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-union :reader reader :writer writer))
 
 (defmethod resolve
     ((reader schema:union) writer)
-  (declare (optimize (speed 3) (safety 0))
-           (inline matchp))
+  (declare (inline matchp))
   (check-type writer schema:schema)
   (let* ((reader-schemas (schema:schemas reader))
          (first-match (find-if (lambda (reader-schema)
@@ -290,7 +278,6 @@
 
 (defmethod resolve
     (reader (writer schema:union))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((reader-union (make-instance 'schema:union :schemas reader)))
     (make-instance 'resolved-union :reader reader-union :writer writer)))
 

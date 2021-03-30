@@ -57,7 +57,6 @@
         assert-valid-sync-marker)
  (inline assert-valid-sync-marker))
 (defun assert-valid-sync-marker (header file-block)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((header-sync (schema:raw-buffer (header:sync header)))
         (block-sync (schema:raw-buffer (header:sync file-block))))
     (declare ((simple-array (unsigned-byte 8) (16)) header-sync block-sync))
@@ -72,7 +71,6 @@
         %decompress)
  (inline %decompress))
 (defun %decompress (codec bytes)
-  (declare (optimize (speed 3) (safety 0)))
   (ecase codec
     (header:null bytes)
     (header:deflate (chipz:decompress nil 'chipz:deflate bytes))
@@ -85,8 +83,7 @@
         decompress)
  (inline decompress))
 (defun decompress (header file-block)
-  (declare (optimize (speed 3) (safety 0))
-           (inline %decompress))
+  (declare (inline %decompress))
   (let ((codec (header:codec header))
         (bytes (bytes file-block)))
     (%decompress codec bytes)))
@@ -106,8 +103,7 @@
  (inline from-file-block))
 (defun from-file-block (header file-block)
   "Read a vector of objects from FILE-BLOCK."
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-valid-sync-marker decompress))
+  (declare (inline assert-valid-sync-marker decompress))
   (assert-valid-sync-marker header file-block)
   (loop
     with count = (count file-block)
@@ -133,7 +129,6 @@
         compress)
  (inline compress))
 (defun compress (codec bytes)
-  (declare (optimize (speed 3) (safety 0)))
   (ecase codec
     (header:null bytes)
     (header:deflate (salza2:compress-data bytes 'salza2:deflate-compressor))))
@@ -144,8 +139,7 @@
         to-file-block)
  (inline to-file-block))
 (defun to-file-block (file-block-objects)
-  (declare (optimize (speed 3) (safety 0))
-           (inline compress))
+  (declare (inline compress))
   (loop
     with header = (file-block-objects-header file-block-objects)
     and objects = (file-block-objects-objects file-block-objects)

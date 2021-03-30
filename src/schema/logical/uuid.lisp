@@ -35,8 +35,7 @@
  (inline rfc-4122-uuid-p))
 (defun rfc-4122-uuid-p (uuid)
   "True if UUID conforms to RFC-4122."
-  (declare (optimize (speed 3) (safety 0))
-           (inline hex-p))
+  (declare (inline hex-p))
   (and (= 36 (length uuid))
        (char= #\-
               (char uuid 8)
@@ -76,8 +75,7 @@
 
 (defmethod initialize-instance :after
     ((instance uuid) &key)
-  (declare (optimize (speed 3) (safety 0))
-           (inline rfc-4122-uuid-p))
+  (declare (inline rfc-4122-uuid-p))
   (with-slots (uuid) instance
     (check-type uuid simple-string)
     (unless (rfc-4122-uuid-p uuid)

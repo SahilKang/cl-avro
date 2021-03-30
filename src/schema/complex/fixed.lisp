@@ -70,7 +70,6 @@
      &key
        (initial-element nil initial-element-p)
        (initial-contents nil initial-contents-p))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((size (size (class-of instance)))
         (keyword-args (list :element-type '(unsigned-byte 8))))
     (when initial-element-p

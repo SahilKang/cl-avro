@@ -37,7 +37,6 @@
  (inline digit-p))
 (defun digit-p (digit)
   "True if DIGIT is a base-10 digit."
-  (declare (optimize (speed 3) (safety 0)))
   (let ((code (char-code digit)))
     (not (null (between code #\0 #\9)))))
 (declaim (notinline digit-p))
@@ -47,7 +46,6 @@
  (inline letter-p))
 (defun letter-p (letter)
   "True if LETTER is a an ascii letter conforming to /[a-zA-Z]/"
-  (declare (optimize (speed 3) (safety 0)))
   (let ((code (char-code letter)))
     (not (null (or (between code #\a #\z)
                    (between code #\A #\Z))))))
@@ -58,7 +56,6 @@
  (inline hex-p))
 (defun hex-p (hex)
   "True if HEX is a hex digit conforming to /[0-9a-f-A-F]/"
-  (declare (optimize (speed 3) (safety 0)))
   (let ((code (char-code hex)))
     (not (null (or (between code #\0 #\9)
                    (between code #\a #\f)

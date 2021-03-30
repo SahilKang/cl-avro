@@ -41,8 +41,7 @@
 (defmethod serialize-into
     ((object schema:uuid) (vector simple-array) (start fixnum))
   "Write uuid string into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (schema:uuid object) vector start))
 
 ;; Read a uuid string from STREAM.
@@ -61,7 +60,6 @@
  (ftype (function (schema:date) (values schema:int &optional)) process-date)
  (inline process-date))
 (defun process-date (date)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((unix-time (local-time:timestamp-to-unix date)))
     (declare (integer unix-time))
     (nth-value 0 (truncate unix-time (* 60 60 24)))))
@@ -75,8 +73,7 @@
   "Write date into VECTOR.
 
 Serialized as the number of days from the ISO unix epoch 1970-01-01."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-date)
+  (declare (inline process-date)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-date object) vector start))
 
@@ -98,7 +95,6 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
         process-time-millis)
  (inline process-time-millis))
 (defun process-time-millis (time-millis)
-  (declare (optimize (speed 3) (safety 0)))
   (local-time:with-decoded-timestamp
       (:hour hour :minute minute :sec second :nsec nanosecond)
       time-millis
@@ -116,8 +112,7 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
   "Write time of day into VECTOR.
 
 Serialized as the number of milliseconds after midnight, 00:00:00.000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-time-millis)
+  (declare (inline process-time-millis)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-time-millis object) vector start))
 
@@ -148,7 +143,6 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
         process-time-micros)
  (inline process-time-micros))
 (defun process-time-micros (time-micros)
-  (declare (optimize (speed 3) (safety 0)))
   (local-time:with-decoded-timestamp
       (:hour hour :minute minute :sec second :nsec nanosecond)
       time-micros
@@ -166,8 +160,7 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
   "Write time of day into VECTOR.
 
 Serialized as the number of microseconds after midnight, 00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-time-micros)
+  (declare (inline process-time-micros)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-time-micros object) vector start))
 
@@ -198,7 +191,6 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
         process-timestamp-millis)
  (inline process-timestamp-millis))
 (defun process-timestamp-millis (timestamp-millis)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-millis))
         (nanoseconds (local-time:nsec-of timestamp-millis)))
     (declare ((integer -9223372036854776 9223372036854775) seconds-from-unix-epoch)
@@ -215,8 +207,7 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
   "Write timestamp into VECTOR.
 
 Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-timestamp-millis)
+  (declare (inline process-timestamp-millis)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-timestamp-millis object) vector start))
 
@@ -247,7 +238,6 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
         process-timestamp-micros)
  (inline process-timestamp-micros))
 (defun process-timestamp-micros (timestamp-micros)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-micros))
         (nanoseconds (local-time:nsec-of timestamp-micros)))
     (declare ((integer -9223372036855 9223372036854) seconds-from-unix-epoch)
@@ -264,8 +254,7 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
   "Write timestamp into VECTOR.
 
 Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-timestamp-micros)
+  (declare (inline process-timestamp-micros)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-timestamp-micros object) vector start))
 
@@ -297,7 +286,6 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
         process-local-timestamp-millis)
  (inline process-local-timestamp-millis))
 (defun process-local-timestamp-millis (local-timestamp-millis)
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
          (seconds-from-epoch (local-time:timestamp-difference
                               epoch local-timestamp-millis)))
@@ -313,8 +301,7 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
   "Write local timestamp into VECTOR.
 
 Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-local-timestamp-millis)
+  (declare (inline process-local-timestamp-millis)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-local-timestamp-millis object) vector start))
 
@@ -348,7 +335,6 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
         process-local-timestamp-micros)
  (inline process-local-timestamp-micros))
 (defun process-local-timestamp-micros (local-timestamp-micros)
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
          (seconds-from-epoch (local-time:timestamp-difference
                               epoch local-timestamp-micros)))
@@ -364,8 +350,7 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
   "Write local timestamp into VECTOR.
 
 Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
-  (declare (optimize (speed 3) (safety 0))
-           (inline process-local-timestamp-micros)
+  (declare (inline process-local-timestamp-micros)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (serialize-into (process-local-timestamp-micros object) vector start))
 
@@ -399,8 +384,7 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defmethod serialize-into
     ((object schema:duration-object) (vector simple-array) (start fixnum))
   "Write duration into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (inline endian:uint32->little-endian)
+  (declare (inline endian:uint32->little-endian)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (endian:uint32->little-endian (schema:months object) vector start)
   (endian:uint32->little-endian (schema:days object) vector (+ start 4))
@@ -437,7 +421,6 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
         big-endian->integer)
  (inline big-endian->integer))
 (defun big-endian->integer (bytes)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with value of-type (integer 0) = 0
 
@@ -457,7 +440,6 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
         integer->big-endian)
  (inline integer->big-endian))
 (defun integer->big-endian (integer bytes start end)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     for offset from (1- end) downto start
     for shift = (* 8 (the fixnum (- offset start)))
@@ -476,8 +458,7 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
         read-twos-complement)
  (inline read-twos-complement))
 (defun read-twos-complement (bytes)
-  (declare (optimize (speed 3) (safety 0))
-           (inline big-endian->integer))
+  (declare (inline big-endian->integer))
   (let* ((bits (* (length bytes) 8))
          (mask (ash 2 (1- bits)))
          (value (big-endian->integer bytes)))
@@ -491,8 +472,7 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
         write-twos-complement)
  (inline write-twos-complement))
 (defun write-twos-complement (integer bytes start end)
-  (declare (optimize (speed 3) (safety 0))
-           (inline integer->big-endian))
+  (declare (inline integer->big-endian))
   (let ((value (if (minusp integer)
                    (1+ (lognot (abs integer)))
                    integer)))
@@ -507,7 +487,6 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
         min-buf-length)
  (inline min-buf-length))
 (defun min-buf-length (unscaled schema)
-  (declare (optimize (speed 3) (safety 0)))
   (if (eq schema 'schema:bytes)
       (nth-value 0 (ceiling (1+ (integer-length unscaled)) 8))
       (schema:size schema)))
@@ -524,8 +503,7 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defmethod serialize-into
     ((object schema:decimal-object) (vector simple-array) (start fixnum))
   "Write decimal into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (inline min-buf-length write-twos-complement)
+  (declare (inline min-buf-length write-twos-complement)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((underlying (schema:underlying (class-of object)))
          (unscaled (schema:unscaled object))

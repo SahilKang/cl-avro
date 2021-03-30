@@ -79,7 +79,6 @@
 
 (defmethod initialize-instance :after
     ((instance enum-object) &key (enum (error "Must supply ENUM")))
-  (declare (optimize (speed 3) (safety 0)))
   (check-type enum name)
   (let* ((symbols (symbols (class-of instance)))
          (position (cl:position enum symbols :test #'string=)))
@@ -90,7 +89,6 @@
 
 (defmethod which-one ((instance enum-object))
   "Return (values enum-string position)"
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((position (position instance))
          (symbols (symbols (class-of instance)))
          (symbol (elt symbols position)))

@@ -32,8 +32,7 @@
         matching-alias-p)
  (inline matching-alias-p))
 (defun matching-alias-p (writer-name reader-alias)
-  (declare (optimize (speed 3) (safety 0))
-           (inline schema:fullname->name))
+  (declare (inline schema:fullname->name))
   (string= writer-name (schema:fullname->name reader-alias)))
 (declaim (notinline matching-alias-p))
 
@@ -43,8 +42,7 @@
         matching-aliases-p)
  (inline matching-aliases-p))
 (defun matching-aliases-p (writer-name reader-aliases)
-  (declare (optimize (speed 3) (safety 0))
-           (inline matching-alias-p))
+  (declare (inline matching-alias-p))
   (flet ((matching-alias-p (reader-alias)
            (matching-alias-p writer-name reader-alias)))
     (not (null (some #'matching-alias-p reader-aliases)))))
@@ -56,8 +54,7 @@
         matching-names-p)
  (inline matching-names-p))
 (defun matching-names-p (reader writer)
-  (declare (optimize (speed 3) (safety 0))
-           (inline matching-aliases-p))
+  (declare (inline matching-aliases-p))
   (let ((reader-name (schema:name reader))
         (writer-name (schema:name writer)))
     (declare (schema:name reader-name writer-name))
@@ -70,8 +67,7 @@
         assert-matching-names)
  (inline assert-matching-names))
 (defun assert-matching-names (reader writer)
-  (declare (optimize (speed 3) (safety 0))
-           (inline matching-names-p))
+  (declare (inline matching-names-p))
   (unless (matching-names-p reader writer)
     (error "Names don't match between reader schema ~S and writer schema ~S"
            reader writer))
@@ -86,8 +82,7 @@
                 `(defmethod assert-match
                      ((reader (eql ',schema))
                       (writer (eql ',schema)))
-                   (declare (optimize (speed 3) (safety 0))
-                            (ignore reader writer))
+                   (declare (ignore reader writer))
                    (values))))
          (let ((primitives (mapcar #'car schema:+primitive->name+)))
            `(progn
@@ -98,30 +93,26 @@
 
 (defmethod assert-match
     ((reader schema:array) (writer schema:array))
-  (declare (optimize (speed 3) (safety 0)))
   (assert-match (schema:items reader) (schema:items writer)))
 
 ;; map schema
 
 (defmethod assert-match
     ((reader schema:map) (writer schema:map))
-  (declare (optimize (speed 3) (safety 0)))
   (assert-match (schema:values reader) (schema:values writer)))
 
 ;; enum schema
 
 (defmethod assert-match
     ((reader schema:enum) (writer schema:enum))
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-matching-names))
+  (declare (inline assert-matching-names))
   (assert-matching-names reader writer))
 
 ;; fixed schema
 
 (defmethod assert-match
     ((reader schema:fixed) (writer schema:fixed))
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-matching-names))
+  (declare (inline assert-matching-names))
   (let ((reader-size (schema:size reader))
         (writer-size (schema:size writer)))
     (declare ((integer 0) reader-size writer-size))
@@ -134,39 +125,33 @@
 
 (defmethod assert-match
     ((reader schema:record) (writer schema:record))
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-matching-names))
+  (declare (inline assert-matching-names))
   (assert-matching-names reader writer))
 
 ;; union schema
 
 (defmethod assert-match
     ((reader schema:union) writer)
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer)))
+  (declare (ignore reader writer)))
 
 (defmethod assert-match
     (reader (writer schema:union))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer)))
+  (declare (ignore reader writer)))
 
 ;; logical schemas
 
 (defmethod assert-match
     ((reader schema:logical-schema) writer)
-  (declare (optimize (speed 3) (safety 0)))
   (assert-match (schema:underlying reader) writer))
 
 (defmethod assert-match
     (reader (writer schema:logical-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (assert-match reader (schema:underlying writer)))
 
 ;; decimal schema
 
 (defmethod assert-match
     ((reader schema:decimal) (writer schema:decimal))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((reader-scale (schema:scale reader))
         (writer-scale (schema:scale writer))
         (reader-precision (schema:precision reader))
@@ -184,5 +169,4 @@
 
 (defmethod assert-match
     ((reader schema:duration) (writer schema:duration))
-  (declare (optimize (speed 3) (safety 0)))
   (assert-match (schema:underlying reader) (schema:underlying writer)))

@@ -61,7 +61,6 @@ Return (values vector number-of-serialized-bytes)"
 
 (defgeneric assert-match (reader writer)
   (:method (reader writer)
-    (declare (optimize (speed 3) (safety 0)))
     (error "Reader schema ~S does not match writer schema ~S" reader writer))
 
   (:documentation
@@ -69,18 +68,15 @@ Return (values vector number-of-serialized-bytes)"
 
 (defgeneric resolve (reader writer)
   (:method :before (reader writer)
-    (declare (optimize (speed 3) (safety 0)))
     (assert-match reader writer))
 
   (:method ((reader symbol) writer)
-    (declare (optimize (speed 3) (safety 0)))
     (if (typep reader 'schema:primitive-schema)
         (call-next-method)
         (resolve (find-class reader) writer)))
 
   (:method (reader writer)
-    (declare (optimize (speed 3) (safety 0))
-             (ignore writer))
+    (declare (ignore writer))
     reader)
 
   (:documentation
@@ -102,7 +98,6 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
 
 (defgeneric deserialize (schema input &key &allow-other-keys)
   (:method ((schema symbol) input &rest keyword-args)
-    (declare (optimize (speed 3) (safety 0)))
     (if (typep schema 'schema:primitive-schema)
         (call-next-method)
         (apply #'deserialize (find-class schema) input keyword-args)))
@@ -149,8 +144,7 @@ resolved schema."))
       `(progn
          (defmethod deserialize-from-vector
              ((,schema ,schema-specializer) (,vector simple-array) (,start fixnum))
-           (declare (optimize (speed 3) (safety 0))
-                    ((simple-array (unsigned-byte 8) (*)) ,vector)
+           (declare ((simple-array (unsigned-byte 8) (*)) ,vector)
                     ,@(cdr (if should-eval-declare-form-p
                                (eval `(let ((vectorp t)
                                             (streamp nil))
@@ -164,8 +158,7 @@ resolved schema."))
 
          (defmethod deserialize-from-stream
              ((,schema ,schema-specializer) (,stream stream))
-           (declare (optimize (speed 3) (safety 0))
-                    ,@(cdr (if should-eval-declare-form-p
+           (declare ,@(cdr (if should-eval-declare-form-p
                                (eval `(let ((vectorp nil)
                                             (streamp t))
                                         (declare (ignorable vectorp streamp))

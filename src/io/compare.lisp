@@ -32,16 +32,14 @@
 ;; TODO be more permissive with bytes
 (defgeneric compare (schema left right)
   (:method (schema (left simple-array) right)
-    (declare (optimize (speed 3) (safety 0)))
     (check-type left (simple-array (unsigned-byte 8) (*)))
     (let ((left (flexi-streams:make-in-memory-input-stream left)))
-      (the comparison (compare schema left right))))
+      (the (values comparison &optional) (compare schema left right))))
 
   (:method (schema left (right simple-array))
-    (declare (optimize (speed 3) (safety 0)))
     (check-type right (simple-array (unsigned-byte 8) (*)))
     (let ((right (flexi-streams:make-in-memory-input-stream right)))
-      (the comparison (compare schema left right))))
+      (the (values comparison &optional) (compare schema left right))))
 
   (:documentation
    "Return 0, -1, or 1 if LEFT is equal to, less than, or greater than RIGHT.
@@ -54,16 +52,14 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema (eql 'schema:null)) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema left right))
+  (declare (ignore schema left right))
   0)
 
 ;;; boolean schema
 
 (defmethod compare
     ((schema (eql 'schema:boolean)) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (let ((left (read-byte left))
         (right (read-byte right)))
     (declare ((integer 0 1) left right))
@@ -83,8 +79,7 @@ LEFT and RIGHT may not necessarily be fully consumed."))
        (declare (schema:primitive-schema schema))
        `(defmethod compare
             ((schema (eql ',schema)) (left stream) (right stream))
-          (declare (optimize (speed 3) (safety 0))
-                   (ignore schema))
+          (declare (ignore schema))
           (let ((left (deserialize ',schema left))
                 (right (deserialize ',schema right)))
             (declare (,schema left right))
@@ -103,7 +98,6 @@ LEFT and RIGHT may not necessarily be fully consumed."))
         compare-bytes)
  (inline compare-bytes))
 (defun compare-bytes (left right)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with left-length = (length left)
     and right-length = (length right)
@@ -122,8 +116,7 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema (eql 'schema:bytes)) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema)
+  (declare (ignore schema)
            (inline compare-bytes))
   (let ((left (deserialize 'schema:bytes left))
         (right (deserialize 'schema:bytes right)))
@@ -133,16 +126,14 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema (eql 'schema:string)) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (compare 'schema:bytes left right))
 
 ;;; fixed schema
 
 (defmethod compare
     ((schema schema:fixed) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (inline compare-bytes))
+  (declare (inline compare-bytes))
   (let ((left (schema:raw-buffer (deserialize schema left)))
         (right (schema:raw-buffer (deserialize schema right))))
     (compare-bytes left right)))
@@ -155,7 +146,6 @@ LEFT and RIGHT may not necessarily be fully consumed."))
         read-count-and-size)
  (inline read-count-and-size))
 (defun read-count-and-size (stream)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((count (deserialize 'schema:long stream)))
     (if (minusp count)
         (values (abs count) (deserialize 'schema:long stream))
@@ -164,8 +154,7 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema schema:array) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (inline read-count-and-size))
+  (declare (inline read-count-and-size))
   (loop
     with items = (schema:items schema)
 
@@ -199,15 +188,13 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema schema:enum) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (compare 'schema:int left right))
 
 ;;; union schema
 
 (defmethod compare
     ((schema schema:union) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((left-position (deserialize 'schema:int left))
          (right-position (deserialize 'schema:int right))
          (comparison (compare-number left-position right-position)))
@@ -228,78 +215,66 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defgeneric skip-bytes (stream count)
   (:method ((stream stream) (count integer))
-    (declare (optimize (speed 3) (safety 0))
-             (schema:long count))
+    (declare (schema:long count))
     (loop repeat count do (read-byte stream))
     (values))
 
   (:method ((stream flexi-streams:in-memory-input-stream) (count integer))
-    (declare (optimize (speed 3) (safety 0))
-             (schema:long count))
+    (declare (schema:long count))
     (file-position stream (+ (file-position stream) count))
     (values)))
 
 (defmethod skip
     ((schema (eql 'schema:null)) stream)
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema stream))
+  (declare (ignore schema stream))
   (values))
 
 (defmethod skip
     ((schema (eql 'schema:boolean)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (skip-bytes stream 1))
 
 (defmethod skip
     ((schema (eql 'schema:int)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (deserialize 'schema:int stream)
   (values))
 
 (defmethod skip
     ((schema (eql 'schema:long)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (deserialize 'schema:long stream)
   (values))
 
 (defmethod skip
     ((schema (eql 'schema:float)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (skip-bytes stream 4))
 
 (defmethod skip
     ((schema (eql 'schema:double)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (skip-bytes stream 8))
 
 (defmethod skip
     ((schema (eql 'schema:bytes)) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (let ((count (deserialize 'schema:int stream)))
     (skip-bytes stream count)))
 
 (defmethod skip
     ((schema (eql 'schema:string)) stream)
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (skip 'schema:bytes stream))
 
 (defmethod skip
     ((schema schema:fixed) (stream stream))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((size (schema:size schema)))
     ;; even though size is (integer 0), schema:long should be fine
     (skip-bytes stream size)))
 
 (defmethod skip
     ((schema schema:union) (stream stream))
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((schemas (schema:schemas schema))
          (position (deserialize 'schema:int stream))
          (chosen-schema (elt schemas position)))
@@ -309,7 +284,6 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod skip
     ((schema schema:array) (stream stream))
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with items = (schema:items schema)
 
@@ -326,7 +300,6 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod skip
     ((schema schema:map) (stream stream))
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with values = (schema:values schema)
 
@@ -347,14 +320,12 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod skip
     ((schema schema:enum) (stream stream))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore schema))
+  (declare (ignore schema))
   (deserialize 'schema:int stream)
   (values))
 
 (defmethod skip
     ((schema schema:record) (stream stream))
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     for field across (schema:fields schema)
     for type = (schema:type field)
@@ -366,7 +337,6 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (defmethod compare
     ((schema schema:record) (left stream) (right stream))
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     for field across (schema:fields schema)
     for order = (schema:order field)

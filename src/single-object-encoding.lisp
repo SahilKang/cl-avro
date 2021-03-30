@@ -43,11 +43,8 @@
  (inline single-object-p))
 (defun single-object-p (bytes)
   "Determine if BYTES adheres to avro's single-object encoding."
-  (declare (optimize (speed 3) (safety 3)))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (and (>= (length bytes) 10)
-         (equalp (subseq bytes 0 2) +marker+))))
+  (and (>= (length bytes) 10)
+       (equalp (subseq bytes 0 2) +marker+)))
 (declaim (notinline single-object-p))
 
 (deftype single-object ()
@@ -61,23 +58,20 @@
  (inline write-single-object))
 (defun write-single-object (object)
   "Serialize OBJECT according to avro single-object encoding."
-  (declare (optimize (speed 3) (safety 3))
-           (inline schema:fingerprint))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let* ((fingerprint (schema:fingerprint
-                         (schema:schema-of object) #'schema:crc-64-avro))
-           (payload (io:serialize object))
-           (bytes (make-array
-                   (+ (length +marker+) (length fingerprint) (length payload))
-                   :element-type '(unsigned-byte 8))))
-      (declare ((simple-array (unsigned-byte 8) (8)) fingerprint)
-               ((simple-array (unsigned-byte 8) (*)) payload))
-      (replace bytes +marker+)
-      (replace bytes fingerprint :start1 (length +marker+))
-      (replace bytes payload
-               :start1 (+ (length +marker+) (length fingerprint)))
-      bytes)))
+  (declare (inline schema:fingerprint))
+  (let* ((fingerprint (schema:fingerprint
+                       (schema:schema-of object) #'schema:crc-64-avro))
+         (payload (io:serialize object))
+         (bytes (make-array
+                 (+ (length +marker+) (length fingerprint) (length payload))
+                 :element-type '(unsigned-byte 8))))
+    (declare ((simple-array (unsigned-byte 8) (8)) fingerprint)
+             ((simple-array (unsigned-byte 8) (*)) payload))
+    (replace bytes +marker+)
+    (replace bytes fingerprint :start1 (length +marker+))
+    (replace bytes payload
+             :start1 (+ (length +marker+) (length fingerprint)))
+    bytes))
 (declaim (notinline write-single-object))
 
 (declaim
@@ -85,11 +79,8 @@
         single-object->fingerprint)
  (inline single-object->fingerprint))
 (defun single-object->fingerprint (bytes)
-  (declare (optimize (speed 3) (safety 3))
-           (inline cl-avro.io.primitive::little-endian->uint64))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (cl-avro.io.primitive::little-endian->uint64 bytes 2)))
+  (declare (inline cl-avro.io.primitive::little-endian->uint64))
+  (cl-avro.io.primitive::little-endian->uint64 bytes 2))
 (declaim (notinline single-object->fingerprint))
 
 (declaim
@@ -98,8 +89,5 @@
         deserialize-single-object)
  (inline deserialize-single-object))
 (defun deserialize-single-object (schema bytes)
-  (declare (optimize (speed 3) (safety 3)))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (nth-value 0 (io:deserialize schema bytes :start 10))))
+  (nth-value 0 (io:deserialize schema bytes :start 10)))
 (declaim (notinline deserialize-single-object))

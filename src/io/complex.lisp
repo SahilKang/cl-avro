@@ -40,8 +40,7 @@
 (defmethod serialize-into
     ((object schema:fixed-object) (vector simple-array) (start fixnum))
   "Write fixed bytes into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((raw-buffer (schema:raw-buffer object)))
     (declare ((simple-array (unsigned-byte 8) (*)) raw-buffer))
     (replace vector raw-buffer :start1 start)
@@ -71,8 +70,7 @@
 (defmethod serialize-into
     ((object schema:union-object) (vector simple-array) (start fixnum))
   "Write tagged union into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((position (nth-value 1 (schema:which-one object)))
          (bytes-written (serialize-into position vector start)))
     (declare (fixnum bytes-written))
@@ -113,8 +111,7 @@
 (defmethod serialize-into
     ((object schema:array-object) (vector simple-array) (start fixnum))
   "Write array into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((raw-buffer (schema:raw-buffer object))
          (count (length raw-buffer))
          (bytes-written 0))
@@ -186,8 +183,7 @@
 (defmethod serialize-into
     ((object schema:map-object) (vector simple-array) (start fixnum))
   "Write map into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((raw-hash-table (schema:raw-hash-table object))
          (count (hash-table-count raw-hash-table))
          (bytes-written 0))
@@ -263,8 +259,7 @@
 (defmethod serialize-into
     ((object schema:enum-object) (vector simple-array) (start fixnum))
   "Write enum into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((position (nth-value 1 (schema:which-one object))))
     (serialize-into position vector start)))
 
@@ -291,8 +286,7 @@
 (defmethod serialize-into
     ((object schema:record-object) (vector simple-array) (start fixnum))
   "Write record into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (loop
     with fields of-type (simple-array schema:field (*)) = (schema:fields
                                                            (class-of object))
