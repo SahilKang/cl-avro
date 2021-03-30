@@ -74,7 +74,7 @@
 (declaim
  (ftype
   (function (file-input-stream)
-            (values (or null (simple-array schema:schema (*))) &optional))
+            (values (or null (simple-array schema:object (*))) &optional))
   read-block))
 (defun read-block (file-input-stream)
   (let ((header (header:header file-input-stream))

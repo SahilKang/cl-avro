@@ -97,7 +97,7 @@
   (header (error "Must supply HEADER")
    :type header:header :read-only t)
   (objects (error "Must supply OBJECTS")
-   :type (simple-array schema:schema (*)) :read-only t))
+   :type (simple-array schema:object (*)) :read-only t))
 
 (declaim
  (ftype (function (header:header file-block)
