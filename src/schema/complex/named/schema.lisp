@@ -125,7 +125,6 @@
 
 ;; name
 
-;; TODO optimize these
 (defgeneric name (named-schema)
   (:method ((instance named-schema))
     "Returns (values deduced provided)."

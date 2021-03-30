@@ -90,7 +90,6 @@
         last-dot-position)
  (inline last-dot-position))
 (defun last-dot-position (fullname)
-  (declare (optimize (speed 3) (safety 0)))
   (position #\. fullname :test #'char= :from-end t))
 (declaim (notinline last-dot-position))
 
@@ -99,8 +98,7 @@
  (inline fullname->name))
 (defun fullname->name (fullname)
   "Return namespace unqualified name."
-  (declare (optimize (speed 3) (safety 0))
-           (inline last-dot-position))
+  (declare (inline last-dot-position))
   (let ((last-dot-position (last-dot-position fullname)))
     (if last-dot-position
         (subseq fullname (1+ last-dot-position))

@@ -85,13 +85,11 @@
     (flet ((make-defmethods (to-schema)
              `((defmethod assert-match
                    ((reader (eql ',to-schema)) (writer (eql ',from-schema)))
-                 (declare (optimize (speed 3) (safety 0))
-                          (ignore reader writer))
+                 (declare (ignore reader writer))
                  (values))
 
                (defmethod resolve
                    ((reader (eql ',to-schema)) (writer (eql ',from-schema)))
-                 (declare (optimize (speed 3) (safety 0)))
                  (make-instance ',resolved-class
                                 :reader reader :writer writer)))))
       `(progn

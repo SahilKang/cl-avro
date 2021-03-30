@@ -140,10 +140,11 @@ created from JSON and its two serialized arguments."
     (is (= 1 (compare "AB" "ABC")))))
 
 (test union-compare
-  (let* ((enum (make-instance
-                'avro:enum
-                :name "foo"
-                :symbols '("ABC" "AB")))
+  (let* ((enum (or (find-class 'enum_name nil)
+                   (closer-mop:ensure-class
+                    'enum_name
+                    :metaclass 'avro:enum
+                    :symbols '("ABC" "AB"))))
          (union (make-instance
                  'avro:union
                  :schemas (list 'avro:int enum))))

@@ -81,7 +81,6 @@
 (defgeneric order (field)
   (:method ((instance field))
     "Return (values order provided-p)."
-    (declare (optimize (speed 3) (safety 0)))
     (let* ((orderp (slot-boundp instance 'order))
            (order (if orderp
                       (slot-value instance 'order)
@@ -90,7 +89,6 @@
 
 (defmethod default ((instance field))
   "Return (values default provided-p)."
-  (declare (optimize (speed 3) (safety 0)))
   (let* ((defaultp (slot-boundp instance 'default))
          (default (when defaultp
                     (slot-value instance 'default))))
@@ -99,7 +97,6 @@
 ;; TODO store in name-string slot to avoid string alloc
 (defmethod name ((instance field))
   "Return (values name-string slot-symbol)."
-  (declare (optimize (speed 3) (safety 0)))
   (let ((name (closer-mop:slot-definition-name instance)))
     (declare (symbol name))
     (values (string name) name)))

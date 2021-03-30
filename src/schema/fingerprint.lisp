@@ -51,7 +51,6 @@
         %fingerprint64)
  (inline %fingerprint64))
 (defun %fingerprint64 (fp byte)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((table-ref (elt +table+ (logand #xff (logxor fp byte)))))
     (logxor (ash fp -8) table-ref)))
 (declaim (notinline %fingerprint64))
@@ -63,8 +62,7 @@
         fingerprint64)
  (inline fingerprint64))
 (defun fingerprint64 (bytes-or-schema)
-  (declare (optimize (speed 3) (safety 0))
-           (inline %fingerprint64))
+  (declare (inline %fingerprint64))
   (let ((bytes (if (typep bytes-or-schema 'schema)
                    (babel:string-to-octets
                     (with-output-to-string (stream)
@@ -85,7 +83,6 @@
         to-little-endian)
  (inline to-little-endian))
 (defun to-little-endian (number)
-  (declare (optimize (speed 3) (safety 0)))
   (loop
     with bytes = (make-array 8 :element-type '(unsigned-byte 8))
 
@@ -97,13 +94,11 @@
        (return bytes)))
 (declaim (notinline to-little-endian))
 
-;; TODO use better safety if this is external
 (declaim
  (ftype fingerprint crc-64-avro)
  (inline crc-64-avro))
 (defun crc-64-avro (bytes)
-  (declare (optimize (speed 3) (safety 0))
-           (inline fingerprint64 to-little-endian))
+  (declare (inline fingerprint64 to-little-endian))
   (to-little-endian
    (fingerprint64 bytes)))
 (declaim (notinline crc-64-avro))
@@ -119,11 +114,8 @@
 (defun fingerprint
     (schema &optional (algorithm *default-fingerprint-algorithm*))
   "Return the fingerprint of avro SCHEMA under ALGORITHM."
-  (declare (optimize (speed 3) (safety 3)))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let* ((string (with-output-to-string (stream)
-                     (schema->json schema stream t)))
-           (bytes (babel:string-to-octets string :encoding :utf-8)))
-      (funcall algorithm bytes))))
+  (let* ((string (with-output-to-string (stream)
+                   (schema->json schema stream t)))
+         (bytes (babel:string-to-octets string :encoding :utf-8)))
+    (funcall algorithm bytes)))
 (declaim (notinline fingerprint))

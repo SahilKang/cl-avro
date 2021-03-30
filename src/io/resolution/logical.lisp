@@ -63,20 +63,17 @@
     `(progn
        (defmethod assert-match
            ((reader ,class-name) (writer ,class-name))
-         (declare (optimize (speed 3) (safety 0))
-                  (ignore reader writer))
+         (declare (ignore reader writer))
          (values))
 
        (defmethod assert-match
            ((reader ,class-name) (writer ,underlying))
-         (declare (optimize (speed 3) (safety 0))
-                  (ignore reader writer))
+         (declare (ignore reader writer))
          (values))
 
        (defmethod assert-match
            ((reader ,underlying) (writer ,class-name))
-         (declare (optimize (speed 3) (safety 0))
-                  (ignore reader writer))
+         (declare (ignore reader writer))
          (values)))))
 
 ;; uuid schema
@@ -96,24 +93,20 @@
 
 (defmethod assert-match
     ((reader schema:date-schema) (writer schema:timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:date-schema) (writer schema:timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-date :reader reader :writer writer))
 
 (defmethod assert-match
     ((reader schema:date-schema) (writer schema:timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:date-schema) (writer schema:timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-date :reader reader :writer writer))
 
 (define-deserialize-from resolved-date
@@ -141,13 +134,11 @@
 
 (defmethod assert-match
     ((reader schema:time-millis-schema) (writer schema:time-micros-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:time-millis-schema) (writer schema:time-micros-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-time-millis :reader reader :writer writer))
 
 (declaim
@@ -155,7 +146,6 @@
         get-millisecond)
  (inline get-millisecond))
 (defun get-millisecond (timestamp)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((second (local-time:timestamp-second timestamp))
         (millisecond (local-time:timestamp-millisecond timestamp)))
     (declare ((integer 0 59) second)
@@ -189,13 +179,11 @@
 
 (defmethod assert-match
     ((reader schema:time-micros-schema) (writer schema:time-millis-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:time-micros-schema) (writer schema:time-millis-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-time-micros :reader reader :writer writer))
 
 (declaim
@@ -204,7 +192,6 @@
         get-microsecond)
  (inline get-microsecond))
 (defun get-microsecond (timestamp)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((second (local-time:timestamp-second timestamp))
         (microsecond (local-time:timestamp-microsecond timestamp)))
     (declare ((integer 0 59) second)
@@ -239,14 +226,12 @@
 (defmethod assert-match
     ((reader schema:timestamp-millis-schema)
      (writer schema:timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:timestamp-millis-schema)
      (writer schema:timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-timestamp-millis :reader reader :writer writer))
 
 (define-deserialize-from resolved-timestamp-millis
@@ -279,14 +264,12 @@
 (defmethod assert-match
     ((reader schema:timestamp-micros-schema)
      (writer schema:timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:timestamp-micros-schema)
      (writer schema:timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-timestamp-micros :reader reader :writer writer))
 
 (define-deserialize-from resolved-timestamp-micros
@@ -319,14 +302,12 @@
 (defmethod assert-match
     ((reader schema:local-timestamp-millis-schema)
      (writer schema:local-timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
   ((reader schema:local-timestamp-millis-schema)
    (writer schema:local-timestamp-micros-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-local-timestamp-millis
                  :reader reader :writer writer))
 
@@ -360,14 +341,12 @@
 (defmethod assert-match
     ((reader schema:local-timestamp-micros-schema)
      (writer schema:local-timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:local-timestamp-micros-schema)
      (writer schema:local-timestamp-millis-schema))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-local-timestamp-micros
                  :reader reader :writer writer))
 
@@ -398,7 +377,6 @@
 
 (defmethod assert-match
     ((reader schema:decimal) (writer schema:decimal))
-  (declare (optimize (speed 3) (safety 0)))
   (let ((reader-scale (schema:scale reader))
         (writer-scale (schema:scale writer))
         (reader-precision (schema:precision reader))
@@ -414,7 +392,6 @@
 
 (defmethod resolve
     ((reader schema:decimal) (writer schema:decimal))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-decimal :reader reader :writer writer))
 
 (define-deserialize-from resolved-decimal
@@ -438,13 +415,11 @@
 
 (defmethod assert-match
     ((reader schema:duration) (writer schema:duration))
-  (declare (optimize (speed 3) (safety 0))
-           (ignore reader writer))
+  (declare (ignore reader writer))
   (values))
 
 (defmethod resolve
     ((reader schema:duration) (writer schema:duration))
-  (declare (optimize (speed 3) (safety 0)))
   (make-instance 'resolved-duration :reader reader :writer writer))
 
 (define-deserialize-from resolved-duration

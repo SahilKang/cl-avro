@@ -42,8 +42,7 @@
 (defmethod serialize-into
     ((object null) (vector simple-array) (start fixnum))
   "Write zero bytes into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore object vector start))
+  (declare (ignore object vector start))
   0)
 
 ;; Read zero bytes from STREAM and return nil.
@@ -62,8 +61,7 @@
 (defmethod serialize-into
     ((object (eql 'schema:true)) (vector simple-array) (start fixnum))
   "Write #o1 into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore object)
+  (declare (ignore object)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (setf (elt vector start) 1)
   1)
@@ -71,8 +69,7 @@
 (defmethod serialize-into
     ((object (eql 'schema:false)) (vector simple-array) (start fixnum))
   "Write #o0 into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (ignore object)
+  (declare (ignore object)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (setf (elt vector start) 0)
   1)
@@ -97,7 +94,6 @@
         zig-zag->int)
  (inline zig-zag->int))
 (defun zig-zag->int (zig-zag)
-  (declare (optimize (speed 3) (safety 0)))
   (logxor (ash zig-zag -1) (- (logand zig-zag 1))))
 (declaim (notinline zig-zag->int))
 
@@ -106,7 +102,6 @@
         zig-zag->long)
  (inline zig-zag->long))
 (defun zig-zag->long (zig-zag)
-  (declare (optimize (speed 3) (safety 0)))
   (logxor (ash zig-zag -1) (- (logand zig-zag 1))))
 (declaim (notinline zig-zag->long))
 
@@ -117,7 +112,6 @@
         int->zig-zag)
  (inline int->zig-zag))
 (defun int->zig-zag (int)
-  (declare (optimize (speed 3) (safety 0)))
   (logxor (ash int 1) (ash int -31)))
 (declaim (notinline int->zig-zag))
 
@@ -126,7 +120,6 @@
         long->zig-zag)
  (inline long->zig-zag))
 (defun long->zig-zag (long)
-  (declare (optimize (speed 3) (safety 0)))
   (logxor (ash long 1) (ash long -63)))
 (declaim (notinline long->zig-zag))
 
@@ -194,8 +187,7 @@
 (defmethod serialize-into
     ((object integer) (vector simple-array) (start fixnum))
   "Write OBJECT into VECTOR as a variable-length zig-zag integer."
-  (declare (optimize (speed 3) (safety 0))
-           (inline int->zig-zag long->zig-zag)
+  (declare (inline int->zig-zag long->zig-zag)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (etypecase object
     (schema:int
@@ -254,7 +246,6 @@
         little-endian->uint32)
  (inline little-endian->uint32))
 (defun little-endian->uint32 (bytes &optional (start 0))
-  (declare (optimize (speed 3) (safety 0)))
   (from-little-endian 32 bytes start))
 (declaim (notinline little-endian->uint32))
 
@@ -264,7 +255,6 @@
         little-endian->uint64)
  (inline little-endian->uint64))
 (defun little-endian->uint64 (bytes &optional (start 0))
-  (declare (optimize (speed 3) (safety 0)))
   (from-little-endian 64 bytes start))
 (declaim (notinline little-endian->uint64))
 
@@ -295,7 +285,6 @@
         uint32->little-endian)
  (inline uint32->little-endian))
 (defun uint32->little-endian (integer bytes &optional (start 0))
-  (declare (optimize (speed 3) (safety 0)))
   (to-little-endian 32 integer bytes start))
 (declaim (notinline uint32->little-endian))
 
@@ -307,7 +296,6 @@
         uint64->little-endian)
  (inline uint64->little-endian))
 (defun uint64->little-endian (integer bytes &optional (start 0))
-  (declare (optimize (speed 3) (safety 0)))
   (to-little-endian 64 integer bytes start))
 (declaim (notinline uint64->little-endian))
 
@@ -319,8 +307,7 @@
 (defmethod serialize-into
     ((object single-float) (vector simple-array) (start fixnum))
   "Write single-precision float into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (inline uint32->little-endian ieee-floats:encode-float32)
+  (declare (inline uint32->little-endian ieee-floats:encode-float32)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((integer (ieee-floats:encode-float32 object)))
     (uint32->little-endian integer vector start))
@@ -350,8 +337,7 @@
 (defmethod serialize-into
     ((object double-float) (vector simple-array) (start fixnum))
   "Write double-precision float to STREAM."
-  (declare (optimize (speed 3) (safety 0))
-           (inline uint64->little-endian ieee-floats:encode-float64)
+  (declare (inline uint64->little-endian ieee-floats:encode-float64)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((integer (ieee-floats:encode-float64 object)))
     (uint64->little-endian integer vector start))
@@ -383,8 +369,7 @@
 (defmethod serialize-into
     ((object vector) (vector simple-array) (start fixnum))
   "Write byte vector into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           ((simple-array (unsigned-byte 8) (*)) vector))
+  (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (check-type object schema:bytes)
   (let ((bytes-written (serialize-into (length object) vector start)))
     (declare (fixnum bytes-written))
@@ -419,8 +404,7 @@
 (defmethod serialize-into
     ((object string) (vector simple-array) (start fixnum))
   "Write utf-8 encoded string into VECTOR."
-  (declare (optimize (speed 3) (safety 0))
-           (inline babel:string-to-octets)
+  (declare (inline babel:string-to-octets)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
     (serialize-into bytes vector start)))

@@ -63,7 +63,6 @@
  (ftype (function (schema t) (values &optional)) assert-type)
  (inline assert-type))
 (defun assert-type (schema object)
-  (declare (optimize (speed 3) (safety 0)))
   (unless (typep object schema)
     (error "Expected type ~S, but got ~S for ~S"
            schema (type-of object) object))
@@ -76,8 +75,7 @@
        (initial-element nil initial-element-p)
        (initial-contents nil initial-contents-p)
        (length (length initial-contents)))
-  (declare (optimize (speed 3) (safety 0))
-           (inline assert-type))
+  (declare (inline assert-type))
   (let* ((schema (items (class-of instance)))
          (keyword-args (list :element-type schema :fill-pointer t :adjustable t)))
     (when initial-element-p
@@ -201,13 +199,11 @@
 
 (defgeneric push (element array)
   (:method (element (instance array-object))
-    (declare (optimize (speed 3) (safety 0))
-             (inline assert-type))
+    (declare (inline assert-type))
     (let ((schema (items (class-of instance))))
       (assert-type schema element))
     (vector-push-extend element (buffer instance))))
 
 (defgeneric pop (array)
   (:method ((instance array-object))
-    (declare (optimize (speed 3) (safety 0)))
     (vector-pop (buffer instance))))

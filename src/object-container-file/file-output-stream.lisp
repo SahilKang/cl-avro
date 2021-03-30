@@ -52,7 +52,7 @@
           header (make-instance 'header:header :sync sync :meta meta))))
 
 (declaim
- (ftype (function (file-output-stream (simple-array schema:schema (*)))
+ (ftype (function (file-output-stream (simple-array schema:object (*)))
                   (values block:file-block &optional))
         write-block))
 (defun write-block (file-output-stream objects)
