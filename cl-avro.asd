@@ -21,7 +21,7 @@
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
   :depends-on (#:uiop
-               #:trivial-gray-streams
+               #:flexi-streams
                #:babel
                #:local-time
                #:ieee-floats
@@ -136,19 +136,16 @@
    (:module "io"
     :depends-on ("schema")
     :components ((:file "base")
-                 (:file "memory-stream")
-                 (:file "block-stream"
-                  :depends-on ("base"))
                  (:file "schema"
                   :depends-on ("base"))
                  (:file "primitive"
-                  :depends-on ("base" "memory-stream"))
+                  :depends-on ("base"))
                  (:file "complex"
-                  :depends-on ("base" "block-stream"))
+                  :depends-on ("base"))
                  (:file "logical"
                   :depends-on ("base" "primitive"))
                  (:file "compare"
-                  :depends-on ("base" "memory-stream" "block-stream"))
+                  :depends-on ("base"))
                  (:module "resolution"
                   :depends-on ("base")
                   :components ((:file "assert-match")
@@ -166,8 +163,7 @@
                                "complex"
                                "logical"
                                "resolution"
-                               "compare"
-                               "memory-stream"))))
+                               "compare"))))
    (:file "single-object-encoding"
     :depends-on ("schema" "io"))
    (:module "object-container-file"
@@ -196,7 +192,7 @@
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
-  :depends-on (#:cl-avro #:1am)
+  :depends-on (#:cl-avro #:1am #:flexi-streams)
   :perform (test-op (op sys) (uiop:symbol-call :1am :run))
   :pathname "test"
   :components

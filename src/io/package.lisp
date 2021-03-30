@@ -23,12 +23,7 @@
         #:cl-avro.io.complex
         #:cl-avro.io.logical
         #:cl-avro.io.resolution
-        #:cl-avro.io.compare
-        #:cl-avro.io.memory-stream)
+        #:cl-avro.io.compare)
   (:export #:serialize
            #:deserialize
-           #:compare
-           #:memory-input-stream
-           #:memory-output-stream
-           #:bytes
-           #:position))
+           #:compare))
