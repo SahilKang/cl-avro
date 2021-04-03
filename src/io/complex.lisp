@@ -280,7 +280,7 @@
 (defmethod serialized-size ((object schema:record-object))
   (reduce (lambda (agg field)
             (+ agg (serialized-size
-                    (schema:field object (schema:name field)))))
+                    (slot-value object (nth-value 1 (schema:name field))))))
           (schema:fields (class-of object))
           :initial-value 0))
 
@@ -294,7 +294,7 @@
     and bytes-written of-type fixnum = 0
 
     for field of-type schema:field across fields
-    for value = (schema:field object (schema:name field))
+    for value = (slot-value object (nth-value 1 (schema:name field)))
 
     do (incf (the fixnum bytes-written)
              (the fixnum

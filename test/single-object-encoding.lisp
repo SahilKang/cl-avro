@@ -85,5 +85,5 @@
                (let* ((record (avro:deserialize-single-object
                                schema single-object)))
                  (flet ((field (field)
-                          (avro:field record (avro:name field))))
+                          (slot-value record (nth-value 1 (avro:name field)))))
                    (map 'list #'field (avro:fields (class-of record)))))))))

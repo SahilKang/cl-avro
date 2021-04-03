@@ -38,7 +38,6 @@
   (:export #:record
            #:record-object
            #:fields
-           #:field
            #:name->field))
 (in-package #:cl-avro.schema.complex.record.schema)
 
@@ -200,26 +199,3 @@
     unless (typep value type) do
       (error "Slot ~S has value ~S which is not of type ~S"
              name value type)))
-
-(defgeneric field (record-object field-name))
-
-(defmethod field
-    ((instance record-object) (field-name simple-string))
-  "Return (values field-value field-slot)."
-  (let ((field (gethash field-name (name->field (class-of instance)))))
-    (unless field
-      (error "No such field named ~S" field-name))
-    (let* ((name (nth-value 1 (name field)))
-           (value (slot-value instance name)))
-      (values value field))))
-
-(defmethod (setf field)
-    (value (instance record-object) (field-name simple-string))
-  "Set FIELD-NAME to VALUE."
-  (let* ((field (nth-value 1 (field instance field-name)))
-         (type (type field))
-         (name (nth-value 1 (name field))))
-    (unless (typep value type)
-      (error "Expected type ~S, but got ~S for ~S"
-             type (type-of value) value))
-    (setf (slot-value instance name) value)))

@@ -23,6 +23,18 @@
 
 (in-package #:test/parser)
 
+(declaim
+ (ftype (function (avro:record-object simple-string)
+                  (values avro:object &optional))
+        field))
+(defun field (record field)
+  (let ((found-field (find field (avro:fields (class-of record))
+                           :key #'avro:name :test #'string=)))
+    (unless found-field
+      (error "No such field ~S" field))
+    (slot-value record (nth-value 1 (avro:name found-field)))))
+
+
 (defun jso-fields (jso)
   "Returns all fields contained in JSO.
 
@@ -95,7 +107,7 @@ Example: '(\"abc.d[0].e\", \"abc.d[1].e\")."
       (multiple-value-bind (default defaultp)
           (avro:default (elt fields 1))
         (is (eq t defaultp))
-        (is (= 4 (avro:field default "value")))))
+        (is (= 4 (field default "value")))))
 
     (is (= 4 (st-json:getjso*
               "default.value"

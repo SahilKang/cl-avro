@@ -129,7 +129,7 @@
     :reader defaulted-initargs
     :type list)
    (needed-fields
-    :initform (make-array 0 :element-type 'schema:name
+    :initform (make-array 0 :element-type 'symbol
                             :adjustable t :fill-pointer t)
     :reader needed-fields
     :type (vector schema:name))
@@ -159,14 +159,12 @@
       collect (let* ((reader-type (schema:type reader-field))
                      (resolved-type (resolve reader-type writer-type)))
                 (list
-                 :name (make-symbol ;; TODO just use second value
-                        (the schema:name (schema:name reader-field)))
+                 :name (nth-value 1 (schema:name reader-field))
                  :type resolved-type))
         into slots
     else
       collect (list
-               :name (make-symbol
-                      (the schema:name (schema:name writer-field)))
+               :name (nth-value 1 (schema:name writer-field))
                :type writer-type)
         into slots
 
@@ -192,7 +190,7 @@
                     (schema:aliases reader-field)))
 
       if writer-field do
-        (vector-push-extend (schema:name reader-field) needed-fields)
+        (vector-push-extend (nth-value 1 (schema:name reader-field)) needed-fields)
       else do
         (multiple-value-bind (default defaultp)
             (schema:default reader-field)
@@ -217,11 +215,11 @@
     with initargs = (defaulted-initargs schema)
 
     for name across (needed-fields schema)
-    for value = (schema:field object name)
+    for value = (slot-value object name)
 
     do
        (push value initargs)
-       (push (intern name 'keyword) initargs)
+       (push (intern (string name) 'keyword) initargs)
 
     finally
        (return initargs)))
