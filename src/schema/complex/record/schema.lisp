@@ -37,8 +37,7 @@
                           #:type)
   (:export #:record
            #:record-object
-           #:fields
-           #:name->field))
+           #:fields))
 (in-package #:cl-avro.schema.complex.record.schema)
 
 ;;; schema
@@ -48,10 +47,6 @@
     :reader fields
     :type (simple-array field (*))
     :documentation "Record fields.")
-   (name->field
-    :reader name->field
-    :type hash-table
-    :documentation "Field name to field slot map.")
    (nullable-fields
     :reader nullable-fields
     :type hash-table
@@ -98,26 +93,6 @@
   (apply #'call-next-method instance initargs))
 
 (declaim
- (ftype (function ((simple-array field (*))) (values hash-table &optional))
-        make-name->field))
-(defun make-name->field (fields)
-  (let ((name->field (make-hash-table :test #'equal)))
-    (labels
-        ((set-if-empty (name field)
-           (declare (name name)
-                    (field field))
-           (if (gethash name name->field)
-               (error "~S already names a field" name)
-               (setf (gethash name name->field) field)))
-         (process-field (field)
-           (set-if-empty (name field) field)
-           (flet ((set-if-empty (alias)
-                    (set-if-empty alias field)))
-             (map nil #'set-if-empty (aliases field)))))
-      (map nil #'process-field fields))
-    name->field))
-
-(declaim
  (ftype (function (field) (values boolean &optional)) nullable-field-p))
 (defun nullable-field-p (field)
   (let ((type (type field)))
@@ -138,22 +113,20 @@
 
 (defmethod initialize-instance :after
     ((instance record) &key)
-  (with-slots (fields name->field nullable-fields) instance
+  (with-slots (fields nullable-fields) instance
     (let ((slots (closer-mop:class-direct-slots instance)))
       (setf fields (make-array (length slots)
                                :element-type 'field
                                :initial-contents slots)
-            name->field (make-name->field fields)
             nullable-fields (find-nullable-fields fields)))))
 
 (defmethod reinitialize-instance :after
     ((instance record) &key)
-  (with-slots (fields name->field nullable-fields) instance
+  (with-slots (fields nullable-fields) instance
     (let ((slots (closer-mop:class-direct-slots instance)))
       (setf fields (make-array (length slots)
                                :element-type 'field
                                :initial-contents slots)
-            name->field (make-name->field fields)
             nullable-fields (find-nullable-fields fields)))))
 
 (defmethod parse-notation

@@ -23,7 +23,6 @@
   (:export #:record
            #:record-object
            #:fields
-           #:name->field
 
            #:field
            #:name

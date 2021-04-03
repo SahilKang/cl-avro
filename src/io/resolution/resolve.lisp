@@ -139,13 +139,40 @@
     :type schema:record)))
 
 (declaim
+ (ftype (function ((simple-array schema:field (*)))
+                  (values hash-table &optional))
+        %make-name->field))
+(defun %make-name->field (fields)
+  (let ((name->field (make-hash-table :test #'equal)))
+    (labels
+        ((set-if-empty (name field)
+           (declare (schema:name name)
+                    (schema:field field))
+           (if (gethash name name->field)
+               (error "~S already names a field" name)
+               (setf (gethash name name->field) field)))
+         (process-field (field)
+           (set-if-empty (schema:name field) field)
+           (flet ((set-if-empty (alias)
+                    (set-if-empty alias field)))
+             (map nil #'set-if-empty (schema:aliases field)))))
+      (map nil #'process-field fields))
+    name->field))
+
+(declaim
+ (ftype (function (schema:record) (values hash-table &optional))
+        make-name->field))
+(defun make-name->field (record)
+  (%make-name->field (schema:fields record)))
+
+(declaim
  (ftype (function (schema:record schema:record)
                   (values schema:record &optional))
         resolve-records)
  (inline resolve-records))
 (defun resolve-records (reader writer)
   (loop
-    with name->reader-field = (schema:name->field reader)
+    with name->reader-field = (make-name->field reader)
 
     for writer-field across (schema:fields writer)
     for writer-type = (schema:type writer-field)
@@ -180,7 +207,7 @@
   (declare (inline resolve-records))
   (with-slots (reader writer defaulted-initargs needed-fields) instance
     (loop
-      with name->writer-field = (schema:name->field writer)
+      with name->writer-field = (make-name->field writer)
 
       for reader-field across (schema:fields reader)
       for writer-field
