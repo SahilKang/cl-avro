@@ -35,14 +35,7 @@
            #:pop))
 (in-package #:cl-avro.schema.complex.array)
 
-(defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
-  ((buffer
-    :accessor buffer
-    :reader raw-buffer
-    :type (vector schema)))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro array schema."))
+;;; schema
 
 (defclass array (complex-schema)
   ((items
@@ -58,6 +51,29 @@
 (defmethod closer-mop:validate-superclass
     ((class array) (superclass complex-schema))
   t)
+
+(declaim (ftype (function (schema) (values cons &optional)) make-buffer-slot))
+(defun make-buffer-slot (items)
+  (list :name 'buffer
+        :type `(vector ,items)))
+
+(defmethod initialize-instance :around
+    ((instance array) &rest initargs &key items)
+  (let ((buffer-slot (make-buffer-slot items)))
+    (cl:push buffer-slot (getf initargs :direct-slots)))
+  (ensure-superclass array-object)
+  (apply #'call-next-method instance initargs))
+
+;;; object
+
+(defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
+  ((buffer
+    :accessor buffer
+    :reader raw-buffer
+    :type (vector schema)))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro array schema."))
 
 (declaim
  (ftype (function (schema t) (values &optional)) assert-type)
@@ -89,18 +105,6 @@
       (cl:push initial-contents keyword-args)
       (cl:push :initial-contents keyword-args))
     (setf (buffer instance) (apply #'make-array length keyword-args))))
-
-(declaim (ftype (function (schema) (values cons &optional)) make-buffer-slot))
-(defun make-buffer-slot (items)
-  (list :name 'buffer
-        :type `(vector ,items)))
-
-(defmethod initialize-instance :around
-    ((instance array) &rest initargs &key items)
-  (let ((buffer-slot (make-buffer-slot items)))
-    (cl:push buffer-slot (getf initargs :direct-slots)))
-  (ensure-superclass array-object)
-  (apply #'call-next-method instance initargs))
 
 (defmethod sequences:length
     ((instance array-object))

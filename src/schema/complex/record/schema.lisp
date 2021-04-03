@@ -42,11 +42,7 @@
            #:name->field))
 (in-package #:cl-avro.schema.complex.record.schema)
 
-(defclass record-object ()
-  ()
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro record schema."))
+;;; schema
 
 (defclass record (named-schema)
   ((fields
@@ -71,53 +67,6 @@
 (defmethod closer-mop:direct-slot-definition-class
     ((class record) &key)
   (find-class 'field))
-
-(defmethod initialize-instance :after
-    ((instance record-object) &key)
-  (loop
-    with fields of-type (simple-array field (*)) = (fields (class-of instance))
-    and nullable-fields of-type hash-table = (nullable-fields (class-of instance))
-
-    for field of-type field across fields
-
-    for name of-type symbol = (nth-value 1 (name field))
-    for type of-type schema = (type field)
-    for value = (if (slot-boundp instance name)
-                    (slot-value instance name)
-                    (if (gethash field nullable-fields)
-                        (setf (slot-value instance name)
-                              (when (typep type 'union:union)
-                                ;; TODO unions should be handled
-                                ;; implicitly like this everywhere
-                                (make-instance type :object nil)))
-                        (error "Field ~S is not optional" name)))
-
-    unless (typep value type) do
-      (error "Slot ~S has value ~S which is not of type ~S"
-             name value type)))
-
-(defgeneric field (record-object field-name))
-
-(defmethod field
-    ((instance record-object) (field-name simple-string))
-  "Return (values field-value field-slot)."
-  (let ((field (gethash field-name (name->field (class-of instance)))))
-    (unless field
-      (error "No such field named ~S" field-name))
-    (let* ((name (nth-value 1 (name field)))
-           (value (slot-value instance name)))
-      (values value field))))
-
-(defmethod (setf field)
-    (value (instance record-object) (field-name simple-string))
-  "Set FIELD-NAME to VALUE."
-  (let* ((field (nth-value 1 (field instance field-name)))
-         (type (type field))
-         (name (nth-value 1 (name field))))
-    (unless (typep value type)
-      (error "Expected type ~S, but got ~S for ~S"
-             type (type-of value) value))
-    (setf (slot-value instance name) value)))
 
 (declaim
  (ftype (function (list) (values list &optional)) add-default-initargs))
@@ -219,3 +168,58 @@
                (push (intern name 'keyword) initargs))
              notation)
     (apply #'make-instance schema initargs)))
+
+;;; object
+
+(defclass record-object ()
+  ()
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro record schema."))
+
+(defmethod initialize-instance :after
+    ((instance record-object) &key)
+  (loop
+    with fields of-type (simple-array field (*)) = (fields (class-of instance))
+    and nullable-fields of-type hash-table = (nullable-fields (class-of instance))
+
+    for field of-type field across fields
+
+    for name of-type symbol = (nth-value 1 (name field))
+    for type of-type schema = (type field)
+    for value = (if (slot-boundp instance name)
+                    (slot-value instance name)
+                    (if (gethash field nullable-fields)
+                        (setf (slot-value instance name)
+                              (when (typep type 'union:union)
+                                ;; TODO unions should be handled
+                                ;; implicitly like this everywhere
+                                (make-instance type :object nil)))
+                        (error "Field ~S is not optional" name)))
+
+    unless (typep value type) do
+      (error "Slot ~S has value ~S which is not of type ~S"
+             name value type)))
+
+(defgeneric field (record-object field-name))
+
+(defmethod field
+    ((instance record-object) (field-name simple-string))
+  "Return (values field-value field-slot)."
+  (let ((field (gethash field-name (name->field (class-of instance)))))
+    (unless field
+      (error "No such field named ~S" field-name))
+    (let* ((name (nth-value 1 (name field)))
+           (value (slot-value instance name)))
+      (values value field))))
+
+(defmethod (setf field)
+    (value (instance record-object) (field-name simple-string))
+  "Set FIELD-NAME to VALUE."
+  (let* ((field (nth-value 1 (field instance field-name)))
+         (type (type field))
+         (name (nth-value 1 (name field))))
+    (unless (typep value type)
+      (error "Expected type ~S, but got ~S for ~S"
+             type (type-of value) value))
+    (setf (slot-value instance name) value)))

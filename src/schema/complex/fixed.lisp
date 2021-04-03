@@ -41,14 +41,7 @@
            #:aliases))
 (in-package #:cl-avro.schema.complex.fixed)
 
-(defclass fixed-object (#+sbcl sequence #-sbcl sequences:sequence)
-  ((buffer
-    :accessor buffer
-    :reader raw-buffer
-    :type (simple-array (unsigned-byte 8) (*))))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro fixed schema."))
+;;; schema
 
 (defclass fixed (named-schema)
   ((size
@@ -65,6 +58,30 @@
     ((class fixed) (superclass named-schema))
   t)
 
+(declaim
+ (ftype (function ((integer 0)) (values cons &optional)) make-buffer-slot))
+(defun make-buffer-slot (size)
+  (list :name 'buffer
+        :type `(simple-array (unsigned-byte 8) (,size))))
+
+(defmethod initialize-instance :around
+    ((instance fixed) &rest initargs &key size)
+  (let ((buffer-slot (make-buffer-slot size)))
+    (push buffer-slot (getf initargs :direct-slots)))
+  (ensure-superclass fixed-object)
+  (apply #'call-next-method instance initargs))
+
+;;; object
+
+(defclass fixed-object (#+sbcl sequence #-sbcl sequences:sequence)
+  ((buffer
+    :accessor buffer
+    :reader raw-buffer
+    :type (simple-array (unsigned-byte 8) (*))))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro fixed schema."))
+
 (defmethod initialize-instance :after
     ((instance fixed-object)
      &key
@@ -79,19 +96,6 @@
       (cl:push initial-contents keyword-args)
       (cl:push :initial-contents keyword-args))
     (setf (buffer instance) (apply #'make-array size keyword-args))))
-
-(declaim
- (ftype (function ((integer 0)) (values cons &optional)) make-buffer-slot))
-(defun make-buffer-slot (size)
-  (list :name 'buffer
-        :type `(simple-array (unsigned-byte 8) (,size))))
-
-(defmethod initialize-instance :around
-    ((instance fixed) &rest initargs &key size)
-  (let ((buffer-slot (make-buffer-slot size)))
-    (push buffer-slot (getf initargs :direct-slots)))
-  (ensure-superclass fixed-object)
-  (apply #'call-next-method instance initargs))
 
 (defmethod sequences:length
     ((instance fixed-object))

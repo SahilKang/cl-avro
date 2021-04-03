@@ -45,14 +45,7 @@
            #:hashrem))
 (in-package #:cl-avro.schema.complex.map)
 
-(defclass map-object ()
-  ((hash-table
-    :reader raw-hash-table
-    :type hash-table
-    :documentation "Hash-table mapping strings to values."))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro map schema."))
+;;; schema
 
 (defclass map (complex-schema)
   ((values
@@ -69,6 +62,22 @@
     ((class map) (superclass complex-schema))
   t)
 
+(defmethod initialize-instance :around
+    ((instance map) &rest initargs)
+  (ensure-superclass map-object)
+  (apply #'call-next-method instance initargs))
+
+;;; object
+
+(defclass map-object ()
+  ((hash-table
+    :reader raw-hash-table
+    :type hash-table
+    :documentation "Hash-table mapping strings to values."))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro map schema."))
+
 (defmethod initialize-instance :after
     ((instance map-object) &key size rehash-size rehash-threshold)
   (let ((keyword-args (list :test #'equal)))
@@ -83,11 +92,6 @@
       (push :rehash-threshold keyword-args))
     (with-slots (hash-table) instance
       (setf hash-table (apply #'make-hash-table keyword-args)))))
-
-(defmethod initialize-instance :around
-    ((instance map) &rest initargs)
-  (ensure-superclass map-object)
-  (apply #'call-next-method instance initargs))
 
 (defmethod generic-hash-table-count
     ((instance map-object))

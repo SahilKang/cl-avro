@@ -42,14 +42,6 @@
 
 ;;; wrappers
 
-(defclass wrapper-object ()
-  ((wrapped-object
-    :initarg :wrap
-    :reader unwrap
-    :documentation "Wrapped union object."))
-  (:default-initargs
-   :wrap (error "Must supply WRAP")))
-
 (defclass wrapper-class (standard-class)
   ((position
     :initarg :position
@@ -78,21 +70,17 @@
   (ensure-superclass wrapper-object)
   (apply #'call-next-method instance initargs))
 
+(defclass wrapper-object ()
+  ((wrapped-object
+    :initarg :wrap
+    :reader unwrap
+    :documentation "Wrapped union object."))
+  (:default-initargs
+   :wrap (error "Must supply WRAP")))
+
 ;;; union schema
 
-(defclass union-object ()
-  ((wrapped-object
-    :reader wrapped-object
-    :type wrapper-object
-    :documentation "Chosen union object."))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro union schema."))
-
-(defgeneric object (union-object)
-  (:method ((instance union-object))
-    "Return the chosen union object."
-    (unwrap (wrapped-object instance))))
+;; schema
 
 ;; TODO change doc to class metaobject class for avro union schemas
 (defclass union (complex-schema)
@@ -124,47 +112,6 @@
           (fullname schema)
           (type-of schema))))
 (declaim (notinline schema-key))00
-
-(defmethod which-one ((instance union-object))
-  "Return (values schema-name position schema)."
-  (declare (inline schema-key))
-  (let* ((position (position (class-of (wrapped-object instance))))
-         (schemas (schemas (class-of instance)))
-         (schema (elt schemas position))
-         (schema-name (schema-key schema)))
-    (declare ((simple-array schema (*)) schemas))
-    (values schema-name position schema)))
-
-(declaim
- (ftype (function (union t) (values (or null wrapper-class) &optional))
-        find-wrapper-class)
- (inline find-wrapper-class))
-(defun find-wrapper-class (union object)
-  (let* ((schemas (schemas union))
-         (wrapper-classes (wrapper-classes union))
-         (position (cl:position object schemas :test #'typep)))
-    (declare ((simple-array schema (*)) schemas)
-             ((simple-array wrapper-class (*)) wrapper-classes))
-    (when position
-      (elt wrapper-classes position))))
-(declaim (notinline find-wrapper-class))
-
-(declaim
- (ftype (function (union t) (values wrapper-object &optional)) wrap)
- (inline wrap))
-(defun wrap (union object)
-  (declare (inline find-wrapper-class))
-  (let ((wrapper-class (find-wrapper-class union object)))
-    (unless wrapper-class
-      (error "Object ~S must be one of ~S" object (schemas union)))
-    (make-instance wrapper-class :wrap object)))
-(declaim (notinline wrap))
-
-(defmethod initialize-instance :after
-    ((instance union-object) &key (object (error "Must supply OBJECT")))
-  (declare (inline wrap))
-  (with-slots (wrapped-object) instance
-    (setf wrapped-object (wrap (class-of instance) object))))
 
 (declaim
  (ftype (function (t) (values schema &optional)) parse-schema))
@@ -223,3 +170,60 @@
     ((instance union) &key)
   (with-slots (schemas wrapper-classes) instance
     (setf wrapper-classes (make-wrapper-classes schemas))))
+
+;; object
+
+(defclass union-object ()
+  ((wrapped-object
+    :reader wrapped-object
+    :type wrapper-object
+    :documentation "Chosen union object."))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro union schema."))
+
+(defgeneric object (union-object)
+  (:method ((instance union-object))
+    "Return the chosen union object."
+    (unwrap (wrapped-object instance))))
+
+(defmethod which-one ((instance union-object))
+  "Return (values schema-name position schema)."
+  (declare (inline schema-key))
+  (let* ((position (position (class-of (wrapped-object instance))))
+         (schemas (schemas (class-of instance)))
+         (schema (elt schemas position))
+         (schema-name (schema-key schema)))
+    (declare ((simple-array schema (*)) schemas))
+    (values schema-name position schema)))
+
+(declaim
+ (ftype (function (union t) (values (or null wrapper-class) &optional))
+        find-wrapper-class)
+ (inline find-wrapper-class))
+(defun find-wrapper-class (union object)
+  (let* ((schemas (schemas union))
+         (wrapper-classes (wrapper-classes union))
+         (position (cl:position object schemas :test #'typep)))
+    (declare ((simple-array schema (*)) schemas)
+             ((simple-array wrapper-class (*)) wrapper-classes))
+    (when position
+      (elt wrapper-classes position))))
+(declaim (notinline find-wrapper-class))
+
+(declaim
+ (ftype (function (union t) (values wrapper-object &optional)) wrap)
+ (inline wrap))
+(defun wrap (union object)
+  (declare (inline find-wrapper-class))
+  (let ((wrapper-class (find-wrapper-class union object)))
+    (unless wrapper-class
+      (error "Object ~S must be one of ~S" object (schemas union)))
+    (make-instance wrapper-class :wrap object)))
+(declaim (notinline wrap))
+
+(defmethod initialize-instance :after
+    ((instance union-object) &key (object (error "Must supply OBJECT")))
+  (declare (inline wrap))
+  (with-slots (wrapped-object) instance
+    (setf wrapped-object (wrap (class-of instance) object))))

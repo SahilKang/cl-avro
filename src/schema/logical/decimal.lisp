@@ -36,17 +36,7 @@
            #:precision))
 (in-package #:cl-avro.schema.logical.decimal)
 
-(defclass decimal-object ()
-  ((unscaled
-    :initarg :unscaled
-    :reader unscaled
-    :type integer
-    :documentation "Unscaled integer for decimal object."))
-  (:metaclass complex-schema)
-  (:default-initargs
-   :unscaled (error "Must supply UNSCALED"))
-  (:documentation
-   "Base class for objects adhering to an avro decimal schema."))
+;;; schema
 
 (defclass decimal (logical-schema)
   ((underlying
@@ -65,35 +55,9 @@
   (:documentation
    "Base class for avro decimal schemas."))
 
-(defgeneric scale (decimal)
-  (:method ((instance decimal))
-    "Return (values scale scale-provided-p)."
-    (let* ((scalep (slot-boundp instance 'scale))
-           (scale (if scalep
-                      (slot-value instance 'scale)
-                      0)))
-      (values scale scalep))))
-
 (defmethod closer-mop:validate-superclass
     ((class decimal) (superclass logical-schema))
   t)
-
-(declaim
- (ftype (function (integer) (values (integer 1) &optional)) number-of-digits))
-(defun number-of-digits (integer)
-  (if (zerop integer)
-      1
-      (let ((abs (abs integer)))
-        (nth-value 0 (ceiling (log (1+ abs) 10))))))
-
-(defmethod initialize-instance :before
-    ((instance decimal-object) &key unscaled)
-  (check-type unscaled integer)
-  (let ((number-of-digits (number-of-digits unscaled))
-        (max-precision (precision (class-of instance))))
-    (unless (<= number-of-digits max-precision)
-      (error "Decimal schema with precision ~S cannot represent ~S digits"
-             max-precision number-of-digits))))
 
 (declaim
  (ftype (function ((integer 1)) (values (integer 1) &optional)) max-precision))
@@ -133,3 +97,43 @@
       (error "Scale ~S cannot be greater than precision ~S" scale precision))
     (when (typep underlying 'fixed)
       (assert-decent-precision precision (size underlying)))))
+
+(defgeneric scale (decimal)
+  (:method ((instance decimal))
+    "Return (values scale scale-provided-p)."
+    (let* ((scalep (slot-boundp instance 'scale))
+           (scale (if scalep
+                      (slot-value instance 'scale)
+                      0)))
+      (values scale scalep))))
+
+;;; object
+
+(defclass decimal-object ()
+  ((unscaled
+    :initarg :unscaled
+    :reader unscaled
+    :type integer
+    :documentation "Unscaled integer for decimal object."))
+  (:metaclass complex-schema)
+  (:default-initargs
+   :unscaled (error "Must supply UNSCALED"))
+  (:documentation
+   "Base class for objects adhering to an avro decimal schema."))
+
+(declaim
+ (ftype (function (integer) (values (integer 1) &optional)) number-of-digits))
+(defun number-of-digits (integer)
+  (if (zerop integer)
+      1
+      (let ((abs (abs integer)))
+        (nth-value 0 (ceiling (log (1+ abs) 10))))))
+
+(defmethod initialize-instance :before
+    ((instance decimal-object) &key unscaled)
+  (check-type unscaled integer)
+  (let ((number-of-digits (number-of-digits unscaled))
+        (max-precision (precision (class-of instance))))
+    (unless (<= number-of-digits max-precision)
+      (error "Decimal schema with precision ~S cannot represent ~S digits"
+             max-precision number-of-digits))))

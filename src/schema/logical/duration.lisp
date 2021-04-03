@@ -34,6 +34,32 @@
            #:milliseconds))
 (in-package #:cl-avro.schema.logical.duration)
 
+;;; schema
+
+(defclass duration (logical-schema)
+  ((underlying
+    :type fixed))
+  (:documentation
+   "Base class for avro duration schemas."))
+
+(defmethod closer-mop:validate-superclass
+    ((class duration) (superclass logical-schema))
+  t)
+
+(defmethod initialize-instance :around
+    ((instance duration) &rest initargs)
+  (ensure-superclass duration-object)
+  (apply #'call-next-method instance initargs))
+
+(defmethod initialize-instance :after
+    ((instance duration) &key)
+  (let* ((underlying (underlying instance))
+         (size (size underlying)))
+    (unless (= size 12)
+      (error "Size of fixed schema must be 12, not ~S" size))))
+
+;;; object
+
 (defclass duration-object ()
   ((months
     :initarg :months
@@ -64,25 +90,3 @@
     (check-type months (unsigned-byte 32))
     (check-type days (unsigned-byte 32))
     (check-type milliseconds (unsigned-byte 32))))
-
-(defclass duration (logical-schema)
-  ((underlying
-    :type fixed))
-  (:documentation
-   "Base class for avro duration schemas."))
-
-(defmethod closer-mop:validate-superclass
-    ((class duration) (superclass logical-schema))
-  t)
-
-(defmethod initialize-instance :around
-    ((instance duration) &rest initargs)
-  (ensure-superclass duration-object)
-  (apply #'call-next-method instance initargs))
-
-(defmethod initialize-instance :after
-    ((instance duration) &key)
-  (let* ((underlying (underlying instance))
-         (size (size underlying)))
-    (unless (= size 12)
-      (error "Size of fixed schema must be 12, not ~S" size))))
