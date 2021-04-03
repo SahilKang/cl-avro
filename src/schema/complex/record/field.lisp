@@ -53,7 +53,8 @@
   '(member ascending descending ignore))
 
 ;; TODO subclass readers to return nil when unbound
-(defclass field (closer-mop:standard-direct-slot-definition)
+(defclass field (closer-mop:standard-direct-slot-definition
+                 closer-mop:standard-effective-slot-definition)
   ((aliases
     :initarg :aliases
     :reader aliases
@@ -178,7 +179,6 @@
   (with-accessors
         ((name closer-mop:slot-definition-name)
          (type closer-mop:slot-definition-type)
-         (writers closer-mop:slot-definition-writers)
          (initfunction closer-mop:slot-definition-initfunction)
          (initform closer-mop:slot-definition-initform)
          (allocation closer-mop:slot-definition-allocation))
@@ -186,8 +186,6 @@
     (let ((name (string name)))
       (check-type name name))
     (check-type type schema)
-    (when writers
-      (error "Did not expect writers for slot ~S: ~S" name writers))
     (when initfunction
       (error "Did not expect an initform for slot ~S: ~S" name initform))
     (unless (eq allocation :instance)

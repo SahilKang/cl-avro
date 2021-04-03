@@ -62,6 +62,19 @@
     ((class record) &key)
   (find-class 'field))
 
+(defmethod closer-mop:effective-slot-definition-class
+    ((class record) &key)
+  (find-class 'field))
+
+(defmethod (setf closer-mop:slot-value-using-class)
+    (new-value (class record) object (slot field))
+  (let ((type (type slot))
+        (name (name slot)))
+    (unless (typep new-value type)
+      (error "Expected type ~S for field ~S, but got a ~S instead: ~S"
+             type name (type-of new-value) new-value)))
+  (call-next-method))
+
 (declaim
  (ftype (function (list) (values list &optional)) add-default-initargs))
 (defun add-default-initargs (slots)
