@@ -1,4 +1,5 @@
 ;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2021 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
