@@ -60,14 +60,15 @@
 (defvar *seen*)
 
 (defgeneric canonicalize (schema)
-  (:method :before ((schema named-schema))
+  (:method :around ((schema named-schema))
     ;; only named schemas can be recursive
-    (setf (gethash schema *seen*) t))
-
-  (:method :around (schema)
-    (if (gethash schema *seen*)
-        schema
-        (call-next-method))))
+    (multiple-value-bind (seen-schema seen-schema-p)
+        (gethash schema *seen*)
+      (if seen-schema-p
+          seen-schema
+          ;; this first setf prevents infinite recursion
+          (setf (gethash schema *seen*) schema
+                (gethash schema *seen*) (call-next-method))))))
 
 (macrolet
     ((defprimitives ()
