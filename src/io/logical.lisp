@@ -431,8 +431,6 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 
 ;; big-endian
 
-;; TODO not sure about this (integer 0) type
-
 (declaim
  (ftype (function ((simple-array (unsigned-byte 8) (*)))
                   (values (integer 0) &optional))
@@ -442,10 +440,11 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
   (loop
     with value of-type (integer 0) = 0
 
-    for offset from (1- (length bytes)) downto 0
+    for offset below (length bytes)
     for byte of-type (unsigned-byte 8) = (elt bytes offset)
+    for shift = (* 8 (1- (- (length bytes) offset))) then (- shift 8)
 
-    do (setf value (logior value (ash byte (* offset 8))))
+    do (setf value (logior value (ash byte shift)))
 
     finally
        (return value)))
@@ -459,8 +458,8 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
  (inline integer->big-endian))
 (defun integer->big-endian (integer bytes start end)
   (loop
-    for offset from (1- end) downto start
-    for shift = (* 8 (the fixnum (- offset start)))
+    for offset from start below end
+    for shift = (* 8 (the fixnum (1- (- end offset)))) then (- shift 8)
     for byte of-type (unsigned-byte 8) = (logand #xff (ash integer (- shift)))
     do (setf (elt bytes offset) byte)
 
@@ -478,10 +477,11 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defun read-twos-complement (bytes)
   (declare (inline big-endian->integer))
   (let* ((bits (* (length bytes) 8))
-         (mask (ash 2 (1- bits)))
+         (mask (ash 1 (1- bits)))
          (value (big-endian->integer bytes)))
-    (+ (- (logand value mask))
-       (logand value (lognot mask)))))
+    (if (zerop (logand value mask))
+        value
+        (- value (expt 2 bits)))))
 (declaim (notinline read-twos-complement))
 
 (declaim
@@ -492,7 +492,8 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defun write-twos-complement (integer bytes start end)
   (declare (inline integer->big-endian))
   (let ((value (if (minusp integer)
-                   (1+ (lognot (abs integer)))
+                   (let ((bits (* (- end start) 8)))
+                     (+ integer (expt 2 bits)))
                    integer)))
     (integer->big-endian value bytes start end)))
 (declaim (notinline write-twos-complement))
