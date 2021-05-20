@@ -21,6 +21,8 @@
   (:import-from #:cl-avro.schema.primitive
                 #:primitive-schema
                 #:primitive-object)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:export #:complex-schema
            #:complex-object
            #:schema
@@ -84,8 +86,8 @@
       (map nil #'check-slot-type slots)))
   (values))
 
-(defmethod initialize-instance :around
-    ((instance complex-schema) &rest initargs)
+(define-initializers complex-schema :around
+    (&rest initargs)
   (ensure-superclass complex-object)
   (let ((instance (apply #'call-next-method instance initargs)))
     (check-slot-types instance)

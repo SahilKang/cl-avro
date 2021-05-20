@@ -24,6 +24,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:import-from #:genhash
                 #:generic-hash-table-count
                 #:generic-hash-table-p
@@ -62,8 +64,8 @@
     ((class map) (superclass complex-schema))
   t)
 
-(defmethod initialize-instance :around
-    ((instance map) &rest initargs)
+(define-initializers map :around
+    (&rest initargs)
   (ensure-superclass map-object)
   (apply #'call-next-method instance initargs))
 

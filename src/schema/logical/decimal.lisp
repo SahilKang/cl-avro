@@ -25,7 +25,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:fixed
-                #:size)
+                #:size
+                #:define-initializers)
   (:import-from #:cl-avro.schema.primitive
                 #:bytes)
   (:export #:decimal
@@ -83,13 +84,13 @@
     (error "Fixed schema has size 0"))
   (%assert-decent-precision precision size))
 
-(defmethod initialize-instance :around
-    ((instance decimal) &rest initargs)
+(define-initializers decimal :around
+    (&rest initargs)
   (ensure-superclass decimal-object)
   (apply #'call-next-method instance initargs))
 
-(defmethod initialize-instance :after
-    ((instance decimal) &key)
+(define-initializers decimal :after
+    (&key)
   (let ((precision (precision instance))
         (scale (scale instance))
         (underlying (underlying instance)))

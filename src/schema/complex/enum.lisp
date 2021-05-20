@@ -22,7 +22,8 @@
   (:import-from #:cl-avro.schema.complex.common
                 #:assert-distinct
                 #:which-one
-                #:default)
+                #:default
+                #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass)
@@ -97,8 +98,8 @@
         (error "Default ~S not found in symbols ~S" default symbols))
       position)))
 
-(defmethod initialize-instance :around
-    ((instance enum) &rest initargs &key symbols default)
+(define-initializers enum :around
+    (&rest initargs &key symbols default)
   (let* ((symbols (parse-symbols symbols))
          (default (parse-default symbols default)))
     (setf (getf initargs :symbols) symbols

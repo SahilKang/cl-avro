@@ -33,6 +33,8 @@
                 #:aliases)
   (:import-from #:cl-avro.schema.complex.record.notation
                 #:parse-notation)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:shadowing-import-from #:cl-avro.schema.complex.record.field
                           #:type)
   (:export #:record
@@ -89,16 +91,8 @@
            slot))
     (mapcar #'add-initarg slots)))
 
-(defmethod initialize-instance :around
-    ((instance record) &rest initargs)
-  (setf (getf initargs :direct-slots)
-        (add-default-initargs
-         (getf initargs :direct-slots)))
-  (ensure-superclass record-object)
-  (apply #'call-next-method instance initargs))
-
-(defmethod reinitialize-instance :around
-    ((instance record) &rest initargs)
+(define-initializers record :around
+    (&rest initargs)
   (setf (getf initargs :direct-slots)
         (add-default-initargs
          (getf initargs :direct-slots)))

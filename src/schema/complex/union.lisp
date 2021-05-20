@@ -32,7 +32,8 @@
   (:import-from #:cl-avro.schema.primitive
                 #:int)
   (:import-from #:cl-avro.schema.complex.common
-                #:which-one)
+                #:which-one
+                #:define-initializers)
   (:export #:union
            #:union-object
            #:schemas
@@ -140,8 +141,8 @@
         (map nil #'assert-valid schemas)))
     schemas))
 
-(defmethod initialize-instance :around
-    ((instance union) &rest initargs &key schemas)
+(define-initializers union :around
+    (&rest initargs &key schemas)
   (let ((schemas (parse-schemas schemas)))
     (setf (getf initargs :schemas) schemas))
   (ensure-superclass union-object)
@@ -166,8 +167,8 @@
     finally
        (return wrapper-classes)))
 
-(defmethod initialize-instance :after
-    ((instance union) &key)
+(define-initializers union :after
+    (&key)
   (with-slots (schemas wrapper-classes) instance
     (setf wrapper-classes (make-wrapper-classes schemas))))
 

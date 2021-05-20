@@ -21,7 +21,8 @@
   (:local-nicknames
    (#:sequences #:org.shirakumo.trivial-extensible-sequences))
   (:import-from #:cl-avro.schema.complex.common
-                #:raw-buffer)
+                #:raw-buffer
+                #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass)
@@ -64,8 +65,8 @@
   (list :name 'buffer
         :type `(simple-array (unsigned-byte 8) (,size))))
 
-(defmethod initialize-instance :around
-    ((instance fixed) &rest initargs &key size)
+(define-initializers fixed :around
+    (&rest initargs &key size)
   (let ((buffer-slot (make-buffer-slot size)))
     (push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass fixed-object)

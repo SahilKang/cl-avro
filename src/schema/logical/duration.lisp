@@ -25,7 +25,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:fixed
-                #:size)
+                #:size
+                #:define-initializers)
   (:export #:duration
            #:underlying
            #:duration-object
@@ -46,13 +47,13 @@
     ((class duration) (superclass logical-schema))
   t)
 
-(defmethod initialize-instance :around
-    ((instance duration) &rest initargs)
+(define-initializers duration :around
+    (&rest initargs &key underlying)
   (ensure-superclass duration-object)
   (apply #'call-next-method instance initargs))
 
-(defmethod initialize-instance :after
-    ((instance duration) &key)
+(define-initializers duration :after
+    (&key)
   (let* ((underlying (underlying instance))
          (size (size underlying)))
     (unless (= size 12)

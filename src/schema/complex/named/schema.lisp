@@ -19,7 +19,8 @@
 (defpackage #:cl-avro.schema.complex.named.schema
   (:use #:cl)
   (:import-from #:cl-avro.schema.complex.common
-                #:assert-distinct)
+                #:assert-distinct
+                #:define-initializers)
   (:import-from #:cl-avro.schema.primitive
                 #:+primitive->name+)
   (:import-from #:cl-avro.schema.complex.base
@@ -94,7 +95,6 @@
     :type valid-fullname
     :documentation "Namespace qualified name of schema.")
    (aliases
-    :initarg :aliases
     :reader aliases
     :type (or null (simple-array valid-fullname (*)))
     :documentation "A vector of aliases if provided, otherwise nil."))
@@ -159,12 +159,6 @@
 
 ;; initialization
 
-(defmethod initialize-instance :around
-    ((instance named-schema) &rest initargs &key (aliases nil aliasesp))
-  (let ((aliases (parse-aliases aliases aliasesp)))
-    (setf (getf initargs :aliases) aliases))
-  (apply #'call-next-method instance initargs))
-
 (declaim
  (ftype (function (symbol list) (values t &optional)) %parse-name))
 (defun %parse-name (name initargs)
@@ -173,21 +167,30 @@
     (if (eq name other-name)
         (string name)
         other-name)))
+
 (declaim
  (ftype (function (t list) (values t &optional)) parse-name))
 (defun parse-name (name initargs)
   (if (symbolp name)
       (%parse-name name initargs)
       name))
-(defmethod initialize-instance :after
-    ((instance named-schema)
-     &rest initargs
+
+(define-initializers named-schema :after
+    (&rest initargs
      &key
-       (name (error "Must supply NAME"))
-       enclosing-namespace)
+     (name (error "Must supply NAME"))
+     (aliases nil aliasesp)
+     enclosing-namespace)
   (let ((provided-namespace (provided-namespace instance)))
-    (with-slots (provided-name deduced-name deduced-namespace fullname) instance
-      (setf provided-name (parse-name name initargs)
+    (with-slots
+          (provided-name
+           deduced-name
+           deduced-namespace
+           fullname
+           (aliases-slot aliases))
+        instance
+      (setf aliases-slot (parse-aliases aliases aliasesp)
+            provided-name (parse-name name initargs)
             deduced-name (fullname->name provided-name)
             deduced-namespace (deduce-namespace
                                provided-name provided-namespace enclosing-namespace)
