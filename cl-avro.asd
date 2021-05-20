@@ -73,6 +73,7 @@
                                 :serial t
                                 :components ((:file "notation")
                                              (:file "field")
+                                             (:file "effective-field")
                                              (:file "schema")
                                              (:file "package")))
                                (:file "package"

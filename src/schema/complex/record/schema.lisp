@@ -30,7 +30,14 @@
   (:import-from #:cl-avro.schema.complex.record.field
                 #:field
                 #:name
-                #:aliases)
+                #:aliases
+                #:default
+                #:order)
+  (:import-from #:cl-avro.schema.complex.record.effective-field
+                #:effective-field
+                #:set-default-once
+                #:set-order-once
+                #:set-aliases-once)
   (:import-from #:cl-avro.schema.complex.record.notation
                 #:parse-notation)
   (:import-from #:cl-avro.schema.complex.common
@@ -46,7 +53,6 @@
 
 (defclass record (named-schema)
   ((fields
-    :reader fields
     :type (simple-array field (*))
     :documentation "Record fields.")
    (nullable-fields
@@ -66,7 +72,23 @@
 
 (defmethod closer-mop:effective-slot-definition-class
     ((class record) &key)
-  (find-class 'field))
+  (find-class 'effective-field))
+
+(defmethod closer-mop:compute-effective-slot-definition
+    ((class record) name slots)
+  (let ((effective-slot (call-next-method)))
+    (dolist (slot slots effective-slot)
+      (multiple-value-bind (default defaultp)
+          (default slot)
+        (when defaultp
+          (set-default-once effective-slot default)))
+      (multiple-value-bind (order orderp)
+          (order slot)
+        (when orderp
+          (set-order-once effective-slot order)))
+      (let ((aliases (aliases slot)))
+        (when aliases
+          (set-aliases-once effective-slot aliases))))))
 
 (defmethod (setf closer-mop:slot-value-using-class)
     (new-value (class record) object (slot field))
@@ -76,6 +98,12 @@
       (error "Expected type ~S for field ~S, but got a ~S instead: ~S"
              type name (type-of new-value) new-value)))
   (call-next-method))
+
+(defgeneric fields (instance)
+  (:method ((instance record))
+    (unless (closer-mop:class-finalized-p instance)
+      (closer-mop:finalize-inheritance instance))
+    (slot-value instance 'fields)))
 
 (declaim
  (ftype (function (list) (values list &optional)) add-default-initargs))
@@ -118,22 +146,25 @@
       (map nil #'fill-table fields))
     nullable-fields))
 
-(defmethod initialize-instance :after
-    ((instance record) &key)
+(defmethod closer-mop:finalize-inheritance :after
+    ((instance record))
   (with-slots (fields nullable-fields) instance
-    (let ((slots (closer-mop:class-direct-slots instance)))
-      (setf fields (make-array (length slots)
-                               :element-type 'field
-                               :initial-contents slots)
-            nullable-fields (find-nullable-fields fields)))))
-
-(defmethod reinitialize-instance :after
-    ((instance record) &key)
-  (with-slots (fields nullable-fields) instance
-    (let ((slots (closer-mop:class-direct-slots instance)))
-      (setf fields (make-array (length slots)
-                               :element-type 'field
-                               :initial-contents slots)
+    (let ((ordered-slot-names
+            (let ((slots (closer-mop:class-direct-slots instance)))
+              (make-array
+               (length slots)
+               :element-type 'symbol
+               :initial-contents (mapcar #'closer-mop:slot-definition-name slots))))
+          (slots
+            (closer-mop:compute-slots instance)))
+      (setf fields (sort
+                    (make-array (length slots)
+                                :element-type 'effective-field
+                                :initial-contents slots)
+                    #'<
+                    :key (lambda (slot)
+                           (let ((name (closer-mop:slot-definition-name slot)))
+                             (position name ordered-slot-names))))
             nullable-fields (find-nullable-fields fields)))))
 
 (defmethod parse-notation

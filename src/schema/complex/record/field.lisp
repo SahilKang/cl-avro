@@ -53,8 +53,7 @@
   '(member ascending descending ignore))
 
 ;; TODO subclass readers to return nil when unbound
-(defclass field (closer-mop:standard-direct-slot-definition
-                 closer-mop:standard-effective-slot-definition)
+(defclass field (closer-mop:standard-direct-slot-definition)
   ((aliases
     :initarg :aliases
     :reader aliases
@@ -66,12 +65,12 @@
     :documentation "Field ordering used during sorting.")
    (default
     :initarg :default
-    :type object
+    :type t
     :documentation "Field default.")
    (type
     :initarg :type
     :reader type
-    :type schema
+    :type (or schema symbol)
     :documentation "Field type."))
   (:default-initargs
    :name (error "Must supply NAME")
@@ -130,62 +129,27 @@
     (order order)
     (simple-string (%parse-order order))))
 
-(declaim (ftype (function (t schema) (values t &optional)) %parse-default))
-(defun %parse-default (default schema)
-  (typecase schema
-    (symbol
-     (if (and (eq schema 'bytes)
-              (stringp default))
-         (babel:string-to-octets default :encoding :latin-1)
-         default))
-    (fixed
-     (if (stringp default)
-         (babel:string-to-octets default :encoding :latin-1)
-         default))
-    (union
-     (let* ((schemas (schemas (class-of schema)))
-            (first (elt schemas 0)))
-       (%parse-default default first)))
-    (t
-     default)))
-
-(declaim (ftype (function (t schema) (values object &optional)) parse-default))
-(defun parse-default (default schema)
-  (let ((default (%parse-default default schema)))
-    (parse-notation schema default)))
-
 (defmethod initialize-instance :around
     ((instance field)
      &rest initargs
      &key
-       type
        (aliases nil aliasesp)
-       (order "ascending" orderp)
-       (default nil defaultp))
+       (order "ascending" orderp))
   (setf (getf initargs :aliases) (parse-aliases aliases aliasesp))
-  (when (and (symbolp type)
-             (not (typep type 'schema)))
-    (let ((schema (find-class type)))
-      (setf type schema
-            (getf initargs :type) schema)))
   (when orderp
     (setf (getf initargs :order) (parse-order order)))
-  (when defaultp
-    (setf (getf initargs :default) (parse-default default type)))
   (apply #'call-next-method instance initargs))
 
 (defmethod initialize-instance :after
     ((instance field) &key)
   (with-accessors
         ((name closer-mop:slot-definition-name)
-         (type closer-mop:slot-definition-type)
          (initfunction closer-mop:slot-definition-initfunction)
          (initform closer-mop:slot-definition-initform)
          (allocation closer-mop:slot-definition-allocation))
       instance
     (let ((name (string name)))
       (check-type name name))
-    (check-type type schema)
     (when initfunction
       (error "Did not expect an initform for slot ~S: ~S" name initform))
     (unless (eq allocation :instance)
