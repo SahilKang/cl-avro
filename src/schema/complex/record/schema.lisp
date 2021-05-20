@@ -138,15 +138,56 @@
 
 (defmethod parse-notation
     ((schema record) (notation hash-table))
-  (let ((test (hash-table-test notation))
-        initargs)
-    (unless (eq test 'equal)
-      (error "Expected test to be #'equal, not ~S" test))
-    (maphash (lambda (name value)
-               (push value initargs)
-               (push (intern name 'keyword) initargs))
-             notation)
+  (loop
+    with string-key-p = nil
+
+    for key being the hash-keys of notation
+      using (hash-value value)
+
+    unless string-key-p do
+      (setf string-key-p (stringp key))
+
+    collect (intern (string key) 'keyword) into initargs
+    collect value into initargs
+
+    finally
+       (when (and string-key-p
+                  (plusp (hash-table-count notation))
+                  (not (eq 'equal (hash-table-test notation))))
+         (error "Hash-table contains a string key but test ~S is not #'equal"
+                (hash-table-test notation)))
+       (return (apply #'make-instance schema initargs))))
+
+(defmethod parse-notation
+    ((schema record) (notation list))
+  (let ((initargs
+          (if (consp (first notation))
+              (alist->initargs notation)
+              (plist->initargs notation))))
     (apply #'make-instance schema initargs)))
+
+(declaim (ftype (function (cons) (values cons &optional)) alist->initargs))
+(defun alist->initargs (alist)
+  (loop
+    for (key . value) in alist
+    collect (intern (string key) 'keyword)
+    collect value))
+
+(declaim (ftype (function (list) (values list &optional)) plist->initargs))
+(defun plist->initargs (plist)
+  (loop
+    for remaining = plist then (cddr remaining)
+    while remaining
+
+    for key = (car remaining)
+    for rest = (cdr remaining)
+    for value = (car rest)
+
+    unless rest do
+      (error "Odd number of key-value pairs: ~S" plist)
+
+    collect (intern (string key) 'keyword)
+    collect value))
 
 ;;; object
 
