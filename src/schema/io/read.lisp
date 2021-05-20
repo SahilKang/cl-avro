@@ -293,8 +293,8 @@ p suffixes for fields should exist."
       (declare (special *enclosing-namespace* *error-on-duplicate-name-p*))
       ;; it kinda sucks having *error-on-duplicate-name-p*
       ;; maybe just do an explicit dfs to get the new fields
-      (reinitialize-instance
-       schema :direct-slots (mapcar #'parse-field fields)))))
+      (setf (getf initargs :direct-slots) (mapcar #'parse-field fields))
+      (apply #'reinitialize-instance schema initargs))))
 
 (declaim
  (ftype (function (fullname namespace st-json:jso) (values list &optional))
