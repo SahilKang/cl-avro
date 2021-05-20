@@ -113,7 +113,7 @@
       (if (subtypep (class-of schema) 'named-schema)
           (fullname schema)
           (type-of schema))))
-(declaim (notinline schema-key))00
+(declaim (notinline schema-key))
 
 (declaim
  (ftype (function (t) (values schema &optional)) parse-schema))
