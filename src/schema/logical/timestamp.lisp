@@ -23,15 +23,14 @@
                 #:underlying)
   (:import-from #:cl-avro.schema.primitive
                 #:long)
-  (:import-from #:cl-avro.schema.logical.timestamp-base
-                #:timestamp-millis-base
-                #:timestamp-micros-base
+  (:import-from #:cl-avro.schema.logical.date
                 #:year
                 #:month
-                #:day
+                #:day)
+  (:import-from #:cl-avro.schema.logical.time
                 #:hour
                 #:minute)
-  (:shadowing-import-from #:cl-avro.schema.logical.timestamp-base
+  (:shadowing-import-from #:cl-avro.schema.logical.time
                           #:second)
   (:export #:timestamp-millis-schema
            #:timestamp-micros-schema
@@ -58,7 +57,7 @@
   (:documentation
    "Avro timestamp-millis schema."))
 
-(defclass timestamp-millis (timestamp-millis-base)
+(defclass timestamp-millis (local-time:timestamp)
   ()
   (:metaclass timestamp-millis-schema)
   (:documentation
@@ -77,7 +76,9 @@ timeline, independent of a particular timezone or calendar."))
              seconds))
          (nanoseconds-from-unix-epoch
            (* milliseconds-from-unix-epoch 1000 1000)))
-    (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+    (local-time:adjust-timestamp!
+        (local-time:encode-timestamp
+         0 0 0 0 1 1 1970 :timezone local-time:+utc-zone+)
       (offset :sec seconds-from-unix-epoch)
       (offset :nsec nanoseconds-from-unix-epoch))))
 
@@ -91,15 +92,57 @@ timeline, independent of a particular timezone or calendar."))
              seconds))
          (nanoseconds-from-unix-epoch
            (* milliseconds-from-unix-epoch 1000 1000)))
-    (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+    (local-time:adjust-timestamp!
+        (local-time:encode-timestamp
+         0 0 0 0 1 1 1970 :timezone local-time:+utc-zone+)
       (offset :sec seconds-from-unix-epoch)
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-millis) &key)
+    ((instance timestamp-millis)
+     &key year month day hour minute millisecond
+       (timezone local-time:*default-timezone*))
+  (when (or year month hour minute millisecond timezone)
+    (multiple-value-bind (second remainder)
+        (truncate millisecond 1000)
+      (local-time:encode-timestamp
+       (* remainder 1000 1000) second minute hour day month year
+       :timezone timezone :into instance)))
   (unless (and (local-time:timestamp>= instance +min-timestamp-millis+)
                (local-time:timestamp<= instance +max-timestamp-millis+))
     (error "Timestamp out of bounds")))
+
+(defmethod year
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-year instance :timezone timezone))
+
+(defmethod month
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-month instance :timezone timezone))
+
+(defmethod day
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-day instance :timezone timezone))
+
+(defmethod hour
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-hour instance :timezone timezone))
+
+(defmethod minute
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-minute instance :timezone timezone))
+
+(defmethod second
+    ((instance timestamp-millis)
+     &key (timezone local-time:*default-timezone*))
+  (let ((second (local-time:timestamp-second instance :timezone timezone))
+        (millisecond (local-time:timestamp-millisecond instance)))
+    (values second (/ millisecond 1000))))
 
 ;;; timestamp-micros
 
@@ -111,7 +154,7 @@ timeline, independent of a particular timezone or calendar."))
   (:documentation
    "Avro timestamp-micros schema."))
 
-(defclass timestamp-micros (timestamp-micros-base)
+(defclass timestamp-micros (local-time:timestamp)
   ()
   (:metaclass timestamp-micros-schema)
   (:documentation
@@ -130,7 +173,9 @@ timeline, independent of a particular timezone or calendar."))
              seconds))
          (nanoseconds-from-unix-epoch
            (* microseconds-from-unix-epoch 1000)))
-    (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+    (local-time:adjust-timestamp!
+        (local-time:encode-timestamp
+         0 0 0 0 1 1 1970 :timezone local-time:+utc-zone+)
       (offset :sec seconds-from-unix-epoch)
       (offset :nsec nanoseconds-from-unix-epoch))))
 
@@ -144,12 +189,54 @@ timeline, independent of a particular timezone or calendar."))
              seconds))
          (nanoseconds-from-unix-epoch
            (* microseconds-from-unix-epoch 1000)))
-    (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+    (local-time:adjust-timestamp!
+        (local-time:encode-timestamp
+         0 0 0 0 1 1 1970 :timezone local-time:+utc-zone+)
       (offset :sec seconds-from-unix-epoch)
       (offset :nsec nanoseconds-from-unix-epoch))))
 
 (defmethod initialize-instance :after
-    ((instance timestamp-micros) &key)
+    ((instance timestamp-micros)
+     &key year month day hour minute microsecond
+       (timezone local-time:*default-timezone*))
+  (when (or year month hour minute microsecond timezone)
+    (multiple-value-bind (second remainder)
+        (truncate microsecond (* 1000 1000))
+      (local-time:encode-timestamp
+       (* remainder 1000) second minute hour day month year
+       :timezone timezone :into instance)))
   (unless (and (local-time:timestamp>= instance +min-timestamp-micros+)
                (local-time:timestamp<= instance +max-timestamp-micros+))
     (error "Timestamp out of bounds")))
+
+(defmethod year
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-year instance :timezone timezone))
+
+(defmethod month
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-month instance :timezone timezone))
+
+(defmethod day
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-day instance :timezone timezone))
+
+(defmethod hour
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-hour instance :timezone timezone))
+
+(defmethod minute
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (local-time:timestamp-minute instance :timezone timezone))
+
+(defmethod second
+    ((instance timestamp-micros)
+     &key (timezone local-time:*default-timezone*))
+  (let ((second (local-time:timestamp-second instance :timezone timezone))
+        (microsecond (local-time:timestamp-microsecond instance)))
+    (values second (/ microsecond (* 1000 1000)))))

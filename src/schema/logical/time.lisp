@@ -22,6 +22,9 @@
   (:import-from #:cl-avro.schema.logical.base
                 #:logical-schema
                 #:underlying)
+  (:import-from #:cl-avro.schema.logical.timezone
+                #:timezone-mixin
+                #:timezone)
   (:import-from #:cl-avro.schema.primitive
                 #:int
                 #:long)
@@ -36,27 +39,28 @@
 
            #:hour
            #:minute
-           #:second))
+           #:second
+           #:timezone))
 (in-package #:cl-avro.schema.logical.time)
 
 ;;; mixins
 
-(defclass hour-minute-mixin (local-time:timestamp)
+(defclass hour-minute-mixin (local-time:timestamp timezone-mixin)
   ()
   (:documentation
    "hour-minute mixin."))
 
-(defgeneric hour (time-of-day)
+(defgeneric hour (time-of-day &key &allow-other-keys)
   (:documentation "Return hour.")
-  (:method ((instance hour-minute-mixin))
-    (local-time:timestamp-hour instance)))
+  (:method ((instance hour-minute-mixin) &key)
+    (local-time:timestamp-hour instance :timezone (timezone instance))))
 
-(defgeneric minute (time-of-day)
+(defgeneric minute (time-of-day &key &allow-other-keys)
   (:documentation "Return minute.")
-  (:method ((instance hour-minute-mixin))
-    (local-time:timestamp-minute instance)))
+  (:method ((instance hour-minute-mixin) &key)
+    (local-time:timestamp-minute instance :timezone (timezone instance))))
 
-(defgeneric second (time-of-day)
+(defgeneric second (time-of-day &key &allow-other-keys)
   (:documentation "Return (values second remainder)."))
 
 (defclass time-millis-mixin (hour-minute-mixin)
@@ -64,8 +68,9 @@
   (:documentation
    "time-millis mixin."))
 
-(defmethod second ((instance time-millis-mixin))
-  (let ((second (local-time:timestamp-second instance))
+(defmethod second ((instance time-millis-mixin) &key)
+  (let ((second
+          (local-time:timestamp-second instance :timezone (timezone instance)))
         (millisecond (local-time:timestamp-millisecond instance)))
     (values second (/ millisecond 1000))))
 
@@ -74,8 +79,9 @@
   (:documentation
    "time-micros mixin."))
 
-(defmethod second ((instance time-micros-mixin))
-  (let ((second (local-time:timestamp-second instance))
+(defmethod second ((instance time-micros-mixin) &key)
+  (let ((second
+          (local-time:timestamp-second instance :timezone (timezone instance)))
         (microsecond (local-time:timestamp-microsecond instance)))
     (values second (/ microsecond (* 1000 1000)))))
 
@@ -108,7 +114,8 @@ to a particular calendar, timezone, or date."))
     (multiple-value-bind (second remainder)
         (truncate millisecond 1000)
       (local-time:encode-timestamp
-       (* remainder 1000 1000) second minute hour 1 1 1 :into instance))))
+       (* remainder 1000 1000) second minute hour 1 1 1 :into instance
+       :timezone (timezone instance)))))
 
 ;;; time-micros
 
@@ -139,4 +146,5 @@ to a particular calendar, timezone, or date."))
     (multiple-value-bind (second remainder)
         (truncate microsecond (* 1000 1000))
       (local-time:encode-timestamp
-       (* remainder 1000) second minute hour 1 1 1 :into instance))))
+       (* remainder 1000) second minute hour 1 1 1 :into instance
+       :timezone (timezone instance)))))

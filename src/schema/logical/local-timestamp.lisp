@@ -23,15 +23,19 @@
                 #:underlying)
   (:import-from #:cl-avro.schema.primitive
                 #:long)
-  (:import-from #:cl-avro.schema.logical.timestamp-base
-                #:timestamp-millis-base
-                #:timestamp-micros-base
+  (:import-from #:cl-avro.schema.logical.date
+                #:date-mixin
                 #:year
                 #:month
-                #:day
+                #:day)
+  (:import-from #:cl-avro.schema.logical.time
+                #:time-millis-mixin
+                #:time-micros-mixin
                 #:hour
                 #:minute)
-  (:shadowing-import-from #:cl-avro.schema.logical.timestamp-base
+  (:import-from #:cl-avro.schema.logical.timezone
+                #:timezone)
+  (:shadowing-import-from #:cl-avro.schema.logical.time
                           #:second)
   (:export #:local-timestamp-millis-schema
            #:local-timestamp-micros-schema
@@ -45,7 +49,8 @@
            #:day
            #:hour
            #:minute
-           #:second))
+           #:second
+           #:timezone))
 (in-package #:cl-avro.schema.logical.local-timestamp)
 
 ;;; local-timestamp-millis
@@ -58,7 +63,7 @@
   (:documentation
    "Avro local-timestamp-millis schema."))
 
-(defclass local-timestamp-millis (timestamp-millis-base)
+(defclass local-timestamp-millis (date-mixin time-millis-mixin)
   ()
   (:metaclass local-timestamp-millis-schema)
   (:documentation
@@ -66,6 +71,16 @@
 
 This represents a millisecond-precision timestamp in a local timezone,
 regardless of what specific timezone is considered local."))
+
+(defmethod initialize-instance :after
+    ((instance local-timestamp-millis)
+     &key year month day hour minute millisecond)
+  (when (or year month hour minute millisecond)
+    (multiple-value-bind (second remainder)
+        (truncate millisecond 1000)
+      (local-time:encode-timestamp
+       (* remainder 1000 1000) second minute hour day month year
+       :timezone (timezone instance) :into instance))))
 
 ;;; local-timestamp-micros
 
@@ -77,7 +92,7 @@ regardless of what specific timezone is considered local."))
   (:documentation
    "Avro local-timestamp-micros schema."))
 
-(defclass local-timestamp-micros (timestamp-micros-base)
+(defclass local-timestamp-micros (date-mixin time-micros-mixin)
   ()
   (:metaclass local-timestamp-micros-schema)
   (:documentation
@@ -85,3 +100,13 @@ regardless of what specific timezone is considered local."))
 
 This represents a microsecond-precision timestamp in a local timezone,
 regardless of what specific timezone is considered local."))
+
+(defmethod initialize-instance :after
+    ((instance local-timestamp-micros)
+     &key year month day hour minute microsecond)
+  (when (or year month hour minute microsecond)
+    (multiple-value-bind (second remainder)
+        (truncate microsecond (* 1000 1000))
+      (local-time:encode-timestamp
+       (* remainder 1000) second minute hour day month year
+       :timezone (timezone instance) :into instance))))

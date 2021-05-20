@@ -21,6 +21,9 @@
   (:import-from #:cl-avro.schema.logical.base
                 #:logical-schema
                 #:underlying)
+  (:import-from #:cl-avro.schema.logical.timezone
+                #:timezone-mixin
+                #:timezone)
   (:import-from #:cl-avro.schema.primitive
                 #:int)
   (:export #:date-schema
@@ -29,30 +32,31 @@
            #:date
            #:year
            #:month
-           #:day))
+           #:day
+           #:timezone))
 (in-package #:cl-avro.schema.logical.date)
 
 ;;; mixin
 
-(defclass date-mixin (local-time:timestamp)
+(defclass date-mixin (local-time:timestamp timezone-mixin)
   ()
   (:documentation
    "Date mixin."))
 
-(defgeneric year (date)
+(defgeneric year (date &key &allow-other-keys)
   (:documentation "Return year.")
-  (:method ((instance date-mixin))
-    (local-time:timestamp-year instance)))
+  (:method ((instance date-mixin) &key)
+    (local-time:timestamp-year instance :timezone (timezone instance))))
 
-(defgeneric month (date)
+(defgeneric month (date &key &allow-other-keys)
   (:documentation "Return month.")
-  (:method ((instance date-mixin))
-    (local-time:timestamp-month instance)))
+  (:method ((instance date-mixin) &key)
+    (local-time:timestamp-month instance :timezone (timezone instance))))
 
-(defgeneric day (date)
+(defgeneric day (date &key &allow-other-keys)
   (:documentation "Return day.")
-  (:method ((instance date-mixin))
-    (local-time:timestamp-day instance)))
+  (:method ((instance date-mixin) &key)
+    (local-time:timestamp-day instance :timezone (timezone instance))))
 
 ;;; date
 
@@ -80,4 +84,5 @@ particular timezone or time-of-day."))
 (defmethod initialize-instance :after
     ((instance date) &key year month day)
   (when (or year month)
-    (local-time:encode-timestamp 0 0 0 0 day month year :into instance)))
+    (local-time:encode-timestamp
+     0 0 0 0 day month year :into instance :timezone (timezone instance))))

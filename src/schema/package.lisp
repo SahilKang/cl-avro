@@ -107,6 +107,8 @@
            #:uuid-schema
            #:uuid
 
+           #:timezone
+
            #:date-schema
            #:date
            #:year

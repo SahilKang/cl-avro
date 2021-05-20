@@ -25,6 +25,7 @@
                #:flexi-streams
                #:babel
                #:local-time
+               #:local-time-duration
                #:ieee-floats
                #:st-json
                #:chipz
@@ -91,21 +92,21 @@
                                 :depends-on ("base"))
                                (:file "duration"
                                 :depends-on ("base"))
+                               (:file "timezone")
                                (:file "date"
-                                :depends-on ("base"))
+                                :depends-on ("base" "timezone"))
                                (:file "time"
-                                :depends-on ("base"))
-                               (:file "timestamp-base"
-                                :depends-on ("date" "time"))
+                                :depends-on ("base" "timezone"))
                                (:file "timestamp"
-                                :depends-on ("base" "timestamp-base"))
+                                :depends-on ("date" "time"))
                                (:file "local-timestamp"
-                                :depends-on ("base" "timestamp-base"))
+                                :depends-on ("date" "time"))
                                (:file "package"
                                 :depends-on ("base"
                                              "uuid"
                                              "decimal"
                                              "duration"
+                                             "timezone"
                                              "date"
                                              "time"
                                              "timestamp"
