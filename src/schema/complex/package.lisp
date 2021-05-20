@@ -26,11 +26,14 @@
         #:cl-avro.schema.complex.map
         #:cl-avro.schema.complex.union
         #:cl-avro.schema.complex.record)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:export #:schema
            #:object
            #:which-one
            #:default
            #:raw-buffer
+           #:define-initializers
 
            #:complex-schema
            #:complex-object
@@ -77,7 +80,6 @@
            #:record
            #:record-object
            #:fields
-           #:name->field
 
            #:field
            #:type

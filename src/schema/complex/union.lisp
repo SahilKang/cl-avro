@@ -24,7 +24,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema
-                #:object)
+                #:object
+                #:scalarize-initargs)
   (:import-from #:cl-avro.schema.complex.named
                 #:named-schema
                 #:valid-fullname
@@ -32,7 +33,8 @@
   (:import-from #:cl-avro.schema.primitive
                 #:int)
   (:import-from #:cl-avro.schema.complex.common
-                #:which-one)
+                #:which-one
+                #:define-initializers)
   (:export #:union
            #:union-object
            #:schemas
@@ -41,14 +43,6 @@
 (in-package #:cl-avro.schema.complex.union)
 
 ;;; wrappers
-
-(defclass wrapper-object ()
-  ((wrapped-object
-    :initarg :wrap
-    :reader unwrap
-    :documentation "Wrapped union object."))
-  (:default-initargs
-   :wrap (error "Must supply WRAP")))
 
 (defclass wrapper-class (standard-class)
   ((position
@@ -78,21 +72,17 @@
   (ensure-superclass wrapper-object)
   (apply #'call-next-method instance initargs))
 
+(defclass wrapper-object ()
+  ((wrapped-object
+    :initarg :wrap
+    :reader unwrap
+    :documentation "Wrapped union object."))
+  (:default-initargs
+   :wrap (error "Must supply WRAP")))
+
 ;;; union schema
 
-(defclass union-object ()
-  ((wrapped-object
-    :reader wrapped-object
-    :type wrapper-object
-    :documentation "Chosen union object."))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro union schema."))
-
-(defgeneric object (union-object)
-  (:method ((instance union-object))
-    "Return the chosen union object."
-    (unwrap (wrapped-object instance))))
+;; schema
 
 ;; TODO change doc to class metaobject class for avro union schemas
 (defclass union (complex-schema)
@@ -124,6 +114,92 @@
           (fullname schema)
           (type-of schema))))
 (declaim (notinline schema-key))00
+
+(declaim
+ (ftype (function (t) (values schema &optional)) parse-schema))
+(defun parse-schema (schema)
+  (let ((schema
+          (if (and (symbolp schema)
+                   (not (typep schema 'schema)))
+              (find-class schema)
+              schema)))
+    (check-type schema schema)
+    schema))
+
+(declaim
+ (ftype (function (sequence) (values (simple-array schema (*)) &optional))
+        parse-schemas))
+(defun parse-schemas (schemas)
+  (let ((schemas (map '(simple-array schema (*)) #'parse-schema schemas)))
+    (when (zerop (length schemas))
+      (error "Schemas cannot be empty"))
+    (let ((seen (make-hash-table :test #'equal :size (length schemas))))
+      (labels
+          ((assert-unique (schema)
+             (let ((key (schema-key schema)))
+               (if (gethash key seen)
+                   (error "Duplicate ~S schema in union" key)
+                   (setf (gethash key seen) t))))
+           (assert-valid (schema)
+             (if (subtypep (class-of schema) 'union)
+                 (error "Nested union schema: ~S" schema)
+                 (assert-unique schema))))
+        (map nil #'assert-valid schemas)))
+    schemas))
+
+(define-initializers union :around
+    (&rest initargs &key schemas)
+  (let ((schemas (parse-schemas schemas)))
+    (setf (getf initargs :schemas) schemas))
+  (ensure-superclass union-object)
+  (apply #'call-next-method instance initargs))
+
+(declaim
+ (ftype (function ((simple-array schema (*)))
+                  (values (simple-array wrapper-class (*)) &optional))
+        make-wrapper-classes))
+(defun make-wrapper-classes (schemas)
+  (loop
+    with wrapper-classes = (make-array (length schemas)
+                                       :element-type 'wrapper-class)
+
+    for schema across schemas
+    for i from 0
+
+    for wrapper-class = (make-instance 'wrapper-class :position i :type schema)
+    do
+       (setf (elt wrapper-classes i) wrapper-class)
+
+    finally
+       (return wrapper-classes)))
+
+(define-initializers union :after
+    (&key)
+  (with-slots (schemas wrapper-classes) instance
+    (setf wrapper-classes (make-wrapper-classes schemas))))
+
+(defmethod scalarize-initargs
+    ((metaclass (eql 'union)) (initargs list))
+  (let ((schemas (getf initargs :schemas)))
+    (if (remf initargs :schemas)
+        (list* :schemas schemas (scalarize-initargs 'complex-schema initargs))
+        (scalarize-initargs 'complex-schema initargs))))
+
+;; object
+
+(defclass union-object ()
+  ((wrapped-object
+    :reader wrapped-object
+    :type wrapper-object
+    :documentation "Chosen union object."))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro union schema."))
+
+(defgeneric object (union-object)
+  (:method ((instance union-object))
+    "Return the chosen union object."
+    (unwrap (wrapped-object instance))))
 
 (defmethod which-one ((instance union-object))
   "Return (values schema-name position schema)."
@@ -165,61 +241,3 @@
   (declare (inline wrap))
   (with-slots (wrapped-object) instance
     (setf wrapped-object (wrap (class-of instance) object))))
-
-(declaim
- (ftype (function (t) (values schema &optional)) parse-schema))
-(defun parse-schema (schema)
-  (check-type schema schema)
-  schema)
-
-(declaim
- (ftype (function (sequence) (values (simple-array schema (*)) &optional))
-        parse-schemas))
-(defun parse-schemas (schemas)
-  (let ((schemas (map '(simple-array schema (*)) #'parse-schema schemas)))
-    (when (zerop (length schemas))
-      (error "Schemas cannot be empty"))
-    (let ((seen (make-hash-table :test #'equal :size (length schemas))))
-      (labels
-          ((assert-unique (schema)
-             (let ((key (schema-key schema)))
-               (if (gethash key seen)
-                   (error "Duplicate ~S schema in union" key)
-                   (setf (gethash key seen) t))))
-           (assert-valid (schema)
-             (if (subtypep (class-of schema) 'union)
-                 (error "Nested union schema: ~S" schema)
-                 (assert-unique schema))))
-        (map nil #'assert-valid schemas)))
-    schemas))
-
-(defmethod initialize-instance :around
-    ((instance union) &rest initargs &key schemas)
-  (let ((schemas (parse-schemas schemas)))
-    (setf (getf initargs :schemas) schemas))
-  (ensure-superclass union-object)
-  (apply #'call-next-method instance initargs))
-
-(declaim
- (ftype (function ((simple-array schema (*)))
-                  (values (simple-array wrapper-class (*)) &optional))
-        make-wrapper-classes))
-(defun make-wrapper-classes (schemas)
-  (loop
-    with wrapper-classes = (make-array (length schemas)
-                                       :element-type 'wrapper-class)
-
-    for schema across schemas
-    for i from 0
-
-    for wrapper-class = (make-instance 'wrapper-class :position i :type schema)
-    do
-       (setf (elt wrapper-classes i) wrapper-class)
-
-    finally
-       (return wrapper-classes)))
-
-(defmethod initialize-instance :after
-    ((instance union) &key)
-  (with-slots (schemas wrapper-classes) instance
-    (setf wrapper-classes (make-wrapper-classes schemas))))

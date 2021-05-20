@@ -119,26 +119,29 @@ If CANONICAL-FORM is true, then the Canonical Form is written."
   (defprimitives))
 
 (defmethod to-jso :before ((schema named-schema))
-  (setf (gethash schema *seen*) t))
+  (unless (gethash schema *seen*)
+    (setf (gethash schema *seen*) schema)))
 
 (defmethod to-jso :around ((schema named-schema))
-  (if (gethash schema *seen*)
-      (fullname schema) ;; prevents infinite recursion
-      (let ((initargs (call-next-method))
-            (aliases (aliases schema)))
-        (when aliases
-          (push aliases initargs)
-          (push "aliases" initargs))
-        (multiple-value-bind (_ namespace namespacep) (namespace schema)
-          (declare (ignore _))
-          (when namespacep
-            (push namespace initargs)
-            (push "namespace" initargs)))
-        (push (downcase-symbol (class-name (class-of schema))) initargs)
-        (push "type" initargs)
-        (push (nth-value 1 (name schema)) initargs)
-        (push "name" initargs)
-        (apply #'st-json:jso initargs))))
+  (multiple-value-bind (seen-schema seen-schema-p)
+      (gethash schema *seen*)
+    (if seen-schema-p
+        (nth-value 1 (name seen-schema)) ; prevents infinite recursion
+        (let ((initargs (call-next-method))
+              (aliases (aliases schema)))
+          (when aliases
+            (push aliases initargs)
+            (push "aliases" initargs))
+          (multiple-value-bind (_ namespace namespacep) (namespace schema)
+            (declare (ignore _))
+            (when namespacep
+              (push namespace initargs)
+              (push "namespace" initargs)))
+          (push (downcase-symbol (class-name (class-of schema))) initargs)
+          (push "type" initargs)
+          (push (nth-value 1 (name schema)) initargs)
+          (push "name" initargs)
+          (apply #'st-json:jso initargs)))))
 
 (defmethod to-jso ((schema fixed))
   (list "size" (size schema)))

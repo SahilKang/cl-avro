@@ -55,15 +55,31 @@
 
 ;; TODO add symbol/class-name specializations (eql 'schema:uuid)
 
+;;; unix time util
+
+(declaim
+ (ftype (function (local-time::timezone) (values integer &optional))
+        utc-offset))
+(defun utc-offset (timezone)
+  (nth-value 9 (local-time:decode-timestamp (local-time:now) :timezone timezone)))
+
+(declaim
+ (ftype (function (local-time::timezone)
+                  (values local-time:timestamp &optional))
+        make-unix-epoch))
+(defun make-unix-epoch (timezone)
+  (local-time:encode-timestamp 0 0 0 0 1 1 1970 :offset (utc-offset timezone)))
+
 ;;; date schema
 
 (declaim
  (ftype (function (schema:date) (values schema:int &optional)) process-date)
  (inline process-date))
 (defun process-date (date)
-  (let ((unix-time (local-time:timestamp-to-unix date)))
-    (declare (integer unix-time))
-    (nth-value 0 (truncate unix-time (* 60 60 24)))))
+  (let* ((unix-epoch (make-unix-epoch (schema:timezone date)))
+         (diff (local-time-duration:timestamp-difference date unix-epoch))
+         (day-diff (local-time-duration:duration-as diff :day)))
+    day-diff))
 (declaim (notinline process-date))
 
 (defmethod serialized-size ((object schema:date))
@@ -85,7 +101,8 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
             `(deserialize-from-vector 'schema:int vector start)
             `(deserialize-from-stream 'schema:int stream))
      (let ((timestamp
-             (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+             (local-time:adjust-timestamp!
+                 (local-time:encode-timestamp 0 0 0 0 1 1 1970)
                (offset :day days))))
        (values (change-class timestamp schema) bytes-read))))
 
@@ -96,13 +113,14 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
         process-time-millis)
  (inline process-time-millis))
 (defun process-time-millis (time-millis)
-  (local-time:with-decoded-timestamp
-      (:hour hour :minute minute :sec second :nsec nanosecond)
-      time-millis
-    (+ (* hour 60 60 1000)
-       (* minute 60 1000)
-       (* second 1000)
-       (truncate nanosecond (* 1000 1000)))))
+  (let ((hour (schema:hour time-millis))
+        (minute (schema:minute time-millis)))
+    (multiple-value-bind (second remainder)
+        (schema:second time-millis)
+      (+ (* hour 60 60 1000)
+         (* minute 60 1000)
+         (* second 1000)
+         (* remainder 1000)))))
 (declaim (notinline process-time-millis))
 
 (defmethod serialized-size ((object schema:time-millis))
@@ -124,14 +142,14 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
             `(deserialize-from-vector 'schema:int vector start)
             `(deserialize-from-stream 'schema:int stream))
      (declare ((and (integer 0) schema:int) milliseconds-after-midnight))
-     (let ((hour (multiple-value-bind (hour remainder)
-                     (truncate milliseconds-after-midnight (* 60 60 1000))
-                   (setf milliseconds-after-midnight remainder)
-                   hour))
-           (minute (multiple-value-bind (minute remainder)
-                       (truncate milliseconds-after-midnight (* 60 1000))
-                     (setf milliseconds-after-midnight remainder)
-                     minute)))
+     (let* ((hour (multiple-value-bind (hour remainder)
+                      (truncate milliseconds-after-midnight (* 60 60 1000))
+                    (setf milliseconds-after-midnight remainder)
+                    hour))
+            (minute (multiple-value-bind (minute remainder)
+                        (truncate milliseconds-after-midnight (* 60 1000))
+                      (setf milliseconds-after-midnight remainder)
+                      minute)))
        (values
         (make-instance schema :hour hour :minute minute
                               :millisecond milliseconds-after-midnight)
@@ -144,13 +162,14 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
         process-time-micros)
  (inline process-time-micros))
 (defun process-time-micros (time-micros)
-  (local-time:with-decoded-timestamp
-      (:hour hour :minute minute :sec second :nsec nanosecond)
-      time-micros
-    (+ (* hour 60 60 1000 1000)
-       (* minute 60 1000 1000)
-       (* second 1000 1000)
-       (truncate nanosecond 1000))))
+  (let ((hour (schema:hour time-micros))
+        (minute (schema:minute time-micros)))
+    (multiple-value-bind (second remainder)
+        (schema:second time-micros)
+      (+ (* hour 60 60 1000 1000)
+         (* minute 60 1000 1000)
+         (* second 1000 1000)
+         (* remainder 1000 1000)))))
 (declaim (notinline process-time-micros))
 
 (defmethod serialized-size ((object schema:time-micros))
@@ -172,14 +191,14 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
      (declare ((and (integer 0) schema:long) microseconds-after-midnight))
-     (let ((hour (multiple-value-bind (hour remainder)
-                     (truncate microseconds-after-midnight (* 60 60 1000 1000))
-                   (setf microseconds-after-midnight remainder)
-                   hour))
-           (minute (multiple-value-bind (minute remainder)
-                       (truncate microseconds-after-midnight (* 60 1000 1000))
-                     (setf microseconds-after-midnight remainder)
-                     minute)))
+     (let* ((hour (multiple-value-bind (hour remainder)
+                      (truncate microseconds-after-midnight (* 60 60 1000 1000))
+                    (setf microseconds-after-midnight remainder)
+                    hour))
+            (minute (multiple-value-bind (minute remainder)
+                        (truncate microseconds-after-midnight (* 60 1000 1000))
+                      (setf microseconds-after-midnight remainder)
+                      minute)))
        (values
         (make-instance schema :hour hour :minute minute
                               :microsecond microseconds-after-midnight)
@@ -192,12 +211,11 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
         process-timestamp-millis)
  (inline process-timestamp-millis))
 (defun process-timestamp-millis (timestamp-millis)
-  (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-millis))
-        (nanoseconds (local-time:nsec-of timestamp-millis)))
-    (declare ((integer -9223372036854776 9223372036854775) seconds-from-unix-epoch)
-             ((integer 0 999999999) nanoseconds))
-    (+ (* 1000 seconds-from-unix-epoch)
-       (truncate nanoseconds (* 1000 1000)))))
+  (let* ((unix-epoch (make-unix-epoch local-time:+utc-zone+))
+         (diff (local-time-duration:timestamp-difference
+                timestamp-millis unix-epoch))
+         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
+    (nth-value 0 (truncate nanosecond-diff (* 1000 1000)))))
 (declaim (notinline process-timestamp-millis))
 
 (defmethod serialized-size ((object schema:timestamp-millis))
@@ -227,7 +245,8 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
             (nanoseconds-from-unix-epoch
               (* milliseconds-from-unix-epoch 1000 1000))
             (timestamp
-              (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+              (local-time:adjust-timestamp!
+                  (make-unix-epoch local-time:+utc-zone+)
                 (offset :sec seconds-from-unix-epoch)
                 (offset :nsec nanoseconds-from-unix-epoch))))
        (values (change-class timestamp schema) bytes-read))))
@@ -239,12 +258,11 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
         process-timestamp-micros)
  (inline process-timestamp-micros))
 (defun process-timestamp-micros (timestamp-micros)
-  (let ((seconds-from-unix-epoch (local-time:timestamp-to-unix timestamp-micros))
-        (nanoseconds (local-time:nsec-of timestamp-micros)))
-    (declare ((integer -9223372036855 9223372036854) seconds-from-unix-epoch)
-             ((integer 0 999999999) nanoseconds))
-    (+ (* 1000 1000 seconds-from-unix-epoch)
-       (truncate nanoseconds 1000))))
+  (let* ((unix-epoch (make-unix-epoch local-time:+utc-zone+))
+         (diff (local-time-duration:timestamp-difference
+                timestamp-micros unix-epoch))
+         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
+    (nth-value 0 (truncate nanosecond-diff 1000))))
 (declaim (notinline process-timestamp-micros))
 
 (defmethod serialized-size ((object schema:timestamp-micros))
@@ -274,7 +292,8 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
             (nanoseconds-from-unix-epoch
               (* microseconds-from-unix-epoch 1000))
             (timestamp
-              (local-time:adjust-timestamp! (local-time:unix-to-timestamp 0)
+              (local-time:adjust-timestamp!
+                  (make-unix-epoch local-time:+utc-zone+)
                 (offset :sec seconds-from-unix-epoch)
                 (offset :nsec nanoseconds-from-unix-epoch))))
        (values (change-class timestamp schema) bytes-read))))
@@ -287,11 +306,11 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
         process-local-timestamp-millis)
  (inline process-local-timestamp-millis))
 (defun process-local-timestamp-millis (local-timestamp-millis)
-  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
-         (seconds-from-epoch (local-time:timestamp-difference
-                              epoch local-timestamp-millis)))
-    (declare ((or integer double-float) seconds-from-epoch))
-    (nth-value 0 (truncate (* seconds-from-epoch 1000)))))
+  (let* ((unix-epoch (make-unix-epoch (schema:timezone local-timestamp-millis)))
+         (diff (local-time-duration:timestamp-difference
+                local-timestamp-millis unix-epoch))
+         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
+    (nth-value 0 (truncate nanosecond-diff (* 1000 1000)))))
 (declaim (notinline process-local-timestamp-millis))
 
 (defmethod serialized-size ((object schema:local-timestamp-millis))
@@ -320,10 +339,9 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
                 seconds))
             (nanoseconds-from-epoch
               (* milliseconds-from-epoch 1000 1000))
-            (epoch
-              (local-time:encode-timestamp 0 0 0 0 1 1 1970))
             (timestamp
-              (local-time:adjust-timestamp! epoch
+              (local-time:adjust-timestamp!
+                  (make-unix-epoch local-time:*default-timezone*)
                 (offset :sec seconds-from-epoch)
                 (offset :nsec nanoseconds-from-epoch))))
        (values (change-class timestamp schema) bytes-read))))
@@ -336,11 +354,11 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
         process-local-timestamp-micros)
  (inline process-local-timestamp-micros))
 (defun process-local-timestamp-micros (local-timestamp-micros)
-  (let* ((epoch (local-time:encode-timestamp 0 0 0 0 1 1 1970))
-         (seconds-from-epoch (local-time:timestamp-difference
-                              epoch local-timestamp-micros)))
-    (declare ((or integer double-float) seconds-from-epoch))
-    (nth-value 0 (truncate (* seconds-from-epoch 1000 1000)))))
+  (let* ((unix-epoch (make-unix-epoch (schema:timezone local-timestamp-micros)))
+         (diff (local-time-duration:timestamp-difference
+                local-timestamp-micros unix-epoch))
+         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
+    (nth-value 0 (truncate nanosecond-diff 1000))))
 (declaim (notinline process-local-timestamp-micros))
 
 (defmethod serialized-size ((object schema:local-timestamp-micros))
@@ -369,10 +387,9 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
                 seconds))
             (nanoseconds-from-epoch
               (* microseconds-from-epoch 1000))
-            (epoch
-              (local-time:encode-timestamp 0 0 0 0 1 1 1970))
             (timestamp
-              (local-time:adjust-timestamp! epoch
+              (local-time:adjust-timestamp!
+                  (make-unix-epoch local-time:*default-timezone*)
                 (offset :sec seconds-from-epoch)
                 (offset :nsec nanoseconds-from-epoch))))
        (values (change-class timestamp schema) bytes-read))))
@@ -414,8 +431,6 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 
 ;; big-endian
 
-;; TODO not sure about this (integer 0) type
-
 (declaim
  (ftype (function ((simple-array (unsigned-byte 8) (*)))
                   (values (integer 0) &optional))
@@ -425,10 +440,11 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
   (loop
     with value of-type (integer 0) = 0
 
-    for offset from (1- (length bytes)) downto 0
+    for offset below (length bytes)
     for byte of-type (unsigned-byte 8) = (elt bytes offset)
+    for shift = (* 8 (1- (- (length bytes) offset))) then (- shift 8)
 
-    do (setf value (logior value (ash byte (* offset 8))))
+    do (setf value (logior value (ash byte shift)))
 
     finally
        (return value)))
@@ -442,8 +458,8 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
  (inline integer->big-endian))
 (defun integer->big-endian (integer bytes start end)
   (loop
-    for offset from (1- end) downto start
-    for shift = (* 8 (the fixnum (- offset start)))
+    for offset from start below end
+    for shift = (* 8 (the fixnum (1- (- end offset)))) then (- shift 8)
     for byte of-type (unsigned-byte 8) = (logand #xff (ash integer (- shift)))
     do (setf (elt bytes offset) byte)
 
@@ -461,10 +477,11 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defun read-twos-complement (bytes)
   (declare (inline big-endian->integer))
   (let* ((bits (* (length bytes) 8))
-         (mask (ash 2 (1- bits)))
+         (mask (ash 1 (1- bits)))
          (value (big-endian->integer bytes)))
-    (+ (- (logand value mask))
-       (logand value (lognot mask)))))
+    (if (zerop (logand value mask))
+        value
+        (- value (expt 2 bits)))))
 (declaim (notinline read-twos-complement))
 
 (declaim
@@ -475,7 +492,8 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defun write-twos-complement (integer bytes start end)
   (declare (inline integer->big-endian))
   (let ((value (if (minusp integer)
-                   (1+ (lognot (abs integer)))
+                   (let ((bits (* (- end start) 8)))
+                     (+ integer (expt 2 bits)))
                    integer)))
     (integer->big-endian value bytes start end)))
 (declaim (notinline write-twos-complement))

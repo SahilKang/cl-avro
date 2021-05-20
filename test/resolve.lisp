@@ -23,6 +23,18 @@
 
 (in-package #:test/resolve)
 
+(declaim
+ (ftype (function (avro:record-object simple-string)
+                  (values avro:object &optional))
+        field))
+(defun field (record field)
+  (let ((found-field (find field (avro:fields (class-of record))
+                           :key #'avro:name :test #'string=)))
+    (unless found-field
+      (error "No such field ~S" field))
+    (slot-value record (nth-value 1 (avro:name found-field)))))
+
+
 (test resolve-enum
   (let ((writer-schema (avro:deserialize
                         'avro:schema
@@ -89,6 +101,6 @@
                                       :|UnknownField| "ignored"))
                      :reader-schema reader-schema)))
         (list
-         (avro:field object "Field_2")
-         (avro:field object "Field_11")
-         (avro:field object "Field_3")))))))
+         (field object "Field_2")
+         (field object "Field_11")
+         (field object "Field_3")))))))

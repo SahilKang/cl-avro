@@ -16,21 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
+(defpackage #:cl-avro.schema.logical.timezone
+  (:use #:cl)
+  (:export #:timezone-mixin
+           #:timezone))
+(in-package #:cl-avro.schema.logical.timezone)
 
-(defpackage #:cl-avro.schema.complex.record
-  (:use #:cl-avro.schema.complex.record.field
-        #:cl-avro.schema.complex.record.schema)
-  (:export #:record
-           #:record-object
-           #:fields
-
-           #:field
-           #:name
-           #:aliases
-           #:type
-           #:default
-           #:order
-
-           #:ascending
-           #:descending
-           #:ignore))
+(defclass timezone-mixin ()
+  ((timezone
+    :type local-time::timezone
+    :reader timezone
+    :initform local-time:*default-timezone*)))

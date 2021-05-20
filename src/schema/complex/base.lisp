@@ -21,6 +21,8 @@
   (:import-from #:cl-avro.schema.primitive
                 #:primitive-schema
                 #:primitive-object)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:export #:complex-schema
            #:complex-object
            #:schema
@@ -84,14 +86,14 @@
       (map nil #'check-slot-type slots)))
   (values))
 
-(defmethod initialize-instance :around
-    ((instance complex-schema) &rest initargs)
+(define-initializers complex-schema :around
+    (&rest initargs)
   (ensure-superclass complex-object)
   (let ((instance (apply #'call-next-method instance initargs)))
     (check-slot-types instance)
     instance))
 
-(declaim (ftype (function (list) (values t &optional)) scalarize))
+(declaim (ftype (function (cons) (values t &optional)) scalarize))
 (defun scalarize (list)
   (if (= (length list) 1)
       (first list)
@@ -127,7 +129,8 @@
         (error "Odd number of key-value pairs: ~S" initargs)
 
       if (or (member arg standard-args)
-             (not (keywordp arg)))
+             (not (keywordp arg))
+             (not (consp value)))
         nconc (list arg value)
       else
         nconc (list arg (scalarize value)))))
@@ -136,6 +139,9 @@
     (class name &rest initargs &key metaclass)
   (if (subtypep metaclass 'complex-schema)
       (let ((initargs (scalarize-initargs metaclass initargs)))
+        (unless (member :name initargs)
+          (push name initargs)
+          (push :name initargs))
         (apply #'call-next-method class name initargs))
       (call-next-method)))
 

@@ -22,7 +22,8 @@
   (:local-nicknames
    (#:sequences #:org.shirakumo.trivial-extensible-sequences))
   (:import-from #:cl-avro.schema.complex.common
-                #:raw-buffer)
+                #:raw-buffer
+                #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
                 #:ensure-superclass
@@ -35,20 +36,18 @@
            #:pop))
 (in-package #:cl-avro.schema.complex.array)
 
-(defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
-  ((buffer
-    :accessor buffer
-    :reader raw-buffer
-    :type (vector schema)))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class for objects adhering to an avro array schema."))
+;;; effective-slot
+
+(defclass effective-slot (closer-mop:standard-effective-slot-definition)
+  ((type
+    :type schema)))
+
+;;; schema
 
 (defclass array (complex-schema)
   ((items
     :initarg :items
-    :reader items
-    :type schema
+    :type (or schema symbol)
     :documentation "Array schema element type."))
   (:default-initargs
    :items (error "Must supply ITEMS"))
@@ -58,6 +57,49 @@
 (defmethod closer-mop:validate-superclass
     ((class array) (superclass complex-schema))
   t)
+
+(defmethod closer-mop:effective-slot-definition-class
+    ((class array) &key)
+  (find-class 'effective-slot))
+
+(defgeneric items (instance)
+  (:method ((instance array))
+    (unless (closer-mop:class-finalized-p instance)
+      (closer-mop:finalize-inheritance instance))
+    (slot-value instance 'items)))
+
+(declaim
+ (ftype (function ((or schema symbol)) (values cons &optional))
+        make-buffer-slot))
+(defun make-buffer-slot (items)
+  (list :name 'buffer
+        :type `(vector ,items)))
+
+(define-initializers array :around
+    (&rest initargs &key items)
+  (let ((buffer-slot (make-buffer-slot items)))
+    (cl:push buffer-slot (getf initargs :direct-slots)))
+  (ensure-superclass array-object)
+  (apply #'call-next-method instance initargs))
+
+(defmethod closer-mop:finalize-inheritance :after
+    ((instance array))
+  (with-slots (items) instance
+    (when (and (symbolp items)
+               (not (typep items 'schema)))
+      (setf items (find-class items)))
+    (check-type items schema)))
+
+;;; object
+
+(defclass array-object (#+sbcl sequence #-sbcl sequences:sequence)
+  ((buffer
+    :accessor buffer
+    :reader raw-buffer
+    :type (vector schema)))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro array schema."))
 
 (declaim
  (ftype (function (schema t) (values &optional)) assert-type)
@@ -89,18 +131,6 @@
       (cl:push initial-contents keyword-args)
       (cl:push :initial-contents keyword-args))
     (setf (buffer instance) (apply #'make-array length keyword-args))))
-
-(declaim (ftype (function (schema) (values cons &optional)) make-buffer-slot))
-(defun make-buffer-slot (items)
-  (list :name 'buffer
-        :type `(vector ,items)))
-
-(defmethod initialize-instance :around
-    ((instance array) &rest initargs &key items)
-  (let ((buffer-slot (make-buffer-slot items)))
-    (cl:push buffer-slot (getf initargs :direct-slots)))
-  (ensure-superclass array-object)
-  (apply #'call-next-method instance initargs))
 
 (defmethod sequences:length
     ((instance array-object))

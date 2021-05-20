@@ -93,7 +93,6 @@
            #:record
            #:record-object
            #:fields
-           #:name->field
 
            #:field
            #:type
@@ -107,6 +106,8 @@
 
            #:uuid-schema
            #:uuid
+
+           #:timezone
 
            #:date-schema
            #:date

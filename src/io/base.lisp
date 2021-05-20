@@ -70,7 +70,7 @@ Return (values vector number-of-serialized-bytes)"
   (:method :before (reader writer)
     (assert-match reader writer))
 
-  (:method ((reader symbol) writer)
+  (:method :around ((reader symbol) writer)
     (if (typep reader 'schema:primitive-schema)
         (call-next-method)
         (resolve (find-class reader) writer)))

@@ -129,7 +129,7 @@
     :reader defaulted-initargs
     :type list)
    (needed-fields
-    :initform (make-array 0 :element-type 'schema:name
+    :initform (make-array 0 :element-type 'symbol
                             :adjustable t :fill-pointer t)
     :reader needed-fields
     :type (vector schema:name))
@@ -139,13 +139,40 @@
     :type schema:record)))
 
 (declaim
+ (ftype (function ((simple-array schema:field (*)))
+                  (values hash-table &optional))
+        %make-name->field))
+(defun %make-name->field (fields)
+  (let ((name->field (make-hash-table :test #'equal)))
+    (labels
+        ((set-if-empty (name field)
+           (declare (schema:name name)
+                    (schema:field field))
+           (if (gethash name name->field)
+               (error "~S already names a field" name)
+               (setf (gethash name name->field) field)))
+         (process-field (field)
+           (set-if-empty (schema:name field) field)
+           (flet ((set-if-empty (alias)
+                    (set-if-empty alias field)))
+             (map nil #'set-if-empty (schema:aliases field)))))
+      (map nil #'process-field fields))
+    name->field))
+
+(declaim
+ (ftype (function (schema:record) (values hash-table &optional))
+        make-name->field))
+(defun make-name->field (record)
+  (%make-name->field (schema:fields record)))
+
+(declaim
  (ftype (function (schema:record schema:record)
                   (values schema:record &optional))
         resolve-records)
  (inline resolve-records))
 (defun resolve-records (reader writer)
   (loop
-    with name->reader-field = (schema:name->field reader)
+    with name->reader-field = (make-name->field reader)
 
     for writer-field across (schema:fields writer)
     for writer-type = (schema:type writer-field)
@@ -159,14 +186,12 @@
       collect (let* ((reader-type (schema:type reader-field))
                      (resolved-type (resolve reader-type writer-type)))
                 (list
-                 :name (make-symbol ;; TODO just use second value
-                        (the schema:name (schema:name reader-field)))
+                 :name (nth-value 1 (schema:name reader-field))
                  :type resolved-type))
         into slots
     else
       collect (list
-               :name (make-symbol
-                      (the schema:name (schema:name writer-field)))
+               :name (nth-value 1 (schema:name writer-field))
                :type writer-type)
         into slots
 
@@ -182,7 +207,7 @@
   (declare (inline resolve-records))
   (with-slots (reader writer defaulted-initargs needed-fields) instance
     (loop
-      with name->writer-field = (schema:name->field writer)
+      with name->writer-field = (make-name->field writer)
 
       for reader-field across (schema:fields reader)
       for writer-field
@@ -192,7 +217,7 @@
                     (schema:aliases reader-field)))
 
       if writer-field do
-        (vector-push-extend (schema:name reader-field) needed-fields)
+        (vector-push-extend (nth-value 1 (schema:name reader-field)) needed-fields)
       else do
         (multiple-value-bind (default defaultp)
             (schema:default reader-field)
@@ -217,11 +242,11 @@
     with initargs = (defaulted-initargs schema)
 
     for name across (needed-fields schema)
-    for value = (schema:field object name)
+    for value = (slot-value object name)
 
     do
        (push value initargs)
-       (push (intern name 'keyword) initargs)
+       (push (intern (string name) 'keyword) initargs)
 
     finally
        (return initargs)))

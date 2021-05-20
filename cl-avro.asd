@@ -25,6 +25,8 @@
                #:flexi-streams
                #:babel
                #:local-time
+               #:local-time-duration
+               #:time-interval
                #:ieee-floats
                #:st-json
                #:chipz
@@ -71,6 +73,7 @@
                                 :serial t
                                 :components ((:file "notation")
                                              (:file "field")
+                                             (:file "effective-field")
                                              (:file "schema")
                                              (:file "package")))
                                (:file "package"
@@ -91,21 +94,21 @@
                                 :depends-on ("base"))
                                (:file "duration"
                                 :depends-on ("base"))
+                               (:file "timezone")
                                (:file "date"
-                                :depends-on ("base"))
+                                :depends-on ("base" "timezone"))
                                (:file "time"
-                                :depends-on ("base"))
-                               (:file "timestamp-base"
-                                :depends-on ("date" "time"))
+                                :depends-on ("base" "timezone"))
                                (:file "timestamp"
-                                :depends-on ("base" "timestamp-base"))
+                                :depends-on ("date" "time"))
                                (:file "local-timestamp"
-                                :depends-on ("base" "timestamp-base"))
+                                :depends-on ("date" "time"))
                                (:file "package"
                                 :depends-on ("base"
                                              "uuid"
                                              "decimal"
                                              "duration"
+                                             "timezone"
                                              "date"
                                              "time"
                                              "timestamp"
@@ -193,14 +196,42 @@
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
-  :depends-on (#:cl-avro #:1am #:flexi-streams)
+  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables)
   :perform (test-op (op sys) (uiop:symbol-call :1am :run))
   :pathname "test"
   :components
-  ((:file "object-container-file")
-   (:file "parser")
+  ((:file "common")
+   (:file "compare")
+   (:file "object-container-file")
    (:file "resolve")
-   (:file "fingerprint")
    (:file "single-object-encoding")
-   (:file "logical")
-   (:file "compare")))
+   (:module "complex"
+    :depends-on ("common")
+    :components ((:file "array")
+                 (:file "enum")
+                 (:file "fixed")
+                 (:file "map")
+                 (:file "record")
+                 (:file "union")))
+   (:module "logical"
+    :depends-on ("common")
+    :components ((:file "date")
+                 (:file "decimal")
+                 (:file "duration")
+                 (:file "local-timestamp-micros")
+                 (:file "local-timestamp-millis")
+                 (:file "time-micros")
+                 (:file "time-millis")
+                 (:file "timestamp-micros")
+                 (:file "timestamp-millis")
+                 (:file "uuid")))
+   (:module "primitive"
+    :depends-on ("common")
+    :components ((:file "boolean")
+                 (:file "bytes")
+                 (:file "double")
+                 (:file "float")
+                 (:file "int")
+                 (:file "long")
+                 (:file "null")
+                 (:file "string")))))

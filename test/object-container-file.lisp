@@ -26,6 +26,17 @@
 (defparameter *weather-filespec*
   (asdf:system-relative-pathname 'cl-avro/test "test/weather.avro"))
 
+(declaim
+ (ftype (function (avro:record-object simple-string)
+                  (values avro:object &optional))
+        field))
+(defun field (record field)
+  (let ((found-field (find field (avro:fields (class-of record))
+                           :key #'avro:name :test #'string=)))
+    (unless found-field
+      (error "No such field ~S" field))
+    (slot-value record (nth-value 1 (avro:name found-field)))))
+
 (test read-file
   (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
     (let ((expected '(("011990-99999" -619524000000 0)
@@ -43,9 +54,9 @@
                     finally (return records))))
       (map nil
            (lambda (lhs rhs)
-             (let ((station (avro:field rhs "station"))
-                   (time (avro:field rhs "time"))
-                   (temp (avro:field rhs "temp")))
+             (let ((station (field rhs "station"))
+                   (time (field rhs "time"))
+                   (temp (field rhs "temp")))
                (is (equal lhs (list station time temp)))))
            expected
            actual))))
@@ -79,9 +90,9 @@
                     finally (return records))))
       (map nil
            (lambda (lhs rhs)
-             (let ((station (avro:field rhs "station"))
-                   (time (avro:field rhs "time"))
-                   (temp (avro:field rhs "temp")))
+             (let ((station (field rhs "station"))
+                   (time (field rhs "time"))
+                   (temp (field rhs "temp")))
                (is (equal lhs (list station time temp)))))
            expected
            actual))))

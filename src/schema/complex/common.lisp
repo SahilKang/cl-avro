@@ -21,7 +21,8 @@
   (:export #:assert-distinct
            #:which-one
            #:default
-           #:raw-buffer))
+           #:raw-buffer
+           #:define-initializers))
 (in-package #:cl-avro.schema.complex.common)
 
 ;;; assert-distinct
@@ -59,3 +60,21 @@
 ;;; raw-buffer
 
 (defgeneric raw-buffer (sequence))
+
+;;; define-initializers
+
+(defmacro define-initializers
+    (instance-specializer qualifier (&rest args) &body body)
+  (declare ((or symbol cons) instance-specializer)
+           ((member :after :around) qualifier))
+  (multiple-value-bind (instance status)
+      (find-symbol "INSTANCE")
+    (unless status
+      (error "Could not find INSTANCE"))
+    `(progn
+       (defmethod initialize-instance ,qualifier
+         ((,instance ,instance-specializer) ,@args)
+         ,@body)
+       (defmethod reinitialize-instance ,qualifier
+         ((,instance ,instance-specializer) ,@args)
+         ,@body))))

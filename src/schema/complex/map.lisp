@@ -24,6 +24,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
+  (:import-from #:cl-avro.schema.complex.common
+                #:define-initializers)
   (:import-from #:genhash
                 #:generic-hash-table-count
                 #:generic-hash-table-p
@@ -45,6 +47,41 @@
            #:hashrem))
 (in-package #:cl-avro.schema.complex.map)
 
+;;; schema
+
+(defclass map (complex-schema)
+  ((values
+    :reader values
+    :type schema
+    :documentation "Map schema value type."))
+  (:documentation
+   "Base class for avro map schemas."))
+
+(defmethod closer-mop:validate-superclass
+    ((class map) (superclass complex-schema))
+  t)
+
+(define-initializers map :around
+    (&rest initargs)
+  (ensure-superclass map-object)
+  (apply #'call-next-method instance initargs))
+
+(declaim (ftype (function (t) (cl:values schema &optional)) parse-values))
+(defun parse-values (values)
+  (let ((values
+          (if (and (symbolp values)
+                   (not (typep values 'schema)))
+              (find-class values)
+              values)))
+    (check-type values schema)
+    values))
+
+(define-initializers map :after
+    (&key (values (error "Must supply VALUES")))
+  (setf (slot-value instance 'values) (parse-values values)))
+
+;;; object
+
 (defclass map-object ()
   ((hash-table
     :reader raw-hash-table
@@ -53,21 +90,6 @@
   (:metaclass complex-schema)
   (:documentation
    "Base class for objects adhering to an avro map schema."))
-
-(defclass map (complex-schema)
-  ((values
-    :initarg :values
-    :reader values
-    :type schema
-    :documentation "Map schema value type."))
-  (:default-initargs
-   :values (error "Must supply VALUES"))
-  (:documentation
-   "Base class for avro map schemas."))
-
-(defmethod closer-mop:validate-superclass
-    ((class map) (superclass complex-schema))
-  t)
 
 (defmethod initialize-instance :after
     ((instance map-object) &key size rehash-size rehash-threshold)
@@ -83,11 +105,6 @@
       (push :rehash-threshold keyword-args))
     (with-slots (hash-table) instance
       (setf hash-table (apply #'make-hash-table keyword-args)))))
-
-(defmethod initialize-instance :around
-    ((instance map) &rest initargs)
-  (ensure-superclass map-object)
-  (apply #'call-next-method instance initargs))
 
 (defmethod generic-hash-table-count
     ((instance map-object))

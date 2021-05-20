@@ -22,10 +22,12 @@
   (:import-from #:cl-avro.schema.complex.common
                 #:assert-distinct
                 #:which-one
-                #:default)
+                #:default
+                #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
-                #:ensure-superclass)
+                #:ensure-superclass
+                #:scalarize-initargs)
   (:import-from #:cl-avro.schema.complex.named
                 #:named-schema
                 #:name
@@ -48,14 +50,7 @@
 (deftype position ()
   '(and int (integer 0)))
 
-(defclass enum-object ()
-  ((position
-    :reader position
-    :type position
-    :documentation "Position of chosen enum."))
-  (:metaclass complex-schema)
-  (:documentation
-   "Base class of objects adhering to an avro enum schema."))
+;;; schema
 
 (defclass enum (named-schema)
   ((symbols
@@ -76,31 +71,6 @@
 (defmethod closer-mop:validate-superclass
     ((class enum) (superclass named-schema))
   t)
-
-(defmethod initialize-instance :after
-    ((instance enum-object) &key (enum (error "Must supply ENUM")))
-  (check-type enum name)
-  (let* ((symbols (symbols (class-of instance)))
-         (position (cl:position enum symbols :test #'string=)))
-    (declare ((simple-array name (*)) symbols))
-    (unless position
-      (error "Enum ~S must be one of ~S" enum symbols))
-    (setf (slot-value instance 'position) position)))
-
-(defmethod which-one ((instance enum-object))
-  "Return (values enum-string position)"
-  (let* ((position (position instance))
-         (symbols (symbols (class-of instance)))
-         (symbol (elt symbols position)))
-    (declare ((simple-array name (*)) symbols))
-    (values symbol position)))
-
-(defmethod default ((instance enum))
-  "Return (values default position)."
-  (with-slots (default symbols) instance
-    (if default
-        (values (elt symbols default) default)
-        (values nil nil))))
 
 (declaim (ftype (function (t) (values name &optional)) parse-symbol))
 (defun parse-symbol (symbol)
@@ -129,11 +99,54 @@
         (error "Default ~S not found in symbols ~S" default symbols))
       position)))
 
-(defmethod initialize-instance :around
-    ((instance enum) &rest initargs &key symbols default)
+(define-initializers enum :around
+    (&rest initargs &key symbols default)
   (let* ((symbols (parse-symbols symbols))
          (default (parse-default symbols default)))
     (setf (getf initargs :symbols) symbols
           (getf initargs :default) default))
   (ensure-superclass enum-object)
   (apply #'call-next-method instance initargs))
+
+(defmethod default ((instance enum))
+  "Return (values default position)."
+  (with-slots (default symbols) instance
+    (if default
+        (values (elt symbols default) default)
+        (values nil nil))))
+
+(defmethod scalarize-initargs
+    ((metaclass (eql 'enum)) (initargs list))
+  (let ((symbols (getf initargs :symbols)))
+    (if (remf initargs :symbols)
+        (list* :symbols symbols (scalarize-initargs 'named-schema initargs))
+        (scalarize-initargs 'named-schema initargs))))
+
+;;; object
+
+(defclass enum-object ()
+  ((position
+    :reader position
+    :type position
+    :documentation "Position of chosen enum."))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class of objects adhering to an avro enum schema."))
+
+(defmethod initialize-instance :after
+    ((instance enum-object) &key (enum (error "Must supply ENUM")))
+  (check-type enum name)
+  (let* ((symbols (symbols (class-of instance)))
+         (position (cl:position enum symbols :test #'string=)))
+    (declare ((simple-array name (*)) symbols))
+    (unless position
+      (error "Enum ~S must be one of ~S" enum symbols))
+    (setf (slot-value instance 'position) position)))
+
+(defmethod which-one ((instance enum-object))
+  "Return (values enum-string position)"
+  (let* ((position (position instance))
+         (symbols (symbols (class-of instance)))
+         (symbol (elt symbols position)))
+    (declare ((simple-array name (*)) symbols))
+    (values symbol position)))

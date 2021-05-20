@@ -25,7 +25,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:fixed
-                #:size)
+                #:size
+                #:define-initializers)
   (:export #:duration
            #:underlying
            #:duration-object
@@ -34,36 +35,7 @@
            #:milliseconds))
 (in-package #:cl-avro.schema.logical.duration)
 
-(defclass duration-object ()
-  ((months
-    :initarg :months
-    :reader months
-    :type (unsigned-byte 32)
-    :documentation "Number of months.")
-   (days
-    :initarg :days
-    :reader days
-    :type (unsigned-byte 32)
-    :documentation "Number of days.")
-   (milliseconds
-    :initarg :milliseconds
-    :reader milliseconds
-    :type (unsigned-byte 32)
-    :documentation "Number of milliseconds."))
-  (:metaclass complex-schema)
-  (:default-initargs
-   :months 0
-   :days 0
-   :milliseconds 0)
-  (:documentation
-   "Base class for objects adhering to an avro duration schema."))
-
-(defmethod initialize-instance :after
-    ((instance duration-object) &key)
-  (with-slots (months days milliseconds) instance
-    (check-type months (unsigned-byte 32))
-    (check-type days (unsigned-byte 32))
-    (check-type milliseconds (unsigned-byte 32))))
+;;; schema
 
 (defclass duration (logical-schema)
   ((underlying
@@ -75,14 +47,92 @@
     ((class duration) (superclass logical-schema))
   t)
 
-(defmethod initialize-instance :around
-    ((instance duration) &rest initargs)
+(define-initializers duration :around
+    (&rest initargs &key underlying)
+  (when (and (symbolp underlying)
+             (not (typep underlying 'fixed)))
+    (setf (getf initargs :underlying) (find-class underlying)))
   (ensure-superclass duration-object)
   (apply #'call-next-method instance initargs))
 
-(defmethod initialize-instance :after
-    ((instance duration) &key)
+(define-initializers duration :after
+    (&key)
   (let* ((underlying (underlying instance))
          (size (size underlying)))
     (unless (= size 12)
       (error "Size of fixed schema must be 12, not ~S" size))))
+
+;;; object
+
+(defclass duration-object (time-interval:time-interval)
+  ((time-interval::months
+    :type (unsigned-byte 32)
+    :documentation "Number of months.")
+   (time-interval::days
+    :type (unsigned-byte 32)
+    :documentation "Number of days.")
+   (milliseconds
+    :type (unsigned-byte 32)
+    :accessor %milliseconds
+    :documentation "Number of milliseconds."))
+  (:metaclass complex-schema)
+  (:documentation
+   "Base class for objects adhering to an avro duration schema."))
+
+(declaim
+ (ftype (function (duration-object) (values &optional)) normalize))
+(defun normalize (duration)
+  (with-accessors
+        ((years time-interval::interval-years)
+         (months time-interval::interval-months)
+         (weeks time-interval::interval-weeks)
+         (days time-interval::interval-days)
+         (hours time-interval::interval-hours)
+         (minutes time-interval::interval-minutes)
+         (seconds time-interval::interval-seconds)
+         (milliseconds %milliseconds)
+         (nanoseconds time-interval::interval-nanoseconds))
+      duration
+    (incf months (* years 12))
+    (setf years 0)
+
+    (incf days (* weeks 7))
+    (setf weeks 0)
+
+    (incf minutes (* 60 hours))
+    (incf seconds (* 60 minutes))
+    (setf hours 0
+          minutes 0)
+
+    (setf milliseconds (+ (* 1000 seconds)
+                          (truncate nanoseconds (* 1000 1000))))
+
+    (check-type months (unsigned-byte 32))
+    (check-type days (unsigned-byte 32))
+    (check-type milliseconds (unsigned-byte 32)))
+  (values))
+
+(defmethod initialize-instance :after
+    ((instance duration-object) &key (milliseconds 0))
+  (multiple-value-bind (seconds remainder)
+      (truncate milliseconds 1000)
+    (incf (time-interval::interval-seconds instance)
+          seconds)
+    (incf (time-interval::interval-nanoseconds instance)
+          (* remainder 1000 1000)))
+  (normalize instance))
+
+(defgeneric months (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (time-interval::interval-months instance)))
+
+(defgeneric days (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (time-interval::interval-days instance)))
+
+(defgeneric milliseconds (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (%milliseconds instance)))
