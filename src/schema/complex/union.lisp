@@ -118,8 +118,13 @@
 (declaim
  (ftype (function (t) (values schema &optional)) parse-schema))
 (defun parse-schema (schema)
-  (check-type schema schema)
-  schema)
+  (let ((schema
+          (if (and (symbolp schema)
+                   (not (typep schema 'schema)))
+              (find-class schema)
+              schema)))
+    (check-type schema schema)
+    schema))
 
 (declaim
  (ftype (function (sequence) (values (simple-array schema (*)) &optional))

@@ -41,14 +41,13 @@
 
 (defclass decimal (logical-schema)
   ((underlying
-    :type (or (eql bytes) fixed))
+    :type (or (eql bytes) fixed symbol))
    (scale
     :initarg :scale
     :type (integer 0)
     :documentation "Decimal scale.")
    (precision
     :initarg :precision
-    :reader precision
     :type (integer 1)
     :documentation "Decimal precision."))
   (:default-initargs
@@ -91,6 +90,8 @@
 
 (define-initializers decimal :after
     (&key)
+  ;; TODO calling these methods finalizes the class, which prevents us
+  ;; from forward referencing classes
   (let ((precision (precision instance))
         (scale (scale instance))
         (underlying (underlying instance)))
@@ -102,11 +103,21 @@
 (defgeneric scale (decimal)
   (:method ((instance decimal))
     "Return (values scale scale-provided-p)."
+    ;; TODO all method invocations on these class metaobjects should
+    ;; do this
+    (unless (closer-mop:class-finalized-p instance)
+      (closer-mop:finalize-inheritance instance))
     (let* ((scalep (slot-boundp instance 'scale))
            (scale (if scalep
                       (slot-value instance 'scale)
                       0)))
       (values scale scalep))))
+
+(defgeneric precision (decimal)
+  (:method ((instance decimal))
+    (unless (closer-mop:class-finalized-p instance)
+      (closer-mop:finalize-inheritance instance))
+    (slot-value instance 'precision)))
 
 ;;; object
 

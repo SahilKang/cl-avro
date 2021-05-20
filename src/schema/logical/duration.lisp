@@ -49,6 +49,9 @@
 
 (define-initializers duration :around
     (&rest initargs &key underlying)
+  (when (and (symbolp underlying)
+             (not (typep underlying 'fixed)))
+    (setf (getf initargs :underlying) (find-class underlying)))
   (ensure-superclass duration-object)
   (apply #'call-next-method instance initargs))
 
