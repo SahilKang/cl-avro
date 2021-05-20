@@ -61,33 +61,75 @@
 
 ;;; object
 
-(defclass duration-object ()
-  ((months
-    :initarg :months
-    :reader months
+(defclass duration-object (time-interval:time-interval)
+  ((time-interval::months
     :type (unsigned-byte 32)
     :documentation "Number of months.")
-   (days
-    :initarg :days
-    :reader days
+   (time-interval::days
     :type (unsigned-byte 32)
     :documentation "Number of days.")
    (milliseconds
-    :initarg :milliseconds
-    :reader milliseconds
     :type (unsigned-byte 32)
+    :accessor %milliseconds
     :documentation "Number of milliseconds."))
   (:metaclass complex-schema)
-  (:default-initargs
-   :months 0
-   :days 0
-   :milliseconds 0)
   (:documentation
    "Base class for objects adhering to an avro duration schema."))
 
-(defmethod initialize-instance :after
-    ((instance duration-object) &key)
-  (with-slots (months days milliseconds) instance
+(declaim
+ (ftype (function (duration-object) (values &optional)) normalize))
+(defun normalize (duration)
+  (with-accessors
+        ((years time-interval::interval-years)
+         (months time-interval::interval-months)
+         (weeks time-interval::interval-weeks)
+         (days time-interval::interval-days)
+         (hours time-interval::interval-hours)
+         (minutes time-interval::interval-minutes)
+         (seconds time-interval::interval-seconds)
+         (milliseconds %milliseconds)
+         (nanoseconds time-interval::interval-nanoseconds))
+      duration
+    (incf months (* years 12))
+    (setf years 0)
+
+    (incf days (* weeks 7))
+    (setf weeks 0)
+
+    (incf minutes (* 60 hours))
+    (incf seconds (* 60 minutes))
+    (setf hours 0
+          minutes 0)
+
+    (setf milliseconds (+ (* 1000 seconds)
+                          (truncate nanoseconds (* 1000 1000))))
+
     (check-type months (unsigned-byte 32))
     (check-type days (unsigned-byte 32))
-    (check-type milliseconds (unsigned-byte 32))))
+    (check-type milliseconds (unsigned-byte 32)))
+  (values))
+
+(defmethod initialize-instance :after
+    ((instance duration-object) &key (milliseconds 0))
+  (multiple-value-bind (seconds remainder)
+      (truncate milliseconds 1000)
+    (incf (time-interval::interval-seconds instance)
+          seconds)
+    (incf (time-interval::interval-nanoseconds instance)
+          (* remainder 1000 1000)))
+  (normalize instance))
+
+(defgeneric months (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (time-interval::interval-months instance)))
+
+(defgeneric days (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (time-interval::interval-days instance)))
+
+(defgeneric milliseconds (duration-object)
+  (:method ((instance duration-object))
+    (normalize instance)
+    (%milliseconds instance)))

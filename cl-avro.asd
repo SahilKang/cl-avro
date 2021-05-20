@@ -26,6 +26,7 @@
                #:babel
                #:local-time
                #:local-time-duration
+               #:time-interval
                #:ieee-floats
                #:st-json
                #:chipz
