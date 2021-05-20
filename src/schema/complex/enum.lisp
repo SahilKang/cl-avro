@@ -26,7 +26,8 @@
                 #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
-                #:ensure-superclass)
+                #:ensure-superclass
+                #:scalarize-initargs)
   (:import-from #:cl-avro.schema.complex.named
                 #:named-schema
                 #:name
@@ -113,6 +114,13 @@
     (if default
         (values (elt symbols default) default)
         (values nil nil))))
+
+(defmethod scalarize-initargs
+    ((metaclass (eql 'enum)) (initargs list))
+  (let ((symbols (getf initargs :symbols)))
+    (if (remf initargs :symbols)
+        (list* :symbols symbols (scalarize-initargs 'named-schema initargs))
+        (scalarize-initargs 'named-schema initargs))))
 
 ;;; object
 

@@ -24,7 +24,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema
-                #:object)
+                #:object
+                #:scalarize-initargs)
   (:import-from #:cl-avro.schema.complex.named
                 #:named-schema
                 #:valid-fullname
@@ -171,6 +172,13 @@
     (&key)
   (with-slots (schemas wrapper-classes) instance
     (setf wrapper-classes (make-wrapper-classes schemas))))
+
+(defmethod scalarize-initargs
+    ((metaclass (eql 'union)) (initargs list))
+  (let ((schemas (getf initargs :schemas)))
+    (if (remf initargs :schemas)
+        (list* :schemas schemas (scalarize-initargs 'complex-schema initargs))
+        (scalarize-initargs 'complex-schema initargs))))
 
 ;; object
 

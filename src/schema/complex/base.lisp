@@ -93,7 +93,7 @@
     (check-slot-types instance)
     instance))
 
-(declaim (ftype (function (list) (values t &optional)) scalarize))
+(declaim (ftype (function (cons) (values t &optional)) scalarize))
 (defun scalarize (list)
   (if (= (length list) 1)
       (first list)
@@ -129,7 +129,8 @@
         (error "Odd number of key-value pairs: ~S" initargs)
 
       if (or (member arg standard-args)
-             (not (keywordp arg)))
+             (not (keywordp arg))
+             (not (consp value)))
         nconc (list arg value)
       else
         nconc (list arg (scalarize value)))))
@@ -138,6 +139,9 @@
     (class name &rest initargs &key metaclass)
   (if (subtypep metaclass 'complex-schema)
       (let ((initargs (scalarize-initargs metaclass initargs)))
+        (unless (member :name initargs)
+          (push name initargs)
+          (push :name initargs))
         (apply #'call-next-method class name initargs))
       (call-next-method)))
 
