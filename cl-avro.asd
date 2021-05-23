@@ -45,6 +45,8 @@
                   :depends-on ("primitive" "ascii")
                   :components ((:file "common")
                                (:file "base")
+                               (:file "late-type-check"
+                                :depends-on ("common" "base"))
                                (:module "named"
                                 :depends-on ("common" "base")
                                 :serial t
