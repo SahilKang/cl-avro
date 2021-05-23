@@ -99,3 +99,32 @@
       (let ((deserialized (avro:deserialize schema serialized)))
         (is (eq schema (class-of deserialized)))
         (check deserialized)))))
+
+(test late-type-check
+  (setf (find-class 'late_duration) nil
+        (find-class 'late_fixed) nil)
+
+  (defclass late_duration ()
+    ()
+    (:metaclass avro:duration)
+    (:underlying late_fixed))
+
+  (signals error
+    (avro:underlying (find-class 'late_duration)))
+
+  (defclass late_fixed ()
+    ()
+    (:metaclass avro:fixed)
+    (:size 12))
+
+  (is (eq (find-class 'late_fixed) (avro:underlying (find-class 'late_duration)))))
+
+(test bad-fixed-size
+  (let ((schema (make-instance
+                 'avro:duration
+                 :underlying (make-instance
+                              'avro:fixed
+                              :name "foo"
+                              :size 13))))
+    (signals error
+      (avro:underlying schema))))

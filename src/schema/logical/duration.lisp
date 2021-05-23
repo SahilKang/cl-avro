@@ -22,6 +22,8 @@
                 #:logical-schema
                 #:underlying)
   (:import-from #:cl-avro.schema.complex
+                #:late-class
+                #:parse-slot-value
                 #:complex-schema
                 #:ensure-superclass
                 #:fixed
@@ -39,7 +41,9 @@
 
 (defclass duration (logical-schema)
   ((underlying
-    :type fixed))
+    :reader underlying
+    :late-type fixed))
+  (:metaclass late-class)
   (:documentation
    "Base class for avro duration schemas."))
 
@@ -48,19 +52,17 @@
   t)
 
 (define-initializers duration :around
-    (&rest initargs &key underlying)
-  (when (and (symbolp underlying)
-             (not (typep underlying 'fixed)))
-    (setf (getf initargs :underlying) (find-class underlying)))
+    (&rest initargs)
   (ensure-superclass duration-object)
   (apply #'call-next-method instance initargs))
 
-(define-initializers duration :after
-    (&key)
-  (let* ((underlying (underlying instance))
-         (size (size underlying)))
+(defmethod parse-slot-value :around
+    ((class duration) (name (eql 'underlying)) type value)
+  (let* ((value (call-next-method))
+         (size (size value)))
     (unless (= size 12)
-      (error "Size of fixed schema must be 12, not ~S" size))))
+      (error "Size of fixed schema must be 12, not ~S" size))
+    value))
 
 ;;; object
 
