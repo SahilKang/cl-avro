@@ -28,12 +28,17 @@
         #:cl-avro.schema.complex.record)
   (:import-from #:cl-avro.schema.complex.common
                 #:define-initializers)
+  (:import-from #:cl-avro.schema.complex.late-type-check
+                #:late-class
+                #:parse-slot-value)
   (:export #:schema
            #:object
            #:which-one
            #:default
            #:raw-buffer
            #:define-initializers
+           #:late-class
+           #:parse-slot-value
 
            #:complex-schema
            #:complex-object

@@ -37,6 +37,7 @@
 
                 #:duration)
   (:import-from #:cl-avro.schema.complex
+                #:late-class
                 #:schema
                 #:named-schema
                 #:name
@@ -76,6 +77,8 @@
   "Write json representation of avro SCHEMA into STREAM.
 
 If CANONICAL-FORM is true, then the Canonical Form is written."
+  (when (typep (class-of schema) 'late-class)
+    (closer-mop:finalize-inheritance schema))
   (let* ((*seen* (make-hash-table :test #'eq))
          (schema (if canonical-form
                      (canonicalize schema)

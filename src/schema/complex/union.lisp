@@ -35,6 +35,9 @@
   (:import-from #:cl-avro.schema.complex.common
                 #:which-one
                 #:define-initializers)
+  (:import-from #:cl-avro.schema.complex.late-type-check
+                #:late-class
+                #:parse-slot-value)
   (:export #:union
            #:union-object
            #:schemas
@@ -89,11 +92,13 @@
   ((schemas
     :initarg :schemas
     :reader schemas
-    :type (simple-array schema (*))
+    :late-type (simple-array schema (*))
+    :early-type (simple-array (or schema symbol) (*))
     :documentation "Schemas for union.")
    (wrapper-classes
     :reader wrapper-classes
     :type (simple-array wrapper-class (*))))
+  (:metaclass late-class)
   (:default-initargs
    :schemas (error "Must supply SCHEMAS"))
   (:documentation
@@ -102,6 +107,32 @@
 (defmethod closer-mop:validate-superclass
     ((class union) (superclass complex-schema))
   t)
+
+(declaim
+ (ftype (function (t) (values (or schema symbol) &optional))
+        parse-early-schema))
+(defun parse-early-schema (early-schema?)
+  (check-type early-schema? (or schema symbol))
+  early-schema?)
+
+(declaim
+ (ftype (function (sequence)
+                  (values (simple-array (or schema symbol) (*)) &optional))
+        parse-early-schemas))
+(defun parse-early-schemas (early-schemas?)
+  (let ((early-schemas (map '(simple-array (or schema symbol) (*))
+                            #'parse-early-schema
+                            early-schemas?)))
+    (when (zerop (length early-schemas))
+      (error "Schemas cannot be empty"))
+    early-schemas))
+
+(define-initializers union :around
+    (&rest initargs &key schemas)
+  (let ((schemas (parse-early-schemas schemas)))
+    (setf (getf initargs :schemas) schemas))
+  (ensure-superclass union-object)
+  (apply #'call-next-method instance initargs))
 
 (declaim
  (ftype (function (schema) (values (or symbol valid-fullname) &optional))
@@ -116,43 +147,43 @@
 (declaim (notinline schema-key))
 
 (declaim
- (ftype (function (t) (values schema &optional)) parse-schema))
-(defun parse-schema (schema)
+ (ftype (function ((simple-array schema (*))) (values &optional))
+        assert-valid-schemas))
+(defun assert-valid-schemas (schemas)
+  (let ((seen (make-hash-table :test #'equal :size (length schemas))))
+    (labels
+        ((assert-unique (schema)
+           (let ((key (schema-key schema)))
+             (if (gethash key seen)
+                 (error "Duplicate ~S schema in union" key)
+                 (setf (gethash key seen) t))))
+         (assert-valid (schema)
+           (if (subtypep (class-of schema) 'union)
+               (error "Nested union schema: ~S" schema)
+               (assert-unique schema))))
+      (map nil #'assert-valid schemas)))
+  (values))
+
+(declaim
+ (ftype (function ((or schema symbol)) (values schema &optional))
+        parse-schema))
+(defun parse-schema (schema?)
   (let ((schema
-          (if (and (symbolp schema)
-                   (not (typep schema 'schema)))
-              (find-class schema)
-              schema)))
+          (if (and (symbolp schema?)
+                   (not (typep schema? 'schema)))
+              (find-class schema?)
+              schema?)))
     (check-type schema schema)
     schema))
 
 (declaim
- (ftype (function (sequence) (values (simple-array schema (*)) &optional))
+ (ftype (function ((simple-array (or schema symbol) (*)))
+                  (values (simple-array (schema) (*)) &optional))
         parse-schemas))
-(defun parse-schemas (schemas)
-  (let ((schemas (map '(simple-array schema (*)) #'parse-schema schemas)))
-    (when (zerop (length schemas))
-      (error "Schemas cannot be empty"))
-    (let ((seen (make-hash-table :test #'equal :size (length schemas))))
-      (labels
-          ((assert-unique (schema)
-             (let ((key (schema-key schema)))
-               (if (gethash key seen)
-                   (error "Duplicate ~S schema in union" key)
-                   (setf (gethash key seen) t))))
-           (assert-valid (schema)
-             (if (subtypep (class-of schema) 'union)
-                 (error "Nested union schema: ~S" schema)
-                 (assert-unique schema))))
-        (map nil #'assert-valid schemas)))
+(defun parse-schemas (schemas?)
+  (let ((schemas (map '(simple-array schema (*)) #'parse-schema schemas?)))
+    (assert-valid-schemas schemas)
     schemas))
-
-(define-initializers union :around
-    (&rest initargs &key schemas)
-  (let ((schemas (parse-schemas schemas)))
-    (setf (getf initargs :schemas) schemas))
-  (ensure-superclass union-object)
-  (apply #'call-next-method instance initargs))
 
 (declaim
  (ftype (function ((simple-array schema (*)))
@@ -173,10 +204,12 @@
     finally
        (return wrapper-classes)))
 
-(define-initializers union :after
-    (&key)
-  (with-slots (schemas wrapper-classes) instance
-    (setf wrapper-classes (make-wrapper-classes schemas))))
+(defmethod parse-slot-value
+    ((class union) (name (eql 'schemas)) type value)
+  (with-slots (schemas wrapper-classes) class
+    (setf schemas (parse-schemas schemas)
+          wrapper-classes (make-wrapper-classes schemas))
+    schemas))
 
 (defmethod scalarize-initargs
     ((metaclass (eql 'union)) (initargs list))

@@ -22,6 +22,8 @@
                 #:logical-schema
                 #:underlying)
   (:import-from #:cl-avro.schema.complex
+                #:late-class
+                #:parse-slot-value
                 #:complex-schema
                 #:ensure-superclass
                 #:fixed
@@ -41,15 +43,19 @@
 
 (defclass decimal (logical-schema)
   ((underlying
-    :type (or (eql bytes) fixed symbol))
+    :reader underlying
+    :late-type (or (eql bytes) fixed))
    (scale
     :initarg :scale
+    :reader scale
     :type (integer 0)
     :documentation "Decimal scale.")
    (precision
     :initarg :precision
+    :reader precision
     :type (integer 1)
     :documentation "Decimal precision."))
+  (:metaclass late-class)
   (:default-initargs
    :precision (error "Must supply PRECISION"))
   (:documentation
@@ -90,34 +96,30 @@
 
 (define-initializers decimal :after
     (&key)
-  ;; TODO calling these methods finalizes the class, which prevents us
-  ;; from forward referencing classes
-  (let ((precision (precision instance))
-        (scale (scale instance))
-        (underlying (underlying instance)))
+  (let ((precision
+          (slot-value instance 'precision))
+        (scale
+          (if (slot-boundp instance 'scale)
+              (slot-value instance 'scale)
+              0)))
     (unless (<= scale precision)
-      (error "Scale ~S cannot be greater than precision ~S" scale precision))
-    (when (typep underlying 'fixed)
-      (assert-decent-precision precision (size underlying)))))
+      (error "Scale ~S cannot be greater than precision ~S" scale precision))))
 
-(defgeneric scale (decimal)
-  (:method ((instance decimal))
-    "Return (values scale scale-provided-p)."
-    ;; TODO all method invocations on these class metaobjects should
-    ;; do this
-    (unless (closer-mop:class-finalized-p instance)
-      (closer-mop:finalize-inheritance instance))
-    (let* ((scalep (slot-boundp instance 'scale))
-           (scale (if scalep
-                      (slot-value instance 'scale)
-                      0)))
-      (values scale scalep))))
+(defmethod parse-slot-value :around
+    ((class decimal) (name (eql 'underlying)) type value)
+  (let ((value (call-next-method)))
+    (when (typep value 'fixed)
+      (assert-decent-precision (slot-value class 'precision) (size value)))
+    value))
 
-(defgeneric precision (decimal)
-  (:method ((instance decimal))
-    (unless (closer-mop:class-finalized-p instance)
-      (closer-mop:finalize-inheritance instance))
-    (slot-value instance 'precision)))
+(defmethod scale
+    ((instance decimal))
+  "Return (values scale scale-provided-p)."
+  (let* ((scalep (slot-boundp instance 'scale))
+         (scale (if scalep
+                    (slot-value instance 'scale)
+                    0)))
+    (values scale scalep)))
 
 ;;; object
 

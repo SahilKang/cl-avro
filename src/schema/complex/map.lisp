@@ -34,6 +34,8 @@
                 #:hashmap
                 #:hashref
                 #:hashrem)
+  (:import-from #:cl-avro.schema.complex.late-type-check
+                #:late-class)
   (:export #:map
            #:map-object
            #:values
@@ -51,9 +53,13 @@
 
 (defclass map (complex-schema)
   ((values
+    :initarg :values
     :reader values
-    :type schema
+    :late-type schema
     :documentation "Map schema value type."))
+  (:metaclass late-class)
+  (:default-initargs
+   :values (error "Must supply VALUES"))
   (:documentation
    "Base class for avro map schemas."))
 
@@ -65,20 +71,6 @@
     (&rest initargs)
   (ensure-superclass map-object)
   (apply #'call-next-method instance initargs))
-
-(declaim (ftype (function (t) (cl:values schema &optional)) parse-values))
-(defun parse-values (values)
-  (let ((values
-          (if (and (symbolp values)
-                   (not (typep values 'schema)))
-              (find-class values)
-              values)))
-    (check-type values schema)
-    values))
-
-(define-initializers map :after
-    (&key (values (error "Must supply VALUES")))
-  (setf (slot-value instance 'values) (parse-values values)))
 
 ;;; object
 

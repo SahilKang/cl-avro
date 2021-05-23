@@ -26,6 +26,7 @@
   (:import-from #:cl-avro.schema.primitive
                 #:+primitive->name+)
   (:import-from #:cl-avro.schema.complex
+                #:late-class
                 #:schema
                 #:named-schema
                 #:fullname
@@ -65,7 +66,10 @@
         (*error-on-duplicate-name-p* t))
     (declare (special *fullname->schema* *enclosing-namespace*
                       *error-on-duplicate-name-p*))
-    (parse-schema (st-json:read-json json))))
+    (let ((schema (parse-schema (st-json:read-json json))))
+      (when (typep (class-of schema) 'late-class)
+        (closer-mop:finalize-inheritance schema))
+      schema)))
 
 (declaim
  (ftype (function ((or list simple-string st-json:jso))
