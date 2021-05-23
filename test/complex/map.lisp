@@ -154,3 +154,22 @@
       (let ((deserialized (avro:deserialize map-schema serialized)))
         (is (eq map-schema (class-of deserialized)))
         (is (equal expected (sorted-alist deserialized)))))))
+
+(test late-type-check
+  (setf (find-class 'late_map) nil
+        (find-class 'late_enum) nil)
+
+  (defclass late_map ()
+    ()
+    (:metaclass avro:map)
+    (:values late_enum))
+
+  (signals error
+    (avro:values (find-class 'late_map)))
+
+  (defclass late_enum ()
+    ()
+    (:metaclass avro:enum)
+    (:symbols "FOO" "BAR"))
+
+  (is (eq (find-class 'late_enum) (avro:values (find-class 'late_map)))))
