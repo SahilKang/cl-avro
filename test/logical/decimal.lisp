@@ -389,3 +389,59 @@
         (check deserialized))
       (signals error
         (make-instance schema :unscaled -1230)))))
+
+(test late-type-check
+  (setf (find-class 'late_decimal) nil
+        (find-class 'late_fixed) nil)
+
+  (defclass late_decimal ()
+    ()
+    (:metaclass avro:decimal)
+    (:underlying late_fixed)
+    (:precision 4))
+
+  (signals error
+    (avro:precision (find-class 'late_decimal)))
+  (signals error
+    (avro:scale (find-class 'late_decimal)))
+  (signals error
+    (avro:underlying (find-class 'late_decimal)))
+
+  (defclass late_fixed ()
+    ()
+    (:metaclass avro:fixed)
+    (:size 12))
+
+  (is (= 4 (avro:precision (find-class 'late_decimal))))
+  (is (zerop (avro:scale (find-class 'late_decimal))))
+  (is (eq (find-class 'late_fixed) (avro:underlying (find-class 'late_decimal)))))
+
+(test scale-greater-than-precision
+  (signals error
+    (make-instance
+     'avro:decimal
+     :precision 2
+     :scale 3
+     :underlying 'avro:bytes)))
+
+(test indecent-precision
+  (let ((schema (make-instance
+                 'avro:decimal
+                 :precision 7
+                 :underlying (make-instance
+                              'avro:fixed
+                              :name "foo"
+                              :size 3))))
+    (signals error
+      (avro:precision schema))))
+
+(test size-zero-fixed
+  (let ((schema (make-instance
+                 'avro:decimal
+                 :precision 1
+                 :underlying (make-instance
+                              'avro:fixed
+                              :name "foo"
+                              :size 0))))
+    (signals error
+      (avro:precision schema))))
