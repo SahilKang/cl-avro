@@ -28,6 +28,8 @@
                 #:complex-schema
                 #:ensure-superclass
                 #:schema)
+  (:import-from #:cl-avro.schema.complex.late-type-check
+                #:late-class)
   (:export #:array
            #:array-object
            #:raw-buffer
@@ -36,19 +38,15 @@
            #:pop))
 (in-package #:cl-avro.schema.complex.array)
 
-;;; effective-slot
-
-(defclass effective-slot (closer-mop:standard-effective-slot-definition)
-  ((type
-    :type schema)))
-
 ;;; schema
 
 (defclass array (complex-schema)
   ((items
     :initarg :items
-    :type (or schema symbol)
+    :reader items
+    :late-type schema
     :documentation "Array schema element type."))
+  (:metaclass late-class)
   (:default-initargs
    :items (error "Must supply ITEMS"))
   (:documentation
@@ -57,16 +55,6 @@
 (defmethod closer-mop:validate-superclass
     ((class array) (superclass complex-schema))
   t)
-
-(defmethod closer-mop:effective-slot-definition-class
-    ((class array) &key)
-  (find-class 'effective-slot))
-
-(defgeneric items (instance)
-  (:method ((instance array))
-    (unless (closer-mop:class-finalized-p instance)
-      (closer-mop:finalize-inheritance instance))
-    (slot-value instance 'items)))
 
 (declaim
  (ftype (function ((or schema symbol)) (values cons &optional))
@@ -81,14 +69,6 @@
     (cl:push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass array-object)
   (apply #'call-next-method instance initargs))
-
-(defmethod closer-mop:finalize-inheritance :after
-    ((instance array))
-  (with-slots (items) instance
-    (when (and (symbolp items)
-               (not (typep items 'schema)))
-      (setf items (find-class items)))
-    (check-type items schema)))
 
 ;;; object
 
