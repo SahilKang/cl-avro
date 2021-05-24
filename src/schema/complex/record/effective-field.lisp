@@ -41,9 +41,7 @@
 
 (defclass effective-field (field:field
                            closer-mop:standard-effective-slot-definition)
-  ((field:type
-    :type schema)
-   (field:default
+  ((field:default
     :type object)))
 
 (declaim (ftype (function (t schema) (values t &optional)) %parse-default))
@@ -89,9 +87,7 @@
 
 (defmethod initialize-instance :after
     ((instance effective-field) &key)
-  (with-accessors
-        ((type closer-mop:slot-definition-type))
-      instance
+  (let ((type (field:type instance)))
     (check-type type schema)))
 
 (declaim
