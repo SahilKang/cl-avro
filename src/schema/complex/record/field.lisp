@@ -66,12 +66,7 @@
    (default
     :initarg :default
     :type t
-    :documentation "Field default.")
-   (type
-    :initarg :type
-    :reader type
-    :type (or schema symbol)
-    :documentation "Field type."))
+    :documentation "Field default."))
   (:default-initargs
    :name (error "Must supply NAME")
    :type (error "Must supply TYPE"))
@@ -100,6 +95,11 @@
   (let ((name (closer-mop:slot-definition-name instance)))
     (declare (symbol name))
     (values (string name) name)))
+
+(defgeneric type (field)
+  (:method ((instance field))
+    "Field type."
+    (closer-mop:slot-definition-type instance)))
 
 (declaim
  (ftype (function (sequence boolean)
@@ -146,8 +146,10 @@
         ((name closer-mop:slot-definition-name)
          (initfunction closer-mop:slot-definition-initfunction)
          (initform closer-mop:slot-definition-initform)
-         (allocation closer-mop:slot-definition-allocation))
+         (allocation closer-mop:slot-definition-allocation)
+         (type closer-mop:slot-definition-type))
       instance
+    (check-type type (or schema symbol))
     (let ((name (string name)))
       (check-type name name))
     (when initfunction
