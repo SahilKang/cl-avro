@@ -58,6 +58,11 @@
            #:fullname
            #:aliases
            #:fullname->name
+           #:named-class
+           #:provided-name
+           #:provided-namespace
+           #:deduced-name
+           #:deduced-namespace
 
            #:array
            #:array-object

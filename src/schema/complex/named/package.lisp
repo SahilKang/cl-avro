@@ -19,7 +19,8 @@
 
 (defpackage #:cl-avro.schema.complex.named
   (:use #:cl-avro.schema.complex.named.type
-        #:cl-avro.schema.complex.named.schema)
+        #:cl-avro.schema.complex.named.schema
+        #:cl-avro.schema.complex.named.class)
   (:export #:named-schema
            #:name
            #:namespace
@@ -27,4 +28,9 @@
            #:aliases
            #:valid-name
            #:valid-fullname
-           #:fullname->name))
+           #:fullname->name
+           #:named-class
+           #:provided-name
+           #:provided-namespace
+           #:deduced-name
+           #:deduced-namespace))

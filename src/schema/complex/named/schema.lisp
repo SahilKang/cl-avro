@@ -18,6 +18,8 @@
 (in-package #:cl-user)
 (defpackage #:cl-avro.schema.complex.named.schema
   (:use #:cl)
+  (:local-nicknames
+   (#:named #:cl-avro.schema.complex.named.class))
   (:import-from #:cl-avro.schema.complex.common
                 #:assert-distinct
                 #:define-initializers)
@@ -29,7 +31,6 @@
                 #:name
                 #:namespace
                 #:fullname
-                #:fullname->name
                 #:deduce-namespace
                 #:deduce-fullname)
   (:import-from #:cl-avro.schema.complex.scalarize
@@ -74,38 +75,28 @@
 
 ;;; named-schema
 
-(defclass named-schema (complex-schema)
-  ((provided-name
-    :reader provided-name
-    :type valid-fullname
-    :documentation "Provided schema name.")
-   (provided-namespace
-    :initarg :namespace
-    :type namespace
-    :documentation "Provided schema namespace.")
-   (deduced-name
-    :reader deduced-name
-    :type valid-name
-    :documentation "Namespace unqualified name of schema.")
-   (deduced-namespace
-    :reader deduced-namespace
-    :type namespace
-    :documentation "Namespace of schema.")
-   (fullname
-    :reader fullname
-    :type valid-fullname
-    :documentation "Namespace qualified name of schema.")
+(defclass named-schema (named:named-class complex-schema)
+  ((named:provided-name
+    :type valid-fullname)
+   (named:deduced-name
+    :type valid-name)
+   (named:fullname
+    :type valid-fullname)
    (aliases
     :reader aliases
     :type (or null (simple-array valid-fullname (*)))
     :documentation "A vector of aliases if provided, otherwise nil."))
   (:metaclass scalarize-class)
-  (:scalarize :name :namespace :enclosing-namespace)
+  (:scalarize :enclosing-namespace)
   (:documentation
    "Base class for avro named schemas."))
 
 (defmethod closer-mop:validate-superclass
     ((class named-schema) (superclass complex-schema))
+  t)
+
+(defmethod closer-mop:validate-superclass
+    ((class named-schema) (superclass named:named-class))
   t)
 
 ;; aliases
@@ -126,76 +117,32 @@
       (assert-distinct aliases)
       aliases)))
 
-;; name
-
-(defgeneric name (named-schema)
-  (:method ((instance named-schema))
-    "Returns (values deduced provided)."
-    (let ((deduced-name (deduced-name instance))
-          (provided-name (provided-name instance)))
-      (values deduced-name provided-name))))
-
-;; namespace
-
-(declaim
- (ftype (function (named-schema) (values boolean &optional))
-        namespace-provided-p))
-(defun namespace-provided-p (named-schema)
-  "True if namespace was provided."
-  (slot-boundp named-schema 'provided-namespace))
-
-(declaim
- (ftype (function (named-schema) (values namespace &optional))
-        provided-namespace))
-(defun provided-namespace (named-schema)
-  "Returns the provided-namespace."
-  (when (namespace-provided-p named-schema)
-    (slot-value named-schema 'provided-namespace)))
-
-(defgeneric namespace (named-schema)
-  (:method ((instance named-schema))
-    "Returns (values deduced provided provided-p)."
-    (let ((deduced-namespace (deduced-namespace instance))
-          (provided-namespace (provided-namespace instance))
-          (namespace-provided-p (namespace-provided-p instance)))
-      (values deduced-namespace provided-namespace namespace-provided-p))))
-
 ;; initialization
 
 (declaim
- (ftype (function (symbol list) (values t &optional)) %parse-name))
-(defun %parse-name (name initargs)
-  (let* ((initargs (cddr (member :name initargs)))
-         (other-name (getf initargs :name name)))
-    (if (eq name other-name)
-        (string name)
-        other-name)))
+ (ftype (function (named-schema namespace) (values namespace &optional))
+        re-deduce-namespace))
+(defun re-deduce-namespace (schema enclosing-namespace)
+  (let ((provided-name (named:provided-name schema))
+        (provided-namespace (named:provided-namespace schema)))
+    (deduce-namespace provided-name provided-namespace enclosing-namespace)))
 
 (declaim
- (ftype (function (t list) (values t &optional)) parse-name))
-(defun parse-name (name initargs)
-  (if (symbolp name)
-      (%parse-name name initargs)
-      name))
+ (ftype (function (named-schema namespace) (values valid-fullname &optional))
+        re-deduce-fullname))
+(defun re-deduce-fullname (schema enclosing-namespace)
+  (let ((provided-name (named:provided-name schema))
+        (provided-namespace (named:provided-namespace schema)))
+    (deduce-fullname provided-name provided-namespace enclosing-namespace)))
 
 (define-initializers named-schema :after
-    (&rest initargs
-     &key
-     (name (or (class-name instance) (error "Must supply NAME")))
-     (aliases nil aliasesp)
-     enclosing-namespace)
-  (let ((provided-namespace (provided-namespace instance)))
-    (with-slots
-          (provided-name
-           deduced-name
-           deduced-namespace
-           fullname
-           (aliases-slot aliases))
-        instance
-      (setf aliases-slot (parse-aliases aliases aliasesp)
-            provided-name (parse-name name initargs)
-            deduced-name (fullname->name provided-name)
-            deduced-namespace (deduce-namespace
-                               provided-name provided-namespace enclosing-namespace)
-            fullname (deduce-fullname
-                      provided-name provided-namespace enclosing-namespace)))))
+    (&key (aliases nil aliasesp) enclosing-namespace)
+  (with-slots
+        (named:deduced-namespace
+         named:fullname
+         (aliases-slot aliases))
+      instance
+    (setf aliases-slot (parse-aliases aliases aliasesp)
+          named:deduced-namespace (re-deduce-namespace
+                                   instance enclosing-namespace)
+          named:fullname (re-deduce-fullname instance enclosing-namespace))))
