@@ -58,6 +58,7 @@
     :late-type schema
     :documentation "Map schema value type."))
   (:metaclass late-class)
+  (:scalarize :values)
   (:default-initargs
    :values (error "Must supply VALUES"))
   (:documentation

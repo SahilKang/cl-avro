@@ -20,7 +20,8 @@
   (:use #:cl)
   (:import-from #:cl-avro.schema.complex
                 #:complex-schema
-                #:schema)
+                #:schema
+                #:scalarize-class)
   (:export #:logical-schema
            #:underlying))
 (in-package #:cl-avro.schema.logical.base)
@@ -31,6 +32,8 @@
     :type (or schema symbol)
     :reader underlying
     :documentation "Underlying schema for logical schema."))
+  (:metaclass scalarize-class)
+  (:scalarize :underlying)
   (:default-initargs
    :underlying (error "Must supply UNDERLYING"))
   (:documentation

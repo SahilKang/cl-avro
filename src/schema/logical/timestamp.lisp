@@ -30,6 +30,8 @@
   (:import-from #:cl-avro.schema.logical.time
                 #:hour
                 #:minute)
+  (:import-from #:cl-avro.schema.complex
+                #:scalarize-class)
   (:shadowing-import-from #:cl-avro.schema.logical.time
                           #:second)
   (:export #:timestamp-millis-schema
@@ -52,6 +54,7 @@
 (defclass timestamp-millis-schema (logical-schema)
   ((underlying
     :type (eql long)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'long)
   (:documentation
@@ -149,6 +152,7 @@ timeline, independent of a particular timezone or calendar."))
 (defclass timestamp-micros-schema (logical-schema)
   ((underlying
     :type (eql long)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'long)
   (:documentation

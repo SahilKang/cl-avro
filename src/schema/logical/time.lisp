@@ -28,6 +28,8 @@
   (:import-from #:cl-avro.schema.primitive
                 #:int
                 #:long)
+  (:import-from #:cl-avro.schema.complex
+                #:scalarize-class)
   (:export #:time-millis-schema
            #:time-micros-schema
            #:underlying
@@ -90,6 +92,7 @@
 (defclass time-millis-schema (logical-schema)
   ((underlying
     :type (eql int)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'int)
   (:documentation
@@ -122,6 +125,7 @@ to a particular calendar, timezone, or date."))
 (defclass time-micros-schema (logical-schema)
   ((underlying
     :type (eql long)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'long)
   (:documentation

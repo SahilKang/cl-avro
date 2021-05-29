@@ -56,6 +56,7 @@
     :type (integer 1)
     :documentation "Decimal precision."))
   (:metaclass late-class)
+  (:scalarize :scale :precision)
   (:default-initargs
    :precision (error "Must supply PRECISION"))
   (:documentation

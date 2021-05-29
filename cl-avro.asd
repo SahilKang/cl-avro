@@ -45,22 +45,24 @@
                   :depends-on ("primitive" "ascii")
                   :components ((:file "common")
                                (:file "base")
-                               (:file "late-type-check"
+                               (:file "scalarize"
                                 :depends-on ("common" "base"))
+                               (:file "late-type-check"
+                                :depends-on ("common" "base" "scalarize"))
                                (:module "named"
-                                :depends-on ("common" "base")
+                                :depends-on ("common" "base" "scalarize")
                                 :serial t
                                 :components ((:file "type")
                                              (:file "schema")
                                              (:file "package")))
                                (:file "array"
-                                :depends-on ("base"))
+                                :depends-on ("base" "late-type-check"))
                                (:file "enum"
                                 :depends-on ("common" "base" "named"))
                                (:file "fixed"
                                 :depends-on ("base" "named"))
                                (:file "map"
-                                :depends-on ("base"))
+                                :depends-on ("base" "late-type-check"))
                                (:file "union"
                                 :depends-on ("common" "base" "named"))
                                (:module "record"
@@ -80,6 +82,8 @@
                                              (:file "package")))
                                (:file "package"
                                 :depends-on ("base"
+                                             "scalarize"
+                                             "late-type-check"
                                              "named"
                                              "array"
                                              "enum"

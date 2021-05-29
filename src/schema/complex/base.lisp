@@ -28,8 +28,7 @@
            #:schema
            #:object
 
-           #:ensure-superclass
-           #:scalarize-initargs))
+           #:ensure-superclass))
 (in-package #:cl-avro.schema.complex.base)
 
 (defclass complex-object ()
@@ -92,58 +91,6 @@
   (let ((instance (apply #'call-next-method instance initargs)))
     (check-slot-types instance)
     instance))
-
-(declaim (ftype (function (cons) (values t &optional)) scalarize))
-(defun scalarize (list)
-  (if (= (length list) 1)
-      (first list)
-      list))
-
-(defgeneric scalarize-initargs (metaclass initargs)
-  (:method ((metaclass symbol) initargs)
-    (scalarize-initargs (find-class metaclass) initargs))
-
-  (:method ((metaclass class) initargs)
-    (scalarize-initargs
-     (class-name
-      (find (find-class 'complex-schema)
-            (closer-mop:class-direct-superclasses metaclass)
-            :test #'superclassp))
-     initargs))
-
-  (:method ((metaclass (eql 'complex-schema)) (initargs list))
-    (loop
-      with standard-args = '(:direct-superclasses
-                             :direct-slots
-                             :direct-default-initargs
-                             :metaclass
-                             :documentation)
-
-      for remaining = initargs then (cddr remaining)
-      while remaining
-      for arg = (car remaining)
-      for rest = (cdr remaining)
-      for value = (car rest)
-
-      unless rest do
-        (error "Odd number of key-value pairs: ~S" initargs)
-
-      if (or (member arg standard-args)
-             (not (keywordp arg))
-             (not (consp value)))
-        nconc (list arg value)
-      else
-        nconc (list arg (scalarize value)))))
-
-(defmethod closer-mop:ensure-class-using-class :around
-    (class name &rest initargs &key metaclass)
-  (if (subtypep metaclass 'complex-schema)
-      (let ((initargs (scalarize-initargs metaclass initargs)))
-        (unless (member :name initargs)
-          (push name initargs)
-          (push :name initargs))
-        (apply #'call-next-method class name initargs))
-      (call-next-method)))
 
 (deftype schema ()
   "An avro schema."
