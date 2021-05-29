@@ -53,6 +53,7 @@
                                 :depends-on ("common" "base" "scalarize")
                                 :serial t
                                 :components ((:file "type")
+                                             (:file "class")
                                              (:file "schema")
                                              (:file "package")))
                                (:file "array"
