@@ -74,15 +74,14 @@
         initargs-to-scalarize))
 (defun initargs-to-scalarize (class)
   (loop
-    for superclass in (closer-mop:class-direct-superclasses class)
+    for superclass in (closer-mop:class-precedence-list class)
 
     when (typep superclass 'scalarize-class)
       append (scalarize superclass) into initargs
 
     finally
        (return
-         (delete-duplicates
-          (append (scalarize class) initargs)))))
+         (delete-duplicates initargs))))
 
 (define-initializers scalarize-object :around
     (&rest initargs)
