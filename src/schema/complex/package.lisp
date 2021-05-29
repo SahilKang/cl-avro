@@ -31,12 +31,15 @@
   (:import-from #:cl-avro.schema.complex.late-type-check
                 #:late-class
                 #:parse-slot-value)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class)
   (:export #:schema
            #:object
            #:which-one
            #:default
            #:raw-buffer
            #:define-initializers
+           #:scalarize-class
            #:late-class
            #:parse-slot-value
 

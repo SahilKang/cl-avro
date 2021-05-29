@@ -26,8 +26,7 @@
                 #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:complex-schema
-                #:ensure-superclass
-                #:scalarize-initargs)
+                #:ensure-superclass)
   (:import-from #:cl-avro.schema.complex.named
                 #:named-schema
                 #:name
@@ -36,6 +35,9 @@
                 #:aliases)
   (:import-from #:cl-avro.schema.primitive
                 #:int)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class
+                #:scalarize-value)
   (:export #:enum
            #:enum-object
            #:symbols
@@ -62,6 +64,8 @@
     :initarg :default
     :type (or null position)
     :documentation "Position of enum default."))
+  (:metaclass scalarize-class)
+  (:scalarize :default)
   (:default-initargs
    :symbols (error "Must supply SYMBOLS")
    :default nil)
@@ -102,7 +106,7 @@
 (define-initializers enum :around
     (&rest initargs &key symbols default)
   (let* ((symbols (parse-symbols symbols))
-         (default (parse-default symbols default)))
+         (default (parse-default symbols (scalarize-value default))))
     (setf (getf initargs :symbols) symbols
           (getf initargs :default) default))
   (ensure-superclass enum-object)
@@ -114,13 +118,6 @@
     (if default
         (values (elt symbols default) default)
         (values nil nil))))
-
-(defmethod scalarize-initargs
-    ((metaclass (eql 'enum)) (initargs list))
-  (let ((symbols (getf initargs :symbols)))
-    (if (remf initargs :symbols)
-        (list* :symbols symbols (scalarize-initargs 'named-schema initargs))
-        (scalarize-initargs 'named-schema initargs))))
 
 ;;; object
 

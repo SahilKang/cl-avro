@@ -32,6 +32,9 @@
                 #:namespace
                 #:fullname
                 #:aliases)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class
+                #:scalarize-value)
   (:export #:fixed
            #:fixed-object
            #:raw-buffer
@@ -50,6 +53,8 @@
     :reader size
     :type (integer 0)
     :documentation "Fixed schema size."))
+  (:metaclass scalarize-class)
+  (:scalarize :size)
   (:default-initargs
    :size (error "Must supply SIZE"))
   (:documentation
@@ -67,7 +72,7 @@
 
 (define-initializers fixed :around
     (&rest initargs &key size)
-  (let ((buffer-slot (make-buffer-slot size)))
+  (let ((buffer-slot (make-buffer-slot (scalarize-value size))))
     (push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass fixed-object)
   (apply #'call-next-method instance initargs))

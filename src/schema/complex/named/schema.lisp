@@ -24,8 +24,7 @@
   (:import-from #:cl-avro.schema.primitive
                 #:+primitive->name+)
   (:import-from #:cl-avro.schema.complex.base
-                #:complex-schema
-                #:scalarize-initargs)
+                #:complex-schema)
   (:import-from #:cl-avro.schema.complex.named.type
                 #:name
                 #:namespace
@@ -33,6 +32,8 @@
                 #:fullname->name
                 #:deduce-namespace
                 #:deduce-fullname)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class)
   (:export #:named-schema
            #:name
            #:namespace
@@ -98,6 +99,8 @@
     :reader aliases
     :type (or null (simple-array valid-fullname (*)))
     :documentation "A vector of aliases if provided, otherwise nil."))
+  (:metaclass scalarize-class)
+  (:scalarize :name :namespace :enclosing-namespace)
   (:documentation
    "Base class for avro named schemas."))
 
@@ -178,7 +181,7 @@
 (define-initializers named-schema :after
     (&rest initargs
      &key
-     (name (error "Must supply NAME"))
+     (name (or (class-name instance) (error "Must supply NAME")))
      (aliases nil aliasesp)
      enclosing-namespace)
   (let ((provided-namespace (provided-namespace instance)))
@@ -196,10 +199,3 @@
                                provided-name provided-namespace enclosing-namespace)
             fullname (deduce-fullname
                       provided-name provided-namespace enclosing-namespace)))))
-
-(defmethod scalarize-initargs
-    ((metaclass (eql 'named-schema)) (initargs list))
-  (let ((aliases (getf initargs :aliases)))
-    (if (remf initargs :aliases)
-        (list* :aliases aliases (scalarize-initargs 'complex-schema initargs))
-        (scalarize-initargs 'complex-schema initargs))))

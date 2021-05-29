@@ -26,6 +26,8 @@
                 #:timezone)
   (:import-from #:cl-avro.schema.primitive
                 #:int)
+  (:import-from #:cl-avro.schema.complex
+                #:scalarize-class)
   (:export #:date-schema
            #:underlying
            #:date-mixin
@@ -63,6 +65,7 @@
 (defclass date-schema (logical-schema)
   ((underlying
     :type (eql int)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'int)
   (:documentation

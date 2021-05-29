@@ -22,6 +22,8 @@
                 #:define-initializers)
   (:import-from #:cl-avro.schema.complex.base
                 #:ensure-superclass)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class)
   (:export #:late-class
            #:parse-slot-value))
 (in-package #:cl-avro.schema.complex.late-type-check)
@@ -77,11 +79,11 @@
 
 ;;; late-class
 
-(defclass late-class (standard-class)
+(defclass late-class (scalarize-class)
   ())
 
 (defmethod closer-mop:validate-superclass
-    ((class late-class) (superclass standard-class))
+    ((class late-class) (superclass scalarize-class))
   t)
 
 (defmethod closer-mop:direct-slot-definition-class

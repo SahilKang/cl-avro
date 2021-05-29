@@ -23,6 +23,8 @@
                 #:underlying)
   (:import-from #:cl-avro.schema.ascii
                 #:hex-p)
+  (:import-from #:cl-avro.schema.complex
+                #:scalarize-class)
   (:shadowing-import-from #:cl-avro.schema.primitive
                           #:string)
   (:export #:uuid-schema
@@ -52,6 +54,7 @@
 (defclass uuid-schema (logical-schema)
   ((underlying
     :type (eql string)))
+  (:metaclass scalarize-class)
   (:default-initargs
    :underlying 'string)
   (:documentation

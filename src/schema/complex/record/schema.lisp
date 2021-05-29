@@ -42,6 +42,8 @@
                 #:parse-notation)
   (:import-from #:cl-avro.schema.complex.common
                 #:define-initializers)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-class)
   (:shadowing-import-from #:cl-avro.schema.complex.record.field
                           #:type)
   (:export #:record
@@ -59,6 +61,7 @@
     :reader nullable-fields
     :type hash-table
     :documentation "Nullable fields."))
+  (:metaclass scalarize-class)
   (:documentation
    "Base class for avro record schemas."))
 

@@ -30,6 +30,8 @@
                 #:schema)
   (:import-from #:cl-avro.schema.complex.late-type-check
                 #:late-class)
+  (:import-from #:cl-avro.schema.complex.scalarize
+                #:scalarize-value)
   (:export #:array
            #:array-object
            #:raw-buffer
@@ -47,6 +49,7 @@
     :late-type schema
     :documentation "Array schema element type."))
   (:metaclass late-class)
+  (:scalarize :items)
   (:default-initargs
    :items (error "Must supply ITEMS"))
   (:documentation
@@ -65,7 +68,7 @@
 
 (define-initializers array :around
     (&rest initargs &key items)
-  (let ((buffer-slot (make-buffer-slot items)))
+  (let ((buffer-slot (make-buffer-slot (scalarize-value items))))
     (cl:push buffer-slot (getf initargs :direct-slots)))
   (ensure-superclass array-object)
   (apply #'call-next-method instance initargs))
