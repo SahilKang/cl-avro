@@ -33,7 +33,9 @@
                #:salza2
                #:closer-mop
                #:trivial-extensible-sequences
-               #:genhash)
+               #:genhash
+               #:md5
+               #:trivial-gray-streams)
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :pathname "src"
@@ -191,11 +193,51 @@
                                "file-block"
                                "file-input-stream"
                                "file-output-stream"))))
+   (:module "ipc"
+    :depends-on ("schema" "io")
+    :components ((:file "handshake")
+                 (:file "error"
+                  :depends-on ("handshake"))
+                 (:file "message"
+                  :depends-on ("error"))
+                 (:file "framing"
+                  :depends-on ("handshake"))
+                 (:module "protocol"
+                  :depends-on ("handshake" "error" "message" "framing")
+                  :components ((:module "class"
+                                :components ((:file "protocol")
+                                             (:file "io"
+                                              :depends-on ("protocol"))
+                                             (:file "package"
+                                              :depends-on ("protocol"))))
+                               (:module "object"
+                                :depends-on ("class")
+                                :components ((:file "transceiver")
+                                             (:module "client"
+                                              :depends-on ("transceiver")
+                                              :components ((:file "common")
+                                                           (:file "stateful"
+                                                            :depends-on ("common"))
+                                                           (:file "stateless"
+                                                            :depends-on ("common"))
+                                                           (:file "package"
+                                                            :depends-on ("common"))))
+                                             (:file "protocol-object"
+                                              :depends-on ("client" "transceiver"))
+                                             (:file "server"
+                                              :depends-on ("protocol-object" "transceiver"))
+                                             (:file "package"
+                                              :depends-on ("protocol-object" "transceiver" "server"))))
+                               (:file "package"
+                                :depends-on ("class" "object"))))
+                 (:file "package"
+                  :depends-on ("error" "message" "protocol"))))
    (:file "package"
     :depends-on ("schema"
                  "io"
                  "single-object-encoding"
-                 "object-container-file"))))
+                 "object-container-file"
+                 "ipc"))))
 
 
 (asdf:defsystem #:cl-avro/test
@@ -266,4 +308,10 @@
                                (:file "time-millis")
                                (:file "timestamp-micros")
                                (:file "timestamp-millis")
-                               (:file "uuid")))))))
+                               (:file "uuid")))))
+   (:module "ipc"
+    :components ((:file "common")
+                 (:file "stateless"
+                  :depends-on ("common"))
+                 (:file "stateful"
+                  :depends-on ("common"))))))

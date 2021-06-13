@@ -20,5 +20,18 @@
 (defpackage #:cl-avro.schema.io
   (:use #:cl-avro.schema.io.read
         #:cl-avro.schema.io.write)
+  (:import-from #:cl-avro.schema.io.write.canonicalize
+                #:*seen*)
   (:export #:json->schema
-           #:schema->json))
+           #:parse-schema
+           #:*fullname->schema*
+           #:make-fullname->schema
+           #:*enclosing-namespace*
+           #:*error-on-duplicate-name-p*
+           #:schema->json
+           #:to-jso
+           #:*seen*
+           #:with-initargs
+           #:with-fields
+           #:register-named-schema
+           #:unregister-named-schema))

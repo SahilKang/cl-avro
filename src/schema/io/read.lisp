@@ -43,7 +43,16 @@
                           #:union
                           #:array
                           #:map)
-  (:export #:json->schema))
+  (:export #:json->schema
+           #:parse-schema
+           #:*fullname->schema*
+           #:make-fullname->schema
+           #:*enclosing-namespace*
+           #:*error-on-duplicate-name-p*
+           #:with-initargs
+           #:with-fields
+           #:register-named-schema
+           #:unregister-named-schema))
 (in-package #:cl-avro.schema.io.read)
 
 (defmacro make-fullname->schema ()
@@ -196,9 +205,10 @@ p suffixes for fields should exist."
            (if (symbolp binding)
                binding
                (first binding))))
-    (let ((fields (mapcar #'parse-field bindings)))
+    (let ((fields (mapcar #'parse-field bindings))
+          (initargs (intern "INITARGS")))
       `(with-fields (,@fields) ,jso
-         (let ((initargs (make-initargs ,@bindings)))
+         (let ((,initargs (make-initargs ,@bindings)))
            ,@body)))))
 
 (declaim

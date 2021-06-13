@@ -25,10 +25,27 @@
         #:cl-avro.schema.fingerprint
         #:cl-avro.schema.schema-of)
   (:export #:+primitive->name+
+           #:scalarize-class
+           #:scalarize-value
+           #:late-class
+           #:parse-slot-value
+           #:define-initializers
+           #:ensure-superclass
 
            #:json->schema
+           #:parse-schema
+           #:*fullname->schema*
+           #:make-fullname->schema
+           #:*enclosing-namespace*
+           #:*error-on-duplicate-name-p*
            #:schema->json
            #:schema-of
+           #:to-jso
+           #:*seen*
+           #:with-initargs
+           #:with-fields
+           #:register-named-schema
+           #:unregister-named-schema
 
            #:fingerprint
            #:*default-fingerprint-algorithm*

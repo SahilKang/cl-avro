@@ -17,16 +17,23 @@
 
 (in-package #:cl-user)
 
-(defpackage #:cl-avro.io
-  (:use #:cl-avro.io.schema
-        #:cl-avro.io.primitive
-        #:cl-avro.io.complex
-        #:cl-avro.io.logical
-        #:cl-avro.io.resolution
-        #:cl-avro.io.compare)
-  (:import-from #:cl-avro.io.base
-                #:serialized-size)
-  (:export #:serialize
-           #:deserialize
-           #:compare
-           #:serialized-size))
+(defpackage #:cl-avro.ipc.protocol
+  (:use #:cl-avro.ipc.protocol.class
+        #:cl-avro.ipc.protocol.object)
+  (:export #:protocol
+           #:messages
+           #:types
+           #:md5
+           #:protocol-object
+           #:transceiver
+           #:receive-from-unconnected-client
+           #:receive-from-connected-client
+
+           #:stateless-client
+           #:stateful-client
+           #:send
+           #:send-and-receive
+           #:send-handshake-p
+
+           #:server
+           #:client-protocol))

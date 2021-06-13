@@ -16,17 +16,25 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
+(defpackage #:test/ipc/common
+  (:use #:cl)
+  (:export #:flatten))
+(in-package #:test/ipc/common)
 
-(defpackage #:cl-avro.io
-  (:use #:cl-avro.io.schema
-        #:cl-avro.io.primitive
-        #:cl-avro.io.complex
-        #:cl-avro.io.logical
-        #:cl-avro.io.resolution
-        #:cl-avro.io.compare)
-  (:import-from #:cl-avro.io.base
-                #:serialized-size)
-  (:export #:serialize
-           #:deserialize
-           #:compare
-           #:serialized-size))
+(declaim
+ (ftype (function (cl-avro.ipc.framing:buffers)
+                  (values (simple-array (unsigned-byte 8) (*)) &optional))
+        flatten))
+(defun flatten (buffers)
+  (flet ((fill-vector (vector buffer)
+           (loop
+             for byte across buffer
+             do (vector-push-extend byte vector)
+             finally (return vector))))
+    (coerce
+     (reduce
+      #'fill-vector
+      buffers
+      :initial-value (make-array 0 :element-type '(unsigned-byte 8)
+                                   :adjustable t :fill-pointer t))
+     '(simple-array (unsigned-byte 8) (*)))))
