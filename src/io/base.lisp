@@ -23,7 +23,7 @@
   (:export #:serialize
            #:deserialize
            #:serialized-size
-           #:serialize-into
+           #:serialize-into-vector
            #:deserialize-from-vector
            #:deserialize-from-stream
            #:define-deserialize-from
@@ -37,7 +37,7 @@
   (:documentation
    "Determine the number of bytes OBJECT will be when serialized."))
 
-(defgeneric serialize-into (object vector start)
+(defgeneric serialize-into-vector (object vector start)
   (:documentation
    "Serialize OBJECT into VECTOR and return the number of serialized bytes."))
 
@@ -54,7 +54,7 @@ Return (values vector number-of-serialized-bytes)"
       (check-type start (and (integer 0) fixnum))
       (when (> size (- (length into) start))
         (error "Not enough room in vector"))
-      (serialize-into object into start)
+      (serialize-into-vector object into start)
       (values into size))))
 
 ;;; resolution

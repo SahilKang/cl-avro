@@ -22,12 +22,12 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:serialize-into
+                #:serialize-into-vector
                 #:serialized-size
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
-  (:export #:serialize-into
+  (:export #:serialize-into-vector
            #:serialized-size
            #:deserialize-from-vector
            #:deserialize-from-stream
@@ -40,7 +40,7 @@
 (defmethod serialized-size ((object null))
   0)
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object null) (vector simple-array) (start fixnum))
   "Write zero bytes into VECTOR."
   (declare (ignore object vector start))
@@ -59,7 +59,7 @@
 (defmethod serialized-size ((object (eql 'schema:false)))
   1)
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object (eql 'schema:true)) (vector simple-array) (start fixnum))
   "Write #o1 into VECTOR."
   (declare (ignore object)
@@ -67,7 +67,7 @@
   (setf (elt vector start) 1)
   1)
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object (eql 'schema:false)) (vector simple-array) (start fixnum))
   "Write #o0 into VECTOR."
   (declare (ignore object)
@@ -185,7 +185,7 @@
 
 ;; serialize
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object integer) (vector simple-array) (start fixnum))
   "Write OBJECT into VECTOR as a variable-length zig-zag integer."
   (declare (inline int->zig-zag long->zig-zag)
@@ -305,7 +305,7 @@
 (defmethod serialized-size ((object single-float))
   4)
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object single-float) (vector simple-array) (start fixnum))
   "Write single-precision float into VECTOR."
   (declare (inline uint32->little-endian ieee-floats:encode-float32)
@@ -335,7 +335,7 @@
 (defmethod serialized-size ((object double-float))
   8)
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object double-float) (vector simple-array) (start fixnum))
   "Write double-precision float to STREAM."
   (declare (inline uint64->little-endian ieee-floats:encode-float64)
@@ -367,12 +367,12 @@
     (+ (serialized-size length)
        length)))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object vector) (vector simple-array) (start fixnum))
   "Write byte vector into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (check-type object schema:bytes)
-  (let ((bytes-written (serialize-into (length object) vector start)))
+  (let ((bytes-written (serialize-into-vector (length object) vector start)))
     (declare (fixnum bytes-written))
     (replace vector object :start1 (+ start bytes-written))
     (the fixnum (+ bytes-written (length object)))))
@@ -402,13 +402,13 @@
     (+ (serialized-size length)
        length)))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object string) (vector simple-array) (start fixnum))
   "Write utf-8 encoded string into VECTOR."
   (declare (inline babel:string-to-octets)
            ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((bytes (babel:string-to-octets object :encoding :utf-8)))
-    (serialize-into bytes vector start)))
+    (serialize-into-vector bytes vector start)))
 
 ;; Read a utf-8 encoded string from STREAM.
 (define-deserialize-from (eql 'schema:string)

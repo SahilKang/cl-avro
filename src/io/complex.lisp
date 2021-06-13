@@ -22,12 +22,12 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:serialize-into
+                #:serialize-into-vector
                 #:serialized-size
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
-  (:export #:serialize-into
+  (:export #:serialize-into-vector
            #:serialized-size
            #:deserialize-from-vector
            #:deserialize-from-stream))
@@ -38,7 +38,7 @@
 (defmethod serialized-size ((object schema:fixed-object))
   (length object))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:fixed-object) (vector simple-array) (start fixnum))
   "Write fixed bytes into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
@@ -68,17 +68,17 @@
     (+ (serialized-size position)
        (serialized-size (schema:object object)))))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:union-object) (vector simple-array) (start fixnum))
   "Write tagged union into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let* ((position (nth-value 1 (schema:which-one object)))
-         (bytes-written (serialize-into position vector start)))
+         (bytes-written (serialize-into-vector position vector start)))
     (declare (fixnum bytes-written))
     (the fixnum
          (+ bytes-written
             (the fixnum
-                 (serialize-into
+                 (serialize-into-vector
                   (schema:object object) vector (the fixnum (+ start bytes-written))))))))
 
 ;; Read a tagged union from STREAM.
@@ -109,7 +109,7 @@
                     object
                     :initial-value (serialized-size count))))))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:array-object) (vector simple-array) (start fixnum))
   "Write array into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
@@ -119,17 +119,17 @@
     (declare (vector raw-buffer))
     (unless (zerop count)
       (incf (the fixnum bytes-written)
-            (the fixnum (serialize-into count vector start)))
-      (flet ((serialize-into (elt)
+            (the fixnum (serialize-into-vector count vector start)))
+      (flet ((serialize-into-vector (elt)
                (incf (the fixnum bytes-written)
                      (the fixnum
-                          (serialize-into
+                          (serialize-into-vector
                            elt vector (the fixnum (+ start bytes-written)))))))
-        (map nil #'serialize-into raw-buffer)))
+        (map nil #'serialize-into-vector raw-buffer)))
     (the fixnum
          (+ bytes-written
             (the fixnum
-                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
+                 (serialize-into-vector 0 vector (the fixnum (+ start bytes-written))))))))
 
 ;; Read an array from STREAM.
 (define-deserialize-from schema:array
@@ -181,7 +181,7 @@
         (schema:hashmap #'incf-result object)))
     result))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:map-object) (vector simple-array) (start fixnum))
   "Write map into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
@@ -190,22 +190,22 @@
          (bytes-written 0))
     (unless (zerop count)
       (incf (the fixnum bytes-written)
-            (the fixnum (serialize-into count vector start)))
-      (flet ((serialize-into (key value)
+            (the fixnum (serialize-into-vector count vector start)))
+      (flet ((serialize-into-vector (key value)
                (declare (simple-string key))
                (incf (the fixnum bytes-written)
                      (the fixnum
-                          (serialize-into
+                          (serialize-into-vector
                            key vector (the fixnum (+ start bytes-written)))))
                (incf (the fixnum bytes-written)
                      (the fixnum
-                          (serialize-into
+                          (serialize-into-vector
                            value vector (the fixnum (+ start bytes-written)))))))
-        (maphash #'serialize-into raw-hash-table)))
+        (maphash #'serialize-into-vector raw-hash-table)))
     (the fixnum
          (+ bytes-written
             (the fixnum
-                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
+                 (serialize-into-vector 0 vector (the fixnum (+ start bytes-written))))))))
 
 ;; Read a map from STREAM.
 (define-deserialize-from schema:map
@@ -257,12 +257,12 @@
   (let ((position (nth-value 1 (schema:which-one object))))
     (serialized-size position)))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:enum-object) (vector simple-array) (start fixnum))
   "Write enum into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
   (let ((position (nth-value 1 (schema:which-one object))))
-    (serialize-into position vector start)))
+    (serialize-into-vector position vector start)))
 
 ;; Read an enum from STREAM.
 (define-deserialize-from schema:enum
@@ -284,7 +284,7 @@
           (schema:fields (class-of object))
           :initial-value 0))
 
-(defmethod serialize-into
+(defmethod serialize-into-vector
     ((object schema:record-object) (vector simple-array) (start fixnum))
   "Write record into VECTOR."
   (declare ((simple-array (unsigned-byte 8) (*)) vector))
@@ -298,7 +298,7 @@
 
     do (incf (the fixnum bytes-written)
              (the fixnum
-                  (serialize-into
+                  (serialize-into-vector
                    value vector (the fixnum (+ start bytes-written)))))
 
     finally
