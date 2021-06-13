@@ -25,10 +25,16 @@
         #:cl-avro.schema.fingerprint
         #:cl-avro.schema.schema-of)
   (:export #:+primitive->name+
+           #:scalarize-class
+           #:scalarize-value
+           #:late-class
+           #:parse-slot-value
 
            #:json->schema
            #:schema->json
            #:schema-of
+           #:to-jso
+           #:*seen*
 
            #:fingerprint
            #:*default-fingerprint-algorithm*

@@ -20,5 +20,9 @@
 (defpackage #:cl-avro.schema.io
   (:use #:cl-avro.schema.io.read
         #:cl-avro.schema.io.write)
+  (:import-from #:cl-avro.schema.io.write.canonicalize
+                #:*seen*)
   (:export #:json->schema
-           #:schema->json))
+           #:schema->json
+           #:to-jso
+           #:*seen*))

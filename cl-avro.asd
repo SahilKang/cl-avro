@@ -33,7 +33,9 @@
                #:salza2
                #:closer-mop
                #:trivial-extensible-sequences
-               #:genhash)
+               #:genhash
+               #:md5
+               #:trivial-gray-streams)
   :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :pathname "src"

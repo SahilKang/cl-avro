@@ -24,6 +24,9 @@
         #:cl-avro.io.logical
         #:cl-avro.io.resolution
         #:cl-avro.io.compare)
+  (:import-from #:cl-avro.io.base
+                #:serialized-size)
   (:export #:serialize
            #:deserialize
-           #:compare))
+           #:compare
+           #:serialized-size))
