@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/duration)
 
@@ -60,45 +61,32 @@
     (:metaclass avro:duration)
     (:underlying |foo|)))
 
-(test io
-  (let* ((schema (make-instance
-                  'avro:duration
-                  :underlying (make-instance
-                               'avro:fixed
-                               :name "foo"
-                               :size 12)))
-         (expected-months 39)
-         (expected-days 17)
-         (expected-milliseconds 14831053)
-         (object (make-instance
-                  schema
-                  :years 3
-                  :months 3
-                  :weeks 2
-                  :days 3
-                  :hours 4
-                  :minutes 7
-                  :seconds 11
-                  :milliseconds 3
-                  :nanoseconds 50000000))
-         (serialized
-           (make-array
-            12
-            :element-type '(unsigned-byte 8)
-            :initial-contents '(#x27 #x00 #x00 #x00
-                                #x11 #x00 #x00 #x00
-                                #xcd #x4d #xe2 #x00))))
-    (flet ((check (object)
-             (is (= expected-months (avro:months object)))
-             (is (= expected-days (avro:days object)))
-             (is (= expected-milliseconds (avro:milliseconds object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      ;; TODO check with size 11 to make sure fixed is returned
-      ;; do this with the other logical-fallthrough tests
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (class-of deserialized)))
-        (check deserialized)))))
+(define-io-test io
+    ((months 39)
+     (days 17)
+     (milliseconds 14831053))
+    (make-instance
+     'avro:duration
+     :underlying (make-instance 'avro:fixed :name "foo" :size 12))
+    (make-instance
+     schema
+     :years 3
+     :months 3
+     :weeks 2
+     :days 3
+     :hours 4
+     :minutes 7
+     :seconds 11
+     :milliseconds 3
+     :nanoseconds 50000000)
+    (#x27 #x00 #x00 #x00
+     #x11 #x00 #x00 #x00
+     #xcd #x4d #xe2 #x00)
+  ;; TODO check with size 11 to make sure fixed is returned do
+  ;; this with the other logical-fallthrough tests
+  (is (= months (avro:months arg)))
+  (is (= days (avro:days arg)))
+  (is (= milliseconds (avro:milliseconds arg))))
 
 (test late-type-check
   (setf (find-class 'late_duration) nil

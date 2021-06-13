@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/record)
 
@@ -993,240 +994,229 @@
      (|nested| :type |InnerRecord| :default (|value| 4)))
     (:metaclass avro:record)))
 
-(test io
-  (let* ((array<double>
-           (make-instance 'avro:array :items 'avro:double))
-         (foo
-           (make-instance
-            'avro:record
-            :name 'foo
-            :direct-slots
-            '((:name |label|
-               :type avro:string
-               :initargs (:label)
-               :readers (label)
-               :writers ((setf label))))))
-         (map<foo>
-           (make-instance 'avro:map :values foo))
-         (array<bytes>
-           (make-instance 'avro:array :items 'avro:bytes))
-         (union<boolean-double-array<bytes>>
-           (make-instance
-            'avro:union
-            :schemas `(avro:boolean avro:double ,array<bytes>)))
-         (kind
-           (make-instance
-            'avro:enum
-            :name 'kind
-            :symbols (list "A" "B" "C")))
-         (md5
-           (make-instance 'avro:fixed :name 'md5 :size 16))
-         (array<node>
-           (make-instance 'avro:array :items 'node))
-         (node
-           (closer-mop:ensure-class
-            'node
-            :metaclass 'avro:record
-            :direct-slots
-            `((:name |label|
-               :type avro:string
-               :initargs (:label)
-               :readers (label)
-               :writers ((setf label)))
-              (:name |children|
-               :type ,array<node>
-               :initargs (:children)
-               :readers (children)
-               :writers ((setf children))))))
-         (interop
-           (make-instance
-            'avro:record
-            :name 'interop
-            :direct-slots
-            `((:name |intField|
-               :type avro:int
-               :initargs (:int-field)
-               :readers (int-field)
-               :writers ((setf int-field)))
-              (:name |longField|
-               :type avro:long
-               :initargs (:long-field)
-               :readers (long-field)
-               :writers ((setf long-field)))
-              (:name |stringField|
-               :type avro:string
-               :initargs (:string-field)
-               :readers (string-field)
-               :writers ((setf string-field)))
-              (:name |boolField|
-               :type avro:boolean
-               :initargs (:bool-field)
-               :readers (bool-field)
-               :writers ((setf bool-field)))
-              (:name |floatField|
-               :type avro:float
-               :initargs (:float-field)
-               :readers (float-field)
-               :writers ((setf float-field)))
-              (:name |doubleField|
-               :type avro:double
-               :initargs (:double-field)
-               :readers (double-field)
-               :writers ((setf double-field)))
-              (:name |bytesField|
-               :type avro:bytes
-               :initargs (:bytes-field)
-               :readers (bytes-field)
-               :writers ((setf bytes-field)))
-              (:name |nullField|
-               :type avro:null
-               :initargs (:null-field)
-               :readers (null-field)
-               :writers ((setf null-field)))
-              (:name |arrayField|
-               :type ,array<double>
-               :initargs (:array-field)
-               :readers (array-field)
-               :writers ((setf array-field)))
-              (:name |mapField|
-               :type ,map<foo>
-               :initargs (:map-field)
-               :readers (map-field)
-               :writers ((setf map-field)))
-              (:name |unionField|
-               :type ,union<boolean-double-array<bytes>>
-               :initargs (:union-field)
-               :readers (union-field)
-               :writers ((setf union-field)))
-              (:name |enumField|
-               :type ,kind
-               :initargs (:enum-field)
-               :readers (enum-field)
-               :writers ((setf enum-field)))
-              (:name |fixedField|
-               :type ,md5
-               :initargs (:fixed-field)
-               :readers (fixed-field)
-               :writers ((setf fixed-field)))
-              (:name |recordField|
-               :type ,node
-               :initargs (:record-field)
-               :readers (record-field)
-               :writers ((setf record-field))))))
-         (object
-           (make-instance
-            interop
-            :int-field 3
-            :long-field 4
-            :string-field "abc"
-            :bool-field 'avro:true
-            :float-field 12.34f0
-            :double-field 56.78d0
-            :bytes-field (make-array 3 :element-type '(unsigned-byte 8)
-                                       :initial-contents '(2 4 6))
-            :null-field nil
-            :array-field (make-instance
-                          array<double>
-                          :initial-contents '(23.7d0 123.456d0))
-            :map-field (let ((map (make-instance map<foo>))
-                             (abc (make-instance foo :label "ABC"))
-                             (def (make-instance foo :label "DEF")))
-                         (setf (avro:hashref "abc" map) abc
-                               (avro:hashref "def" map) def)
-                         map)
-            :union-field (make-instance
-                          union<boolean-double-array<bytes>>
-                          :object 'avro:false)
-            :enum-field (make-instance kind :enum "A")
-            :fixed-field (make-instance
-                          md5
-                          :initial-contents (loop
-                                              for i from 1 to 16
-                                              collect (* i 2)))
-            :record-field (let ((child-1
-                                  (make-instance
-                                   node
-                                   :label "child-1"
-                                   :children (make-instance array<node>)))
-                                (child-2
-                                  (make-instance
-                                   node
-                                   :label "child-2"
-                                   :children (make-instance array<node>))))
-                            (make-instance
-                             node
-                             :label "parent"
-                             :children
-                             (make-instance
-                              array<node>
-                              :initial-contents (list child-1 child-2))))))
-         (serialized
-           (make-array
-            105
-            :element-type '(unsigned-byte 8)
-            :initial-contents
-            '(6                                       ; 3
-              8                                       ; 4
-              6 #x61 #x62 #x63                        ; "abc"
-              1                                       ; 'avro:true
-              #xa4 #x70 #x45 #x41                     ; 12.34f0
-              #xa4 #x70 #x3d #x0a #xd7 #x63 #x4c #x40 ; 56.78d0
-              6 2 4 6                                 ; #(2 4 6)
-              ;; nil is not serialized
-              4                         ; two elements in array:
-              #x33 #x33 #x33 #x33 #x33 #xb3 #x37 #x40 ; 23.7d0
-              #x77 #xbe #x9f #x1a #x2f #xdd #x5e #x40 ; 123.456d0
-              0                                       ; end array
-              4                         ; two key-value pairs in map
-              6 #x61 #x62 #x63          ; "abc"
-              6 #x41 #x42 #x43          ; "ABC"
-              6 #x64 #x65 #x66          ; "def"
-              6 #x44 #x45 #x46          ; "DEF"
-              0                         ; end map
-              0 0                       ; 'avro:false under union
-              0                         ; "A" under enum
-              2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32 ; md5
-              12 #x70 #x61 #x72 #x65 #x6e #x74            ; "parent"
-              4                         ; two elements in array
-              14 #x63 #x68 #x69 #x6c #x64 #x2d #x31 ; "child-1"
-              0                                     ; empty array
-              14 #x63 #x68 #x69 #x6c #x64 #x2d #x32 ; "child-2"
-              0                                     ; empty array
-              0                         ; end 2 element array
-              ))))
-    (is (equalp serialized (avro:serialize object)))
-    (is (= 3 (int-field object)))
-    (is (= 4 (long-field object)))
-    (is (string= "abc" (string-field object)))
-    (is (eq 'avro:true (bool-field object)))
-    (is (= 12.34f0 (float-field object)))
-    (is (= 56.78d0 (double-field object)))
-    (is (equalp #(2 4 6) (bytes-field object)))
-    (is (null (null-field object)))
-    (is (equalp #(23.7d0 123.456d0) (avro:raw-buffer (array-field object))))
-    (let ((map (map-field object)))
-      (is (= 2 (avro:generic-hash-table-count map)))
-      (is (string= "ABC" (label (avro:hashref "abc" map))))
-      (is (string= "DEF" (label (avro:hashref "def" map)))))
-    (is (eq 'avro:false (avro:object (union-field object))))
-    (is (string= "A" (avro:which-one (enum-field object))))
-    (is (equalp
-         #(2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32)
-         (avro:raw-buffer (fixed-field object))))
-    (let* ((parent (record-field object))
-           (children (children parent))
-           (child-1 (elt children 0))
-           (child-2 (elt children 1)))
-      (is (= 2 (length children)))
-      (is (zerop (length (children child-1))))
-      (is (zerop (length (children child-2))))
-      (is (string= "parent" (label parent)))
-      (is (string= "child-1" (label child-1)))
-      (is (string= "child-2" (label child-2))))
-    (let ((deserialized (avro:deserialize interop serialized)))
-      (is (eq interop (class-of deserialized)))
-      (is (equalp serialized (avro:serialize deserialized))))
-    (setf (string-field object) "foo")
-    (is (string= "foo" (string-field object)))
-    (signals error
-      (setf (string-field object) 3))))
+(define-io-test io
+    ((array<double>
+      (make-instance 'avro:array :items 'avro:double))
+     (foo
+      (make-instance
+       'avro:record
+       :name 'foo
+       :direct-slots
+       '((:name |label|
+          :type avro:string
+          :initargs (:label)
+          :readers (label)
+          :writers ((setf label))))))
+     (map<foo>
+      (make-instance 'avro:map :values foo))
+     (array<bytes>
+      (make-instance 'avro:array :items 'avro:bytes))
+     (union<boolean-double-array<bytes>>
+      (make-instance
+       'avro:union
+       :schemas `(avro:boolean avro:double ,array<bytes>)))
+     (kind
+      (make-instance 'avro:enum :name 'kind :symbols '("A" "B" "C")))
+     (md5
+      (make-instance 'avro:fixed :name 'md5 :size 16))
+     (array<node>
+      (make-instance 'avro:array :items 'node))
+     (node
+      (closer-mop:ensure-class
+       'node
+       :metaclass 'avro:record
+       :direct-slots
+       `((:name |label|
+          :type avro:string
+          :initargs (:label)
+          :readers (label)
+          :writers ((setf label)))
+         (:name |children|
+          :type ,array<node>
+          :initargs (:children)
+          :readers (children)
+          :writers ((setf children)))))))
+    (make-instance
+     'avro:record
+     :name 'interop
+     :direct-slots
+     `((:name |intField|
+        :type avro:int
+        :initargs (:int-field)
+        :readers (int-field)
+        :writers ((setf int-field)))
+       (:name |longField|
+        :type avro:long
+        :initargs (:long-field)
+        :readers (long-field)
+        :writers ((setf long-field)))
+       (:name |stringField|
+        :type avro:string
+        :initargs (:string-field)
+        :readers (string-field)
+        :writers ((setf string-field)))
+       (:name |boolField|
+        :type avro:boolean
+        :initargs (:bool-field)
+        :readers (bool-field)
+        :writers ((setf bool-field)))
+       (:name |floatField|
+        :type avro:float
+        :initargs (:float-field)
+        :readers (float-field)
+        :writers ((setf float-field)))
+       (:name |doubleField|
+        :type avro:double
+        :initargs (:double-field)
+        :readers (double-field)
+        :writers ((setf double-field)))
+       (:name |bytesField|
+        :type avro:bytes
+        :initargs (:bytes-field)
+        :readers (bytes-field)
+        :writers ((setf bytes-field)))
+       (:name |nullField|
+        :type avro:null
+        :initargs (:null-field)
+        :readers (null-field)
+        :writers ((setf null-field)))
+       (:name |arrayField|
+        :type ,array<double>
+        :initargs (:array-field)
+        :readers (array-field)
+        :writers ((setf array-field)))
+       (:name |mapField|
+        :type ,map<foo>
+        :initargs (:map-field)
+        :readers (map-field)
+        :writers ((setf map-field)))
+       (:name |unionField|
+        :type ,union<boolean-double-array<bytes>>
+        :initargs (:union-field)
+        :readers (union-field)
+        :writers ((setf union-field)))
+       (:name |enumField|
+        :type ,kind
+        :initargs (:enum-field)
+        :readers (enum-field)
+        :writers ((setf enum-field)))
+       (:name |fixedField|
+        :type ,md5
+        :initargs (:fixed-field)
+        :readers (fixed-field)
+        :writers ((setf fixed-field)))
+       (:name |recordField|
+        :type ,node
+        :initargs (:record-field)
+        :readers (record-field)
+        :writers ((setf record-field)))))
+    (make-instance
+     schema
+     :int-field 3
+     :long-field 4
+     :string-field "abc"
+     :bool-field 'avro:true
+     :float-field 12.34f0
+     :double-field 56.78d0
+     :bytes-field (make-array 3 :element-type '(unsigned-byte 8)
+                                :initial-contents '(2 4 6))
+     :null-field nil
+     :array-field (make-instance
+                   array<double>
+                   :initial-contents '(23.7d0 123.456d0))
+     :map-field (let ((map (make-instance map<foo>))
+                      (abc (make-instance foo :label "ABC"))
+                      (def (make-instance foo :label "DEF")))
+                  (setf (avro:hashref "abc" map) abc
+                        (avro:hashref "def" map) def)
+                  map)
+     :union-field (make-instance
+                   union<boolean-double-array<bytes>>
+                   :object 'avro:false)
+     :enum-field (make-instance kind :enum "A")
+     :fixed-field (make-instance
+                   md5
+                   :initial-contents (loop
+                                       for i from 1 to 16
+                                       collect (* i 2)))
+     :record-field (let ((child-1
+                           (make-instance
+                            node
+                            :label "child-1"
+                            :children (make-instance array<node>)))
+                         (child-2
+                           (make-instance
+                            node
+                            :label "child-2"
+                            :children (make-instance array<node>))))
+                     (make-instance
+                      node
+                      :label "parent"
+                      :children
+                      (make-instance
+                       array<node>
+                       :initial-contents (list child-1 child-2)))))
+    (6                                       ; 3
+     8                                       ; 4
+     6 #x61 #x62 #x63                        ; "abc"
+     1                                       ; 'avro:true
+     #xa4 #x70 #x45 #x41                     ; 12.34f0
+     #xa4 #x70 #x3d #x0a #xd7 #x63 #x4c #x40 ; 56.78d0
+     6 2 4 6                                 ; #(2 4 6)
+     ;; nil is not serialized
+     4                                       ; two elements in array:
+     #x33 #x33 #x33 #x33 #x33 #xb3 #x37 #x40 ; 23.7d0
+     #x77 #xbe #x9f #x1a #x2f #xdd #x5e #x40 ; 123.456d0
+     0                                       ; end array
+     4                                  ; two key-value pairs in map
+     6 #x61 #x62 #x63                   ; "abc"
+     6 #x41 #x42 #x43                   ; "ABC"
+     6 #x64 #x65 #x66                   ; "def"
+     6 #x44 #x45 #x46                   ; "DEF"
+     0                                  ; end map
+     0 0                                ; 'avro:false under union
+     0                                  ; "A" under enum
+     2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32 ; md5
+     12 #x70 #x61 #x72 #x65 #x6e #x74            ; "parent"
+     4                                     ; two elements in array
+     14 #x63 #x68 #x69 #x6c #x64 #x2d #x31 ; "child-1"
+     0                                     ; empty array
+     14 #x63 #x68 #x69 #x6c #x64 #x2d #x32 ; "child-2"
+     0                                     ; empty array
+     0                                     ; end 2 element array
+     )
+  (is (= 3 (int-field arg)))
+  (is (= 4 (long-field arg)))
+  (is (string= "abc" (string-field arg)))
+  (is (eq 'avro:true (bool-field arg)))
+  (is (= 12.34f0 (float-field arg)))
+  (is (= 56.78d0 (double-field arg)))
+  (is (equalp #(2 4 6) (bytes-field arg)))
+  (is (null (null-field arg)))
+  (is (equalp #(23.7d0 123.456d0) (avro:raw-buffer (array-field arg))))
+  (let ((map (map-field arg)))
+    (is (= 2 (avro:generic-hash-table-count map)))
+    (is (string= "ABC" (label (avro:hashref "abc" map))))
+    (is (string= "DEF" (label (avro:hashref "def" map)))))
+  (is (eq 'avro:false (avro:object (union-field arg))))
+  (is (string= "A" (avro:which-one (enum-field arg))))
+  (is (equalp
+       #(2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32)
+       (avro:raw-buffer (fixed-field arg))))
+  (let* ((parent (record-field arg))
+         (children (children parent))
+         (child-1 (elt children 0))
+         (child-2 (elt children 1)))
+    (is (= 2 (length children)))
+    (is (zerop (length (children child-1))))
+    (is (zerop (length (children child-2))))
+    (is (string= "parent" (label parent)))
+    (is (string= "child-1" (label child-1)))
+    (is (string= "child-2" (label child-2))))
+
+  (setf (string-field arg) "foo")
+  (is (string= "foo" (string-field arg)))
+  (setf (string-field arg) "abc")
+
+  (signals error
+    (setf (string-field arg) 3)))

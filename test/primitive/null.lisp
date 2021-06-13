@@ -20,7 +20,8 @@
 (defpackage #:test/null
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/null)
 
@@ -40,10 +41,15 @@
     (is (string= json (avro:serialize 'avro:null :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:null)))))
 
-(test io
-  (is (typep nil 'avro:null))
-  (is (equalp #() (avro:serialize nil)))
-  (let ((serialized
-          (make-array 3 :element-type '(unsigned-byte 8)
-                        :initial-contents '(2 4 6))))
-    (is (null (avro:deserialize 'avro:null serialized)))))
+(define-io-test io
+    ()
+    avro:null
+    nil
+    ()
+  (is (eq object arg))
+  (multiple-value-bind (deserialized size)
+      (let ((bytes (make-array 3 :element-type '(unsigned-byte 8)
+                                 :initial-contents '(2 4 6))))
+        (avro:deserialize 'avro:null bytes))
+    (is (zerop size))
+    (is (eq object deserialized))))

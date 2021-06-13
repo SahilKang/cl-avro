@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:json-syntax
-                #:json-string=))
+                #:json-string=
+                #:define-io-test))
 
 (in-package #:test/time-millis)
 
@@ -35,27 +36,21 @@
     (is (json-string= json (avro:serialize expected)))
     (is (= fingerprint (avro:fingerprint64 expected)))))
 
-(test io
-  (let* ((expected-hour 3)
-         (expected-minute 39)
-         (expected-millisecond 44300)
-         (object (make-instance
-                  'avro:time-millis
-                  :hour expected-hour
-                  :minute expected-minute
-                  :millisecond expected-millisecond))
-         (serialized (make-array 4 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(#xd8 #xb4 #xc9 #xc))))
-    (flet ((check (object)
-             (is (= expected-hour (avro:hour object)))
-             (is (= expected-minute (avro:minute object)))
-             (is (= expected-millisecond (multiple-value-bind (second remainder)
-                                             (avro:second object)
-                                           (+ (* 1000 second)
-                                              (* 1000 remainder)))))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize 'avro:time-millis serialized)))
-        (is (eq (find-class 'avro:time-millis) (class-of deserialized)))
-        (check deserialized)
-        (is (local-time:timestamp= object deserialized))))))
+(define-io-test io
+    ((hour 3)
+     (minute 39)
+     (millisecond 44300))
+    avro:time-millis
+    (make-instance
+     'avro:time-millis
+     :hour hour
+     :minute minute
+     :millisecond millisecond)
+    (#xd8 #xb4 #xc9 #xc)
+  (is (local-time:timestamp= object arg))
+  (is (= hour (avro:hour arg)))
+  (is (= minute (avro:minute arg)))
+  (is (= millisecond (multiple-value-bind (second remainder)
+                         (avro:second arg)
+                       (+ (* 1000 second)
+                          (* 1000 remainder))))))

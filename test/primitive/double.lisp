@@ -20,7 +20,8 @@
 (defpackage #:test/double
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/double)
 
@@ -40,21 +41,16 @@
     (is (string= json (avro:serialize 'avro:double :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:double)))))
 
-(test io
-  (let ((double 23.7d0)
-        (serialized
-          (make-array
-           8
-           :element-type '(unsigned-byte 8)
-           :initial-contents '(#x33 #x33 #x33 #x33 #x33 #xB3 #x37 #x40))))
-    (is (typep double 'avro:double))
-    (is (equalp serialized (avro:serialize double)))
-    (is (= double (avro:deserialize 'avro:double serialized)))))
+(define-io-test io
+    ()
+    avro:double
+    23.7d0
+    (#x33 #x33 #x33 #x33 #x33 #xB3 #x37 #x40)
+  (is (= object arg)))
 
-(test io-zero
-  (let ((double 0.0d0)
-        (serialized
-          (make-array 8 :element-type '(unsigned-byte 8) :initial-element 0)))
-    (is (typep double 'avro:double))
-    (is (equalp serialized (avro:serialize double)))
-    (is (= double (avro:deserialize 'avro:double serialized)))))
+(define-io-test io-zero
+    ()
+    avro:double
+    0.0d0
+    (0 0 0 0 0 0 0 0)
+  (is (= object arg)))

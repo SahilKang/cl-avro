@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/fixed)
 
@@ -54,17 +55,12 @@
     (:aliases "foo" "foo.bar")
     (:size 12)))
 
-(test io
-  (let* ((schema (make-instance 'avro:fixed :name 'fixed :size 3))
-         (expected '(2 4 6))
-         (object (make-instance schema :initial-contents expected))
-         (serialized (make-array 3 :element-type '(unsigned-byte 8)
-                                   :initial-contents expected)))
-    (is (equal expected (coerce object 'list)))
-    (is (equalp serialized (avro:serialize object)))
-    (let ((deserialized (avro:deserialize schema serialized)))
-      (is (eq schema (class-of deserialized)))
-      (is (equal expected (coerce deserialized 'list))))))
+(define-io-test io
+    ((expected '(2 4 6)))
+    (make-instance 'avro:fixed :name 'fixed :size 3)
+    (make-instance schema :initial-contents expected)
+    (2 4 6)
+  (is (equal expected (coerce arg 'list))))
 
 (define-schema-test python-test
   {

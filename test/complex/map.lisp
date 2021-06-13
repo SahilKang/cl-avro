@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/map)
 
@@ -123,37 +124,24 @@
     (:metaclass avro:map)
     (:values |EnumName|)))
 
-(test io
-  (let* ((enum-schema
-           (make-instance 'avro:enum :name "Test" :symbols '("A" "B")))
-         (map-schema
-           (make-instance 'avro:map :values enum-schema))
-         (expected
-           '(("a" . "A") ("aa" . "A") ("b" . "B")))
-         (object
-           (let ((map (make-instance map-schema)))
-             (dolist (cons expected)
-               (destructuring-bind (key . value) cons
-                 (let ((enum (make-instance enum-schema :enum value)))
-                   (setf (avro:hashref key map) enum))))
-             map))
-         (serialized
-           (make-array
-            12
-            :element-type '(unsigned-byte 8)
-            :initial-contents '(6 2 #x61 0 4 #x61 #x61 0 2 #x62 2 0))))
-    (flet ((sorted-alist (map)
-             (let (alist)
-               (flet ((fill-alist (key value)
-                        (let ((cons (cons key (avro:which-one value))))
-                          (push cons alist))))
-                 (avro:hashmap #'fill-alist map))
-               (sort alist #'string< :key #'car))))
-      (is (equal expected (sorted-alist object)))
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize map-schema serialized)))
-        (is (eq map-schema (class-of deserialized)))
-        (is (equal expected (sorted-alist deserialized)))))))
+(define-io-test io
+    ((enum-schema (make-instance 'avro:enum :name "Test" :symbols '("A" "B")))
+     (expected '(("a" . "A") ("aa" . "A") ("b" . "B"))))
+    (make-instance 'avro:map :values enum-schema)
+    (let ((map (make-instance schema)))
+      (dolist (cons expected)
+        (destructuring-bind (key . value) cons
+          (let ((enum (make-instance enum-schema :enum value)))
+            (setf (avro:hashref key map) enum))))
+      map)
+    (6 2 #x61 0 4 #x61 #x61 0 2 #x62 2 0)
+  (let (sorted-alist)
+    (flet ((fill-alist (key value)
+             (let ((cons (cons key (avro:which-one value))))
+               (push cons sorted-alist))))
+      (avro:hashmap #'fill-alist arg))
+    (setf sorted-alist (sort sorted-alist #'string< :key #'car))
+    (is (equal expected sorted-alist))))
 
 (test late-type-check
   (setf (find-class 'late_map) nil

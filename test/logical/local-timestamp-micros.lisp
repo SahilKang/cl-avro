@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:json-syntax
-                #:json-string=))
+                #:json-string=
+                #:define-io-test))
 
 (in-package #:test/local-timestamp-micros)
 
@@ -35,42 +36,31 @@
     (is (json-string= json (avro:serialize expected)))
     (is (= fingerprint (avro:fingerprint64 expected)))))
 
-(test io
-  (let* ((expected-year 2021)
-         (expected-month 5)
-         (expected-day 14)
-         (expected-hour 2)
-         (expected-minute 54)
-         (expected-microsecond 23800900)
-         (object (make-instance
-                  'avro:local-timestamp-micros
-                  :year expected-year
-                  :month expected-month
-                  :day expected-day
-                  :hour expected-hour
-                  :minute expected-minute
-                  :microsecond expected-microsecond))
-         (serialized
-           (make-array
-            8
-            :element-type '(unsigned-byte 8)
-            :initial-contents '(#x88 #xb9 #xda #xc7 #xab #x90 #xe1 #x05))))
-    (flet ((check (object)
-             (is (= expected-year (avro:year object)))
-             (is (= expected-month (avro:month object)))
-             (is (= expected-day (avro:day object)))
-             (is (= expected-hour (avro:hour object)))
-             (is (= expected-minute (avro:minute object)))
-             (is (= expected-microsecond
-                    (multiple-value-bind (second remainder)
-                        (avro:second object)
-                      (+ (* 1000 1000 second)
-                         (* 1000 1000 remainder)))))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized
-              (avro:deserialize 'avro:local-timestamp-micros serialized)))
-        (is (eq (find-class 'avro:local-timestamp-micros)
-                (class-of deserialized)))
-        (check deserialized)
-        (is (local-time:timestamp= object deserialized))))))
+(define-io-test io
+    ((year 2021)
+     (month 5)
+     (day 14)
+     (hour 2)
+     (minute 54)
+     (microsecond 23800900))
+    avro:local-timestamp-micros
+    (make-instance
+     'avro:local-timestamp-micros
+     :year year
+     :month month
+     :day day
+     :hour hour
+     :minute minute
+     :microsecond microsecond)
+    (#x88 #xb9 #xda #xc7 #xab #x90 #xe1 #x05)
+  (is (local-time:timestamp= object arg))
+  (is (= year (avro:year arg)))
+  (is (= month (avro:month arg)))
+  (is (= day (avro:day arg)))
+  (is (= hour (avro:hour arg)))
+  (is (= minute (avro:minute arg)))
+  (is (= microsecond
+         (multiple-value-bind (second remainder)
+             (avro:second arg)
+           (+ (* 1000 1000 second)
+              (* 1000 1000 remainder))))))

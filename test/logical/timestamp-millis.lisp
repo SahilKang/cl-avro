@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:json-syntax
-                #:json-string=))
+                #:json-string=
+                #:define-io-test))
 
 (in-package #:test/timestamp-millis)
 
@@ -35,42 +36,35 @@
     (is (json-string= json (avro:serialize expected)))
     (is (= fingerprint (avro:fingerprint64 expected)))))
 
-(test io
-  (let* ((expected-year 2021)
-         (expected-month 5)
-         (expected-day 5)
-         (expected-hour 4)
-         (expected-minute 4)
-         (expected-millisecond 42600)
-         (object (make-instance
-                  'avro:timestamp-millis
-                  :year expected-year
-                  :month expected-month
-                  :day expected-day
-                  :hour expected-hour
-                  :minute expected-minute
-                  :millisecond expected-millisecond
-                  :timezone local-time:+utc-zone+))
-         (serialized
-           (make-array 6 :element-type '(unsigned-byte 8)
-                         :initial-contents '(#xd0 #xa7 #x98 #xab #xa7 #x5e))))
-    (flet ((check (object)
-             (is (= expected-year (avro:year object)))
-             (is (= expected-month (avro:month object)))
-             (is (= expected-day
-                    (avro:day object :timezone local-time:+utc-zone+)))
-             (is (= expected-hour
-                    (avro:hour object :timezone local-time:+utc-zone+)))
-             (is (= expected-minute
-                    (avro:minute object :timezone local-time:+utc-zone+)))
-             (is (= expected-millisecond
-                    (multiple-value-bind (second remainder)
-                        (avro:second object :timezone local-time:+utc-zone+)
-                      (+ (* 1000 second)
-                         (* 1000 remainder)))))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize 'avro:timestamp-millis serialized)))
-        (is (eq (find-class 'avro:timestamp-millis) (class-of deserialized)))
-        (check deserialized)
-        (is (local-time:timestamp= object deserialized))))))
+(define-io-test io
+    ((year 2021)
+     (month 5)
+     (day 5)
+     (hour 4)
+     (minute 4)
+     (millisecond 42600))
+    avro:timestamp-millis
+    (make-instance
+     'avro:timestamp-millis
+     :year year
+     :month month
+     :day day
+     :hour hour
+     :minute minute
+     :millisecond millisecond
+     :timezone local-time:+utc-zone+)
+    (#xd0 #xa7 #x98 #xab #xa7 #x5e)
+  (is (local-time:timestamp= object arg))
+  (is (= year (avro:year arg)))
+  (is (= month (avro:month arg)))
+  (is (= day
+         (avro:day arg :timezone local-time:+utc-zone+)))
+  (is (= hour
+         (avro:hour arg :timezone local-time:+utc-zone+)))
+  (is (= minute
+         (avro:minute arg :timezone local-time:+utc-zone+)))
+  (is (= millisecond
+         (multiple-value-bind (second remainder)
+             (avro:second arg :timezone local-time:+utc-zone+)
+           (+ (* 1000 second)
+              (* 1000 remainder))))))

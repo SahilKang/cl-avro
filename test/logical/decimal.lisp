@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/decimal)
 
@@ -64,27 +65,20 @@
     (:precision 4)
     (:scale 2)))
 
-(test io-bytes
-  (let* ((expected-precision 4)
-         (expected-scale 2)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying 'avro:bytes
-                  :precision expected-precision
-                  :scale expected-scale))
-         (expected-unscaled -1234)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 3 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(4 #xfb #x2e))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled -12340)))))
+(define-io-test io-bytes
+    ((precision 4)
+     (scale 2)
+     (unscaled -1234))
+    (make-instance
+     'avro:decimal
+     :underlying 'avro:bytes
+     :precision precision
+     :scale scale)
+    (make-instance schema :unscaled unscaled)
+    (4 #xfb #x2e)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled -12340)))
 
 (define-schema-test schema-bytes-same-scale-and-precision
   {
@@ -112,27 +106,20 @@
     (:precision 4)
     (:scale 4)))
 
-(test io-bytes-same-scale-and-precision
-  (let* ((expected-precision 4)
-         (expected-scale expected-precision)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying 'avro:bytes
-                  :precision expected-precision
-                  :scale expected-scale))
-         (expected-unscaled 1234)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 3 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(4 #x04 #xd2))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled 12340)))))
+(define-io-test io-bytes-same-scale-and-precision
+    ((precision 4)
+     (scale precision)
+     (unscaled 1234))
+    (make-instance
+     'avro:decimal
+     :underlying 'avro:bytes
+     :precision precision
+     :scale scale)
+    (make-instance schema :unscaled unscaled)
+    (4 #x04 #xd2)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled 12340)))
 
 (define-schema-test schema-bytes-default-scale
   {
@@ -156,25 +143,15 @@
     (:underlying avro:bytes)
     (:precision 3)))
 
-(test io-bytes-default-scale
-  (let* ((expected-precision 3)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying 'avro:bytes
-                  :precision expected-precision))
-         (expected-unscaled -123)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 2 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(2 #x85))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled -1230)))))
+(define-io-test io-bytes-default-scale
+    ((precision 3)
+     (unscaled -123))
+    (make-instance 'avro:decimal :underlying 'avro:bytes :precision precision)
+    (make-instance schema :unscaled unscaled)
+    (2 #x85)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled -1230)))
 
 ;;; fixed underlying
 
@@ -239,30 +216,20 @@
     (:precision 4)
     (:scale 2)))
 
-(test io-fixed
-  (let* ((expected-precision 4)
-         (expected-scale 2)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying (make-instance
-                               'avro:fixed
-                               :name "foo"
-                               :size 2)
-                  :precision expected-precision
-                  :scale expected-scale))
-         (expected-unscaled -1234)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 2 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(#xfb #x2e))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled -12340)))))
+(define-io-test io-fixed
+    ((precision 4)
+     (scale 2)
+     (unscaled -1234))
+    (make-instance
+     'avro:decimal
+     :underlying (make-instance 'avro:fixed :name "foo" :size 2)
+     :precision precision
+     :scale scale)
+    (make-instance schema :unscaled unscaled)
+    (#xfb #x2e)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled -12340)))
 
 (define-schema-test schema-fixed-same-scale-and-precision
   {
@@ -305,30 +272,20 @@
     (:precision 4)
     (:scale 4)))
 
-(test io-fixed-same-scale-and-precision
-  (let* ((expected-precision 4)
-         (expected-scale expected-precision)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying (make-instance
-                               'avro:fixed
-                               :name "foo"
-                               :size 4)
-                  :precision expected-precision
-                  :scale expected-scale))
-         (expected-unscaled 1234)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 4 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(#x00 #x00 #x04 #xd2))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled 12340)))))
+(define-io-test io-fixed-same-scale-and-precision
+    ((precision 4)
+     (scale precision)
+     (unscaled 1234))
+    (make-instance
+     'avro:decimal
+     :underlying (make-instance 'avro:fixed :name "foo" :size 4)
+     :precision precision
+     :scale scale)
+    (make-instance schema :unscaled unscaled)
+    (#x00 #x00 #x04 #xd2)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled 12340)))
 
 (define-schema-test schema-fixed-default-scale
   {
@@ -367,28 +324,18 @@
     (:underlying |foo|)
     (:precision 4)))
 
-(test io-fixed-default-scale
-  (let* ((expected-precision 3)
-         (schema (make-instance
-                  'avro:decimal
-                  :underlying (make-instance
-                               'avro:fixed
-                               :name "foo"
-                               :size 4)
-                  :precision expected-precision))
-         (expected-unscaled -123)
-         (object (make-instance schema :unscaled expected-unscaled))
-         (serialized (make-array 4 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(#xff #xff #xff #x85))))
-    (flet ((check (object)
-             (is (= expected-unscaled (avro:unscaled object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize schema serialized)))
-        (is (eq schema (avro:schema-of deserialized)))
-        (check deserialized))
-      (signals error
-        (make-instance schema :unscaled -1230)))))
+(define-io-test io-fixed-default-scale
+    ((precision 3)
+     (unscaled -123))
+    (make-instance
+     'avro:decimal
+     :underlying (make-instance 'avro:fixed :name "foo" :size 4)
+     :precision precision)
+    (make-instance schema :unscaled unscaled)
+    (#xff #xff #xff #x85)
+  (is (= unscaled (avro:unscaled arg)))
+  (signals error
+    (make-instance schema :unscaled -1230)))
 
 (test late-type-check
   (setf (find-class 'late_decimal) nil

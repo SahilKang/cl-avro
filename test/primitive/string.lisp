@@ -20,7 +20,8 @@
 (defpackage #:test/string
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/string)
 
@@ -40,27 +41,20 @@
     (is (string= json (avro:serialize 'avro:string :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:string)))))
 
-(test io
-  (let ((string
-          (concatenate 'string (string #\u1f44b) " hello world!"))
-        (serialized
-          (make-array
-           18
-           :element-type '(unsigned-byte 8)
-           :initial-contents
-           '(34                            ; length
-             #xf0 #x9f #x91 #x8b           ; waving hand sign emoji
-             #x20 #x68 #x65 #x6c #x6c #x6f ; <space> hello
-             #x20 #x77 #x6f #x72 #x6c #x64 #x21) ; <space> world!
-           )))
-    (is (typep string 'avro:string))
-    (is (equalp serialized (avro:serialize string)))
-    (is (string= string (avro:deserialize 'avro:string serialized)))))
+(define-io-test io
+    ()
+    avro:string
+    (concatenate 'string (string #\u1f44b) " hello world!")
+    (34                                 ; length
+     #xf0 #x9f #x91 #x8b                ; waving hand sign emoji
+     #x20 #x68 #x65 #x6c #x6c #x6f      ; <space> hello
+     #x20 #x77 #x6f #x72 #x6c #x64 #x21 ; <space> world!
+     )
+  (is (string= object arg)))
 
-(test io-empty
-  (let ((string "")
-        (serialized
-          (make-array 1 :element-type '(unsigned-byte 8) :initial-element 0)))
-    (is (typep string 'avro:string))
-    (is (equalp serialized (avro:serialize string)))
-    (is (string= string (avro:deserialize 'avro:string serialized)))))
+(define-io-test io-empty
+    ()
+    avro:string
+    ""
+    (0)
+  (is (string= object arg)))

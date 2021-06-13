@@ -20,7 +20,8 @@
 (defpackage #:test/boolean
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/boolean)
 
@@ -40,16 +41,16 @@
     (is (string= json (avro:serialize 'avro:boolean :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:boolean)))))
 
-(test io-true
-  (is (typep 'avro:true 'avro:boolean))
-  (let ((serialized
-          (make-array 1 :element-type '(unsigned-byte 8) :initial-element 1)))
-    (is (equalp serialized (avro:serialize 'avro:true)))
-    (is (eq 'avro:true (avro:deserialize 'avro:boolean serialized)))))
+(define-io-test io-true
+    ()
+    avro:boolean
+    'avro:true
+    (1)
+  (is (eq 'avro:true arg)))
 
-(test io-false
-  (is (typep 'avro:false 'avro:boolean))
-  (let ((serialized
-          (make-array 1 :element-type '(unsigned-byte 8) :initial-element 0)))
-    (is (equalp serialized (avro:serialize 'avro:false)))
-    (is (eq 'avro:false (avro:deserialize 'avro:boolean serialized)))))
+(define-io-test io-false
+    ()
+    avro:boolean
+    'avro:false
+    (0)
+  (is (eq 'avro:false arg)))

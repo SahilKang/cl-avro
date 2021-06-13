@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/union)
 
@@ -77,23 +78,15 @@
     (:metaclass avro:union)
     (:schemas avro:string |baz|)))
 
-(test io
-  (let* ((schema (make-instance 'avro:union :schemas '(avro:null avro:string)))
-         (expected "foobar")
-         (object (make-instance schema :object expected))
-         (serialized
-           (make-array
-            8
-            :element-type '(unsigned-byte 8)
-            :initial-contents '(2 12 #x66 #x6f #x6f #x62 #x61 #x72))))
-    (is (string= expected (avro:object object)))
-    (is (equalp serialized (avro:serialize object)))
-    (let ((deserialized (avro:deserialize schema serialized)))
-      (is (eq schema (avro:schema-of deserialized)))
-      (is (string= expected (avro:object deserialized))))
-    (is (null (avro:object (make-instance schema :object nil))))
-    (signals error
-      (make-instance schema :object 3))))
+(define-io-test io
+    ((expected "foobar"))
+    (make-instance 'avro:union :schemas '(avro:null avro:string))
+    (make-instance schema :object expected)
+    (2 12 #x66 #x6f #x6f #x62 #x61 #x72)
+  (is (string= expected (avro:object arg)))
+  (is (null (avro:object (make-instance schema :object nil))))
+  (signals error
+    (make-instance schema :object 3)))
 
 (test late-type-check
   (setf (find-class 'late_union) nil

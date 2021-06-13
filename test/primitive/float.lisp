@@ -20,7 +20,8 @@
 (defpackage #:test/float
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/float)
 
@@ -40,19 +41,16 @@
     (is (string= json (avro:serialize 'avro:float :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:float)))))
 
-(test io
-  (let ((float 23.7f0)
-        (serialized
-          (make-array 4 :element-type '(unsigned-byte 8)
-                        :initial-contents '(#x9a #x99 #xbd #x41))))
-    (is (typep float 'avro:float))
-    (is (equalp serialized (avro:serialize float)))
-    (is (= float (avro:deserialize 'avro:float serialized)))))
+(define-io-test io
+    ()
+    avro:float
+    23.7f0
+    (#x9a #x99 #xbd #x41)
+  (is (= object arg)))
 
-(test io-zero
-  (let ((float 0.0f0)
-        (serialized
-          (make-array 4 :element-type '(unsigned-byte 8) :initial-element 0)))
-    (is (typep float 'avro:float))
-    (is (equalp serialized (avro:serialize float)))
-    (is (= float (avro:deserialize 'avro:float serialized)))))
+(define-io-test io-zero
+    ()
+    avro:float
+    0.0f0
+    (0 0 0 0)
+  (is (= object arg)))
