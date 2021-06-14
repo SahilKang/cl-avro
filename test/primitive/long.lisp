@@ -20,7 +20,8 @@
 (defpackage #:test/long
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/long)
 
@@ -40,45 +41,48 @@
     (is (string= json (avro:serialize 'avro:long :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:long)))))
 
-(test io
-  (loop
-    with long->serialized
-      = '((0 . (#x00))
-          (-1 . (#x01))
-          (1 . (#x02))
-          (-2 . (#x03))
-          (2 . (#x04))
-          (-64 . (#x7f))
-          (64 . (#x80 #x01))
-          (8192 . (#x80 #x80 #x01))
-          (-8193 . (#x81 #x80 #x01)))
-        initially
-           (dolist (cons long->serialized)
-             (let* ((bytes-list (cdr cons))
-                    (bytes-vector (make-array
-                                   (length bytes-list)
-                                   :element-type '(unsigned-byte 8)
-                                   :initial-contents bytes-list)))
-               (rplacd cons bytes-vector)))
+(macrolet
+    ((make-tests (&rest long->serialized)
+       `(progn
+          ,@(mapcar
+             (lambda (long&serialized)
+               `(define-io-test
+                    ,(intern (format nil "IO-~A" (car long&serialized)))
+                    ()
+                    ,(if (typep (car long&serialized) '(signed-byte 32))
+                         '(avro:long avro:int)
+                         'avro:long)
+                    ,(car long&serialized)
+                    ,(cdr long&serialized)
+                  (is (= object arg))))
+             long->serialized))))
+  (make-tests
+   (0 . (#x00))
+   (-1 . (#x01))
+   (1 . (#x02))
+   (-2 . (#x03))
+   (2 . (#x04))
+   (-64 . (#x7f))
+   (64 . (#x80 #x01))
+   (8192 . (#x80 #x80 #x01))
+   (-8193 . (#x81 #x80 #x01))))
 
-    for (long . serialized) in long->serialized
-    do
-       (is (equalp serialized (avro:serialize long)))
-       (is (= long (avro:deserialize 'avro:long serialized)))))
+(define-io-test io-min
+    ()
+    avro:long
+    (- (expt 2 63))
+    (#xff #xff #xff #xff #xff #xff #xff #xff #xff #x01)
+  (is (= object arg))
+  (is (not (typep (1- arg) 'avro:long)))
+  (signals error
+    (avro:serialize (1- arg))))
 
-(test io-edges
-  (let ((max (1- (expt 2 63)))
-        (min (- (expt 2 63))))
-    (is (typep max 'avro:long))
-    (is (typep min 'avro:long))
-
-    (is (not (typep (1+ max) 'avro:long)))
-    (is (not (typep (1- min) 'avro:long)))
-
-    (is (= max (avro:deserialize 'avro:long (avro:serialize max))))
-    (is (= min (avro:deserialize 'avro:long (avro:serialize min))))
-
-    (signals error
-      (avro:serialize (1+ max)))
-    (signals error
-      (avro:serialize (1- min)))))
+(define-io-test io-max
+    ()
+    avro:long
+    (1- (expt 2 63))
+    (#xfe #xff #xff #xff #xff #xff #xff #xff #xff #x01)
+  (is (= object arg))
+  (is (not (typep (1+ arg) 'avro:long)))
+  (signals error
+    (avro:serialize (1+ arg))))

@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:json-syntax
-                #:json-string=))
+                #:json-string=
+                #:define-io-test))
 
 (in-package #:test/date)
 
@@ -35,24 +36,14 @@
     (is (json-string= json (avro:serialize expected)))
     (is (= fingerprint (avro:fingerprint64 expected)))))
 
-(test io
-  (let* ((expected-year 2021)
-         (expected-month 5)
-         (expected-day 5)
-         (object (make-instance
-                  'avro:date
-                  :year expected-year
-                  :month expected-month
-                  :day expected-day))
-         (serialized (make-array 3 :element-type '(unsigned-byte 8)
-                                   :initial-contents '(#x80 #xa5 #x02))))
-    (flet ((check (object)
-             (is (= expected-year (avro:year object)))
-             (is (= expected-month (avro:month object)))
-             (is (= expected-day (avro:day object)))))
-      (check object)
-      (is (equalp serialized (avro:serialize object)))
-      (let ((deserialized (avro:deserialize 'avro:date serialized)))
-        (is (eq (find-class 'avro:date) (class-of deserialized)))
-        (check deserialized)
-        (is (local-time:timestamp= object deserialized))))))
+(define-io-test io
+    ((year 2021)
+     (month 5)
+     (day 5))
+    avro:date
+    (make-instance 'avro:date :year year :month month :day day)
+    (#x80 #xa5 #x02)
+  (is (local-time:timestamp= object arg))
+  (is (= year (avro:year arg)))
+  (is (= month (avro:month arg)))
+  (is (= day (avro:day arg))))

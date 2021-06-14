@@ -20,7 +20,8 @@
 (defpackage #:test/bytes
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/bytes)
 
@@ -40,25 +41,19 @@
     (is (string= json (avro:serialize 'avro:bytes :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:bytes)))))
 
-(test io
-  (let ((bytes
-          (make-array 3 :element-type '(unsigned-byte 8)
-                        :adjustable t :fill-pointer t
-                        :initial-contents '(2 4 6)))
-        (serialized
-          (make-array 4 :element-type '(unsigned-byte 8)
-                        :initial-contents '(6 2 4 6))))
-    (is (typep bytes 'avro:bytes))
-    (is (equalp serialized (avro:serialize bytes)))
-    (is (equalp bytes (avro:deserialize 'avro:bytes serialized)))))
+(define-io-test io
+    ()
+    avro:bytes
+    (make-array 3 :element-type '(unsigned-byte 8)
+                  :adjustable t :fill-pointer t
+                  :initial-contents '(2 4 6))
+    (6 2 4 6)
+  (is (equalp object arg)))
 
-(test io-empty
-  (let ((bytes
-          (make-array 0 :element-type '(unsigned-byte 8)
-                        :adjustable t :fill-pointer t))
-        (serialized
-          (make-array 1 :element-type '(unsigned-byte 8)
-                        :initial-element 0)))
-    (is (typep bytes 'avro:bytes))
-    (is (equalp serialized (avro:serialize bytes)))
-    (is (equalp bytes (avro:deserialize 'avro:bytes serialized)))))
+(define-io-test io-empty
+    ()
+    avro:bytes
+    (make-array 0 :element-type '(unsigned-byte 8)
+                  :adjustable t :fill-pointer t)
+    (0)
+  (is (equalp object arg)))

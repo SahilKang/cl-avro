@@ -20,7 +20,8 @@
 (defpackage #:test/int
   (:use #:cl #:1am)
   (:import-from #:test/common
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/int)
 
@@ -40,49 +41,48 @@
     (is (string= json (avro:serialize 'avro:int :canonical-form-p t)))
     (is (= fingerprint (avro:fingerprint64 'avro:int)))))
 
-(test io
-  (loop
-    with int->serialized
-      = '((0 . (#x00))
-          (-1 . (#x01))
-          (1 . (#x02))
-          (-2 . (#x03))
-          (2 . (#x04))
-          (-64 . (#x7f))
-          (64 . (#x80 #x01))
-          (8192 . (#x80 #x80 #x01))
-          (-8193 . (#x81 #x80 #x01)))
-        initially
-           (dolist (cons int->serialized)
-             (let* ((bytes-list (cdr cons))
-                    (bytes-vector (make-array
-                                   (length bytes-list)
-                                   :element-type '(unsigned-byte 8)
-                                   :initial-contents bytes-list)))
-               (rplacd cons bytes-vector)))
+(macrolet
+    ((make-tests (&rest int->serialized)
+       `(progn
+          ,@(mapcar
+             (lambda (int&serialized)
+               `(define-io-test
+                    ,(intern (format nil "IO-~A" (car int&serialized)))
+                    ()
+                    avro:int
+                    ,(car int&serialized)
+                    ,(cdr int&serialized)
+                  (is (= object arg))))
+             int->serialized))))
+  (make-tests
+   (0 . (#x00))
+   (-1 . (#x01))
+   (1 . (#x02))
+   (-2 . (#x03))
+   (2 . (#x04))
+   (-64 . (#x7f))
+   (64 . (#x80 #x01))
+   (8192 . (#x80 #x80 #x01))
+   (-8193 . (#x81 #x80 #x01))))
 
-    for (int . serialized) in int->serialized
-    do
-       (is (equalp serialized (avro:serialize int)))
-       (is (= int (avro:deserialize 'avro:int serialized)))))
+(define-io-test io-min
+    ()
+    avro:int
+    (- (expt 2 31))
+    (#xff #xff #xff #xff #x0f)
+  (is (= object arg))
+  (is (not (typep (1- arg) 'avro:int)))
+  ;; this gets serialized as a long so that's why we check for an
+  ;; error during deserialization
+  (signals error
+    (avro:deserialize 'avro:int (avro:serialize (1- arg)))))
 
-(test io-edges
-  (let ((max (1- (expt 2 31)))
-        (min (- (expt 2 31))))
-    (is (typep max 'avro:int))
-    (is (typep min 'avro:int))
-
-    (is (not (typep (1+ max) 'avro:int)))
-    (is (not (typep (1- min) 'avro:int)))
-
-    (is (= max (avro:deserialize 'avro:int (avro:serialize max))))
-    (is (= min (avro:deserialize 'avro:int (avro:serialize min))))
-
-    ;; these get serialized as longs so that's why we check for an
-    ;; error during deserialization
-    (let ((serialized (avro:serialize (1+ max))))
-      (signals error
-        (avro:deserialize 'avro:int serialized)))
-    (let ((serialized (avro:serialize (1- min))))
-      (signals error
-        (avro:deserialize 'avro:int serialized)))))
+(define-io-test io-max
+    ()
+    avro:int
+    (1- (expt 2 31))
+    (#xfe #xff #xff #xff #x0f)
+  (is (= object arg))
+  (is (not (typep (1+ arg) 'avro:int)))
+  (signals error
+    (avro:deserialize 'avro:int (avro:serialize (1+ arg)))))

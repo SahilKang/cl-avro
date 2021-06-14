@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/array)
 
@@ -134,30 +135,18 @@
     (:metaclass avro:array)
     (:items |RecordName|)))
 
-(test io
-  (let* ((enum-schema
-           (make-instance 'avro:enum :name "Test" :symbols '("A" "B")))
-         (array-schema
-           (make-instance 'avro:array :items enum-schema))
-         (expected
-           '("A" "A" "B"))
-         (object
-           (make-instance
-            array-schema
-            :initial-contents (mapcar
-                               (lambda (enum)
-                                 (make-instance enum-schema :enum enum))
-                               expected)))
-         (serialized
-           (make-array
-            5
-            :element-type '(unsigned-byte 8)
-            :initial-contents '(6 0 0 2 0))))
-    (is (equal expected (map 'list #'avro:which-one object)))
-    (is (equalp serialized (avro:serialize object)))
-    (let ((deserialized (avro:deserialize array-schema serialized)))
-      (is (eq array-schema (class-of deserialized)))
-      (is (equal expected (map 'list #'avro:which-one deserialized))))))
+(define-io-test io
+    ((enum-schema (make-instance 'avro:enum :name "Test" :symbols '("A" "B")))
+     (expected '("A" "A" "B")))
+    (make-instance 'avro:array :items enum-schema)
+    (make-instance
+     schema
+     :initial-contents (mapcar
+                        (lambda (enum)
+                          (make-instance enum-schema :enum enum))
+                        expected))
+    (6 0 0 2 0)
+  (is (equal expected (map 'list #'avro:which-one arg))))
 
 (test late-type-check
   (setf (find-class 'late_array) nil

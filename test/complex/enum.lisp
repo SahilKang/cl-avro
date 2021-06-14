@@ -21,7 +21,8 @@
   (:use #:cl #:1am)
   (:import-from #:test/common
                 #:define-schema-test
-                #:json-syntax))
+                #:json-syntax
+                #:define-io-test))
 
 (in-package #:test/enum)
 
@@ -140,16 +141,11 @@
     (:default "FOO")
     (:symbols "FOO" "BAR" "BAZ")))
 
-(test io
-  (let* ((schema (make-instance 'avro:enum :name "foo" :symbols '("A" "B")))
-         (expected "B")
-         (object (make-instance schema :enum expected))
-         (serialized (make-array 1 :element-type '(unsigned-byte 8)
-                                   :initial-element 2)))
-    (is (string= expected (avro:which-one object)))
-    (is (equalp serialized (avro:serialize object)))
-    (let ((deserialized (avro:deserialize schema serialized)))
-      (is (eq schema (class-of deserialized)))
-      (is (string= expected (avro:which-one object))))
-    (signals error
-      (make-instance schema :enum "C"))))
+(define-io-test io
+    ((expected "B"))
+    (make-instance 'avro:enum :name "foo" :symbols '("A" "B"))
+    (make-instance schema :enum expected)
+    (2)
+  (is (string= expected (avro:which-one arg)))
+  (signals error
+    (make-instance schema :enum "C")))

@@ -23,6 +23,7 @@
            #:json=
            #:json-string=
            #:define-schema-test
+           #:define-io-test
            #:json-syntax))
 
 (in-package #:test/common)
@@ -116,6 +117,99 @@
        (1am:is (= expected-fingerprint (avro:fingerprint64 defclass-schema)))
        (1am:is (= expected-fingerprint (avro:fingerprint64 make-instance-schema)))
        (1am:is (= expected-fingerprint (avro:fingerprint64 actual-schema))))))
+
+;;; define-io-test
+
+(eval-when (:compile-toplevel)
+  (defun schema-pair-p (schema)
+    (declare ((or symbol cons) schema))
+    (and (consp schema)
+         (not (member (first schema) '(make-instance closer-mop:ensure-class))))))
+
+(defmacro define-io-test
+    (name (&rest context) schema object (&rest serialized) &body check)
+  (declare (symbol name))
+  (flet ((assert-binding (binding)
+           (etypecase binding
+             (cons
+              (unless (= (length binding) 2)
+                (error "Expected a binding pair ~S" binding))
+              (check-type (first binding) symbol))
+             (symbol))))
+    (map nil #'assert-binding context))
+  (let ((schema-symbol (intern "SCHEMA"))
+        (object-symbol (intern "OBJECT"))
+        (arg (intern "ARG"))
+        (schema (if (schema-pair-p schema) (first schema) schema))
+        (schema-to-check (when (schema-pair-p schema) (second schema))))
+    `(1am:test ,name
+       (let* (,@context
+              (,schema-symbol ,(let ((schema schema))
+                                 (if (symbolp schema)
+                                     (if (typep schema 'avro:schema)
+                                         `',schema
+                                         (find-class schema))
+                                     schema)))
+              (,object-symbol ,object)
+              (serialized (make-array ,(length serialized)
+                                      :element-type '(unsigned-byte 8)
+                                      :initial-contents ',serialized))
+              (schema-to-check ,(if schema-to-check
+                                    (if (symbolp schema-to-check)
+                                        (if (typep schema-to-check 'avro:schema)
+                                            `',schema-to-check
+                                            (find-class schema-to-check))
+                                        schema-to-check)
+                                    schema-symbol)))
+         (flet ((check (,arg)
+                  (declare (ignorable ,arg))
+                  ,@check))
+           (1am:is (eq schema-to-check (avro:schema-of ,object-symbol)))
+           (check ,object-symbol)
+
+           (multiple-value-bind (bytes size)
+               (avro:serialize ,object-symbol)
+             (1am:is (= (length serialized) size))
+             (1am:is (equalp serialized bytes)))
+
+           (let ((into (make-array (1+ (length serialized))
+                                   :element-type '(unsigned-byte 8))))
+             (multiple-value-bind (bytes size)
+                 (avro:serialize ,object-symbol :into into :start 1)
+               (1am:is (eq into bytes))
+               (1am:is (= (length serialized) size))
+               (1am:is (equalp serialized (subseq into 1))))
+             (1am:signals error
+               (avro:serialize ,object-symbol :into into :start 2)))
+
+           (let ((bytes (flexi-streams:with-output-to-sequence (stream)
+                          (multiple-value-bind (returned size)
+                              (avro:serialize ,object-symbol :into stream)
+                            (1am:is (eq stream returned))
+                            (1am:is (= (length serialized) size))))))
+             (1am:is (equalp serialized bytes)))
+
+           (multiple-value-bind (deserialized size)
+               (avro:deserialize ,schema-symbol serialized)
+             (1am:is (= (length serialized) size))
+             (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+             (check deserialized))
+
+           (let ((input (make-array (1+ (length serialized))
+                                    :element-type '(unsigned-byte 8))))
+             (replace input serialized :start1 1)
+             (multiple-value-bind (deserialized size)
+                 (avro:deserialize ,schema-symbol input :start 1)
+               (1am:is (= (length serialized) size))
+               (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+               (check deserialized)))
+
+           (multiple-value-bind (deserialized size)
+               (flexi-streams:with-input-from-sequence (stream serialized)
+                 (avro:deserialize ,schema-symbol stream))
+             (1am:is (= (length serialized) size))
+             (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+             (check deserialized)))))))
 
 ;;; json-syntax
 

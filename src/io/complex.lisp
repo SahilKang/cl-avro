@@ -22,12 +22,15 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:serialize-into
                 #:serialized-size
+                #:serialize-into-vector
+                #:serialize-into-stream
+                #:define-serialize-into
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
-  (:export #:serialize-into
+  (:export #:serialize-into-vector
+           #:serialize-into-stream
            #:serialized-size
            #:deserialize-from-vector
            #:deserialize-from-stream))
@@ -38,17 +41,17 @@
 (defmethod serialized-size ((object schema:fixed-object))
   (length object))
 
-(defmethod serialize-into
-    ((object schema:fixed-object) (vector simple-array) (start fixnum))
-  "Write fixed bytes into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (let ((raw-buffer (schema:raw-buffer object)))
-    (declare ((simple-array (unsigned-byte 8) (*)) raw-buffer))
-    (replace vector raw-buffer :start1 start)
-    (length raw-buffer)))
+(define-serialize-into schema:fixed-object
+  "Write fixed bytes."
+  `(let ((raw-buffer (schema:raw-buffer object)))
+     (declare ((simple-array (unsigned-byte 8) (*)) raw-buffer))
+     ,(if vectorp
+          '(replace vector raw-buffer :start1 start)
+          '(write-sequence raw-buffer stream))
+     (length raw-buffer)))
 
-;; Read a fixed number of bytes from STREAM.
 (define-deserialize-from schema:fixed
+  "Read a fixed number of bytes."
   `(let ((size (schema:size schema))
          (bytes (make-instance schema)))
      ,@(when vectorp
@@ -68,21 +71,22 @@
     (+ (serialized-size position)
        (serialized-size (schema:object object)))))
 
-(defmethod serialize-into
-    ((object schema:union-object) (vector simple-array) (start fixnum))
-  "Write tagged union into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (let* ((position (nth-value 1 (schema:which-one object)))
-         (bytes-written (serialize-into position vector start)))
-    (declare (fixnum bytes-written))
-    (the fixnum
-         (+ bytes-written
-            (the fixnum
-                 (serialize-into
-                  (schema:object object) vector (the fixnum (+ start bytes-written))))))))
+(define-serialize-into schema:union-object
+  "Write tagged union."
+  `(let* ((position (nth-value 1 (schema:which-one object)))
+          (bytes-written
+            ,(if vectorp
+                 '(serialize-into-vector position vector start)
+                 '(serialize-into-stream position stream)))
+          (object (schema:object object)))
+     (declare (fixnum bytes-written))
+     (+ bytes-written
+        ,(if vectorp
+             '(serialize-into-vector object vector (+ start bytes-written))
+             '(serialize-into-stream object stream)))))
 
-;; Read a tagged union from STREAM.
 (define-deserialize-from schema:union
+  "Read a tagged union."
   `(let ((schemas (schema:schemas schema)))
      (declare ((simple-array schema:schema (*)) schemas))
      (multiple-value-bind (position bytes-read)
@@ -109,30 +113,31 @@
                     object
                     :initial-value (serialized-size count))))))
 
-(defmethod serialize-into
-    ((object schema:array-object) (vector simple-array) (start fixnum))
-  "Write array into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (let* ((raw-buffer (schema:raw-buffer object))
-         (count (length raw-buffer))
-         (bytes-written 0))
-    (declare (vector raw-buffer))
-    (unless (zerop count)
-      (incf (the fixnum bytes-written)
-            (the fixnum (serialize-into count vector start)))
-      (flet ((serialize-into (elt)
-               (incf (the fixnum bytes-written)
-                     (the fixnum
-                          (serialize-into
-                           elt vector (the fixnum (+ start bytes-written)))))))
-        (map nil #'serialize-into raw-buffer)))
-    (the fixnum
-         (+ bytes-written
-            (the fixnum
-                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
+(define-serialize-into schema:array-object
+  "Write array."
+  `(let* ((raw-buffer (schema:raw-buffer object))
+          (count (length raw-buffer))
+          (bytes-written 0))
+     (declare (vector raw-buffer))
+     (unless (zerop count)
+       (incf bytes-written
+             ,(if vectorp
+                  '(serialize-into-vector count vector start)
+                  '(serialize-into-stream count stream)))
+       (flet ((serialize-into (elt)
+                (incf bytes-written
+                      ,(if vectorp
+                           '(serialize-into-vector
+                             elt vector (+ start bytes-written))
+                           '(serialize-into-stream elt stream)))))
+         (map nil #'serialize-into raw-buffer)))
+     (+ bytes-written
+        ,(if vectorp
+             '(serialize-into-vector 0 vector (+ start bytes-written))
+             '(serialize-into-stream 0 stream)))))
 
-;; Read an array from STREAM.
 (define-deserialize-from schema:array
+  "Read an array."
   `(loop
      with total-bytes-read = 0
      and item-schema = (schema:items schema)
@@ -181,34 +186,36 @@
         (schema:hashmap #'incf-result object)))
     result))
 
-(defmethod serialize-into
-    ((object schema:map-object) (vector simple-array) (start fixnum))
-  "Write map into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (let* ((raw-hash-table (schema:raw-hash-table object))
-         (count (hash-table-count raw-hash-table))
-         (bytes-written 0))
-    (unless (zerop count)
-      (incf (the fixnum bytes-written)
-            (the fixnum (serialize-into count vector start)))
-      (flet ((serialize-into (key value)
-               (declare (simple-string key))
-               (incf (the fixnum bytes-written)
-                     (the fixnum
-                          (serialize-into
-                           key vector (the fixnum (+ start bytes-written)))))
-               (incf (the fixnum bytes-written)
-                     (the fixnum
-                          (serialize-into
-                           value vector (the fixnum (+ start bytes-written)))))))
-        (maphash #'serialize-into raw-hash-table)))
-    (the fixnum
-         (+ bytes-written
-            (the fixnum
-                 (serialize-into 0 vector (the fixnum (+ start bytes-written))))))))
+(define-serialize-into schema:map-object
+  "Write map."
+  `(let* ((raw-hash-table (schema:raw-hash-table object))
+          (count (hash-table-count raw-hash-table))
+          (bytes-written 0))
+     (unless (zerop count)
+       (incf bytes-written
+             ,(if vectorp
+                  '(serialize-into-vector count vector start)
+                  '(serialize-into-stream count stream)))
+       (flet ((serialize-into (key value)
+                (declare (simple-string key))
+                (incf bytes-written
+                      ,(if vectorp
+                           '(serialize-into-vector
+                             key vector (+ start bytes-written))
+                           '(serialize-into-stream key stream)))
+                (incf bytes-written
+                      ,(if vectorp
+                           '(serialize-into-vector
+                             value vector (+ start bytes-written))
+                           '(serialize-into-stream value stream)))))
+         (maphash #'serialize-into raw-hash-table)))
+     (+ bytes-written
+        ,(if vectorp
+             '(serialize-into-vector 0 vector (+ start bytes-written))
+             '(serialize-into-stream 0 stream)))))
 
-;; Read a map from STREAM.
 (define-deserialize-from schema:map
+  "Read a map."
   `(loop
      with total-bytes-read = 0
      and value-schema = (schema:values schema)
@@ -257,15 +264,15 @@
   (let ((position (nth-value 1 (schema:which-one object))))
     (serialized-size position)))
 
-(defmethod serialize-into
-    ((object schema:enum-object) (vector simple-array) (start fixnum))
-  "Write enum into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (let ((position (nth-value 1 (schema:which-one object))))
-    (serialize-into position vector start)))
+(define-serialize-into schema:enum-object
+  "Write enum."
+  `(let ((position (nth-value 1 (schema:which-one object))))
+     ,(if vectorp
+          '(serialize-into-vector position vector start)
+          '(serialize-into-stream position stream))))
 
-;; Read an enum from STREAM.
 (define-deserialize-from schema:enum
+  "Read an enum."
   `(multiple-value-bind (position bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:int vector start)
@@ -284,28 +291,27 @@
           (schema:fields (class-of object))
           :initial-value 0))
 
-(defmethod serialize-into
-    ((object schema:record-object) (vector simple-array) (start fixnum))
-  "Write record into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (loop
-    with fields of-type (simple-array schema:field (*)) = (schema:fields
-                                                           (class-of object))
-    and bytes-written of-type fixnum = 0
+(define-serialize-into schema:record-object
+  "Write record."
+  `(loop
+     with fields of-type (simple-array schema:field (*)) = (schema:fields
+                                                            (class-of object))
+     and bytes-written of-type fixnum = 0
 
-    for field of-type schema:field across fields
-    for value = (slot-value object (nth-value 1 (schema:name field)))
+     for field of-type schema:field across fields
+     for value = (slot-value object (nth-value 1 (schema:name field)))
 
-    do (incf (the fixnum bytes-written)
-             (the fixnum
-                  (serialize-into
-                   value vector (the fixnum (+ start bytes-written)))))
+     do (incf bytes-written
+              ,(if vectorp
+                   '(serialize-into-vector
+                     value vector (+ start bytes-written))
+                   '(serialize-into-stream value stream)))
 
-    finally
-       (return bytes-written)))
+     finally
+        (return bytes-written)))
 
-;; Read a record from STREAM.
 (define-deserialize-from schema:record
+  "Read a record."
   `(loop
      with fields of-type (simple-array schema:field (*)) = (schema:fields schema)
      and initargs of-type list = nil

@@ -23,7 +23,9 @@
   (:export #:serialize
            #:deserialize
            #:serialized-size
-           #:serialize-into
+           #:serialize-into-vector
+           #:serialize-into-stream
+           #:define-serialize-into
            #:deserialize-from-vector
            #:deserialize-from-stream
            #:define-deserialize-from
@@ -37,24 +39,35 @@
   (:documentation
    "Determine the number of bytes OBJECT will be when serialized."))
 
-(defgeneric serialize-into (object vector start)
+(defgeneric serialize-into-vector (object vector start)
   (:documentation
    "Serialize OBJECT into VECTOR and return the number of serialized bytes."))
 
+(defgeneric serialize-into-stream (object stream)
+  (:documentation
+   "Serialize OBJECT into STREAM and return the number of serialized bytes."))
+
 (defgeneric serialize (object &key &allow-other-keys)
   (:method (object &key into (start 0))
-    "Serialize OBJECT into vector supplied by INTO, starting at START.
+    "Serialize OBJECT into stream or vector supplied by INTO.
 
-If INTO is nil, then a new vector will be allocated.
+If INTO is a vector, then START specifies the vector offset to start
+writing into.
 
-Return (values vector number-of-serialized-bytes)"
-    (let* ((size (serialized-size object))
-           (into (or into (make-array size :element-type '(unsigned-byte 8)))))
-      (check-type into (simple-array (unsigned-byte 8) (*)))
-      (check-type start (and (integer 0) fixnum))
-      (when (> size (- (length into) start))
-        (error "Not enough room in vector"))
-      (serialize-into object into start)
+If INTO is nil, then a new vector will be allocated and returned.
+
+Return (values INTO number-of-serialized-bytes)"
+    (let ((size (serialized-size object)))
+      (if (streamp into)
+          (serialize-into-stream object into)
+          (progn
+            (if into
+                (check-type into (simple-array (unsigned-byte 8) (*)))
+                (setf into (make-array size :element-type '(unsigned-byte 8))))
+            (check-type start (and (integer 0) fixnum))
+            (when (> size (- (length into) start))
+              (error "Not enough room in vector"))
+            (serialize-into-vector object into start)))
       (values into size))))
 
 ;;; resolution
@@ -121,7 +134,7 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
 If READER-SCHEMA is provided, then deserialization is performed on the
 resolved schema."))
 
-;; macro
+;;; macros
 
 (eval-when (:compile-toplevel)
   (defun parse-declare (body)
@@ -131,40 +144,88 @@ resolved schema."))
          (values (car body) nil))
         ((and (consp (cadar body))
               (eq (caadar body) 'declare))
-         (values (car body) t))))))
+         (values (car body) t)))))
+
+  (defun parse-documentation (body)
+    (cond
+      ((stringp (first body))
+       (values (first body) (rest body)))
+      ((stringp (second body))
+       (values (second body) (cons (first body) (cddr body))))
+      (t
+       (values nil body))))
+
+  (defun parse-body (body)
+    (multiple-value-bind (documentation body)
+        (parse-documentation body)
+      (multiple-value-bind (declare-form should-eval-declare-form-p)
+          (parse-declare body)
+        (values
+         (if declare-form (rest body) body)
+         documentation
+         declare-form
+         should-eval-declare-form-p))))
+
+  (defun %find-method (prefix suffix)
+    (declare (symbol prefix suffix))
+    (let ((name (format nil "~A-~A" prefix suffix)))
+      (multiple-value-bind (method existsp)
+          (intern name)
+        (unless existsp
+          (error "Symbol ~S does not exist" name))
+        (unless (fboundp method)
+          (error "~S does not name a function" name))
+        method)))
+
+  (defun vector/stream-methods (method-prefix arg specializer body)
+    (declare (symbol method-prefix arg)
+             (list body)
+             ((or symbol cons) specializer))
+    (multiple-value-bind
+          (body documentation declare-form should-eval-declare-form-p)
+        (parse-body body)
+      (let ((vector-method (%find-method method-prefix 'vector))
+            (stream-method (%find-method method-prefix 'stream))
+            (arg (intern (string arg)))
+            (vector (intern "VECTOR"))
+            (start (intern "START"))
+            (stream (intern "STREAM")))
+        `(progn
+           (defmethod ,vector-method
+               ((,arg ,specializer) (,vector simple-array) (,start fixnum))
+             ,@(when documentation (list documentation))
+             (declare ((simple-array (unsigned-byte 8) (*)) ,vector)
+                      ,@(cdr (if should-eval-declare-form-p
+                                 (eval `(let ((vectorp t)
+                                              (streamp nil))
+                                          (declare (ignorable vectorp streamp))
+                                          ,declare-form))
+                                 declare-form)))
+             ,(eval `(let ((vectorp t)
+                           (streamp nil))
+                       (declare (ignorable vectorp streamp))
+                       ,@body)))
+
+           (defmethod ,stream-method
+               ((,arg ,specializer) (,stream stream))
+             ,@(when documentation (list documentation))
+             (declare ,@(cdr (if should-eval-declare-form-p
+                                 (eval `(let ((vectorp nil)
+                                              (streamp t))
+                                          (declare (ignorable vectorp streamp))
+                                          ,declare-form))
+                                 declare-form)))
+             ,(eval `(let ((vectorp nil)
+                           (streamp t))
+                       (declare (ignorable vectorp streamp))
+                       ,@body))))))))
 
 (defmacro define-deserialize-from (schema-specializer &body body)
-  (multiple-value-bind (declare-form should-eval-declare-form-p)
-      (parse-declare body)
-    (let ((body (if declare-form (cdr body) body))
-          (schema (intern "SCHEMA"))
-          (vector (intern "VECTOR"))
-          (start (intern "START"))
-          (stream (intern "STREAM")))
-      `(progn
-         (defmethod deserialize-from-vector
-             ((,schema ,schema-specializer) (,vector simple-array) (,start fixnum))
-           (declare ((simple-array (unsigned-byte 8) (*)) ,vector)
-                    ,@(cdr (if should-eval-declare-form-p
-                               (eval `(let ((vectorp t)
-                                            (streamp nil))
-                                        (declare (ignorable vectorp streamp))
-                                        ,declare-form))
-                               declare-form)))
-           ,(eval `(let ((vectorp t)
-                         (streamp nil))
-                     (declare (ignorable vectorp streamp))
-                     ,@body)))
+  (declare ((or symbol cons) schema-specializer))
+  (vector/stream-methods
+      '#:deserialize-from '#:schema schema-specializer body))
 
-         (defmethod deserialize-from-stream
-             ((,schema ,schema-specializer) (,stream stream))
-           (declare ,@(cdr (if should-eval-declare-form-p
-                               (eval `(let ((vectorp nil)
-                                            (streamp t))
-                                        (declare (ignorable vectorp streamp))
-                                        ,declare-form))
-                               declare-form)))
-           ,(eval `(let ((vectorp nil)
-                         (streamp t))
-                     (declare (ignorable vectorp streamp))
-                     ,@body)))))))
+(defmacro define-serialize-into (object-specializer &body body)
+  (declare ((or symbol cons) object-specializer))
+  (vector/stream-methods
+      '#:serialize-into '#:object object-specializer body))

@@ -23,12 +23,15 @@
    (#:schema #:cl-avro.schema)
    (#:endian #:cl-avro.io.primitive))
   (:import-from #:cl-avro.io.base
-                #:serialize-into
                 #:serialized-size
+                #:serialize-into-vector
+                #:serialize-into-stream
+                #:define-serialize-into
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
-  (:export #:serialize-into
+  (:export #:serialize-into-vector
+           #:serialize-into-stream
            #:serialized-size
            #:deserialize-from-vector
            #:deserialize-from-stream))
@@ -39,14 +42,14 @@
 (defmethod serialized-size ((object schema:uuid))
   (serialized-size (schema:uuid object)))
 
-(defmethod serialize-into
-    ((object schema:uuid) (vector simple-array) (start fixnum))
-  "Write uuid string into VECTOR."
-  (declare ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (schema:uuid object) vector start))
+(define-serialize-into schema:uuid
+  "Write uuid string."
+  (if vectorp
+      '(serialize-into-vector (schema:uuid object) vector start)
+      '(serialize-into-stream (schema:uuid object) stream)))
 
-;; Read a uuid string from STREAM.
 (define-deserialize-from schema:uuid-schema
+  "Read a uuid string."
   `(multiple-value-bind (uuid bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:string vector start)
@@ -85,17 +88,17 @@
 (defmethod serialized-size ((object schema:date))
   (serialized-size (process-date object)))
 
-(defmethod serialize-into
-    ((object schema:date) (vector simple-array) (start fixnum))
-  "Write date into VECTOR.
+(define-serialize-into schema:date
+  "Write date.
 
 Serialized as the number of days from the ISO unix epoch 1970-01-01."
-  (declare (inline process-date)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-date object) vector start))
+  (declare (inline process-date))
+  (if vectorp
+      '(serialize-into-vector (process-date object) vector start)
+      '(serialize-into-stream (process-date object) stream)))
 
-;; Read a date from STREAM.
 (define-deserialize-from schema:date-schema
+  "Read a date."
   `(multiple-value-bind (days bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:int vector start)
@@ -126,17 +129,17 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
 (defmethod serialized-size ((object schema:time-millis))
   (serialized-size (process-time-millis object)))
 
-(defmethod serialize-into
-    ((object schema:time-millis) (vector simple-array) (start fixnum))
-  "Write time of day into VECTOR.
+(define-serialize-into schema:time-millis
+  "Write time of day.
 
 Serialized as the number of milliseconds after midnight, 00:00:00.000."
-  (declare (inline process-time-millis)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-time-millis object) vector start))
+  (declare (inline process-time-millis))
+  (if vectorp
+      '(serialize-into-vector (process-time-millis object) vector start)
+      '(serialize-into-stream (process-time-millis object) stream)))
 
-;; Read time of day from STREAM.
 (define-deserialize-from schema:time-millis-schema
+  "Read time of day."
   `(multiple-value-bind (milliseconds-after-midnight bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:int vector start)
@@ -175,17 +178,17 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
 (defmethod serialized-size ((object schema:time-micros))
   (serialized-size (process-time-micros object)))
 
-(defmethod serialize-into
-    ((object schema:time-micros) (vector simple-array) (start fixnum))
-  "Write time of day into VECTOR.
+(define-serialize-into schema:time-micros
+  "Write time of day.
 
 Serialized as the number of microseconds after midnight, 00:00:00.000000."
-  (declare (inline process-time-micros)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-time-micros object) vector start))
+  (declare (inline process-time-micros))
+  (if vectorp
+      '(serialize-into-vector (process-time-micros object) vector start)
+      '(serialize-into-stream (process-time-micros object) stream)))
 
-;; Read time of day from STREAM.
 (define-deserialize-from schema:time-micros-schema
+  "Read time of day."
   `(multiple-value-bind (microseconds-after-midnight bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
@@ -221,17 +224,17 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
 (defmethod serialized-size ((object schema:timestamp-millis))
   (serialized-size (process-timestamp-millis object)))
 
-(defmethod serialize-into
-    ((object schema:timestamp-millis) (vector simple-array) (start fixnum))
+(define-serialize-into schema:timestamp-millis
   "Write timestamp into VECTOR.
 
 Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
-  (declare (inline process-timestamp-millis)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-timestamp-millis object) vector start))
+  (declare (inline process-timestamp-millis))
+  (if vectorp
+      '(serialize-into-vector (process-timestamp-millis object) vector start)
+      '(serialize-into-stream (process-timestamp-millis object) stream)))
 
-;; Read a timestamp from STREAM.
 (define-deserialize-from schema:timestamp-millis-schema
+  "Read a timestamp."
   `(multiple-value-bind (milliseconds-from-unix-epoch bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
@@ -268,17 +271,17 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
 (defmethod serialized-size ((object schema:timestamp-micros))
   (serialized-size (process-timestamp-micros object)))
 
-(defmethod serialize-into
-    ((object schema:timestamp-micros) (vector simple-array) (start fixnum))
-  "Write timestamp into VECTOR.
+(define-serialize-into schema:timestamp-micros
+  "Write timestamp.
 
 Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000."
-  (declare (inline process-timestamp-micros)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-timestamp-micros object) vector start))
+  (declare (inline process-timestamp-micros))
+  (if vectorp
+      '(serialize-into-vector (process-timestamp-micros object) vector start)
+      '(serialize-into-stream (process-timestamp-micros object) stream)))
 
-;; Read timestamp from STREAM.
 (define-deserialize-from schema:timestamp-micros-schema
+  "Read timestamp."
   `(multiple-value-bind (microseconds-from-unix-epoch bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
@@ -316,17 +319,17 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
 (defmethod serialized-size ((object schema:local-timestamp-millis))
   (serialized-size (process-local-timestamp-millis object)))
 
-(defmethod serialize-into
-    ((object schema:local-timestamp-millis) (vector simple-array) (start fixnum))
-  "Write local timestamp into VECTOR.
+(define-serialize-into schema:local-timestamp-millis
+  "Write local timestamp.
 
 Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
-  (declare (inline process-local-timestamp-millis)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-local-timestamp-millis object) vector start))
+  (declare (inline process-local-timestamp-millis))
+  (if vectorp
+      '(serialize-into-vector (process-local-timestamp-millis object) vector start)
+      '(serialize-into-stream (process-local-timestamp-millis object) stream)))
 
-;; Read local timestamp from STREAM.
 (define-deserialize-from schema:local-timestamp-millis-schema
+  "Read local timestamp."
   `(multiple-value-bind (milliseconds-from-epoch bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
@@ -364,17 +367,17 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
 (defmethod serialized-size ((object schema:local-timestamp-micros))
   (serialized-size (process-local-timestamp-micros object)))
 
-(defmethod serialize-into
-    ((object schema:local-timestamp-micros) (vector simple-array) (start fixnum))
-  "Write local timestamp into VECTOR.
+(define-serialize-into schema:local-timestamp-micros
+  "Write local timestamp.
 
 Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
-  (declare (inline process-local-timestamp-micros)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (serialize-into (process-local-timestamp-micros object) vector start))
+  (declare (inline process-local-timestamp-micros))
+  (if vectorp
+      '(serialize-into-vector (process-local-timestamp-micros object) vector start)
+      '(serialize-into-stream (process-local-timestamp-micros object) stream)))
 
-;; Read local timestamp from STREAM.
 (define-deserialize-from schema:local-timestamp-micros-schema
+  "Read local timestamp."
   `(multiple-value-bind (microseconds-from-epoch bytes-read)
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
@@ -399,18 +402,20 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (defmethod serialized-size ((object schema:duration-object))
   12)
 
-(defmethod serialize-into
-    ((object schema:duration-object) (vector simple-array) (start fixnum))
-  "Write duration into VECTOR."
-  (declare (inline endian:uint32->little-endian)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (endian:uint32->little-endian (schema:months object) vector start)
-  (endian:uint32->little-endian (schema:days object) vector (+ start 4))
-  (endian:uint32->little-endian (schema:milliseconds object) vector (+ start 8))
-  12)
+(define-serialize-into schema:duration-object
+  "Write duration."
+  (declare (inline endian:uint32->little-endian))
+  `(prog1 12
+     ,@(if vectorp
+           '((endian:uint32->little-endian (schema:months object) vector start)
+             (endian:uint32->little-endian (schema:days object) vector (+ start 4))
+             (endian:uint32->little-endian (schema:milliseconds object) vector (+ start 8)))
+           '((endian:uint32->little-endian (schema:months object) stream)
+             (endian:uint32->little-endian (schema:days object) stream)
+             (endian:uint32->little-endian (schema:milliseconds object) stream)))))
 
-;; Read duration from STREAM.
 (define-deserialize-from schema:duration
+  "Read duration."
   (declare (inline endian:little-endian->uint32))
   `(let ((bytes ,(if vectorp
                      'vector
@@ -450,21 +455,37 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
        (return value)))
 (declaim (notinline big-endian->integer))
 
+(defmacro to-big-endian (integer into length &optional (start nil startp))
+  (declare (symbol integer into length start))
+  `(loop
+     repeat ,length
+     for shift = (* 8 (1- ,length)) then (- shift 8)
+     for byte of-type (unsigned-byte 8) = (logand #xff (ash ,integer (- shift)))
+     ,@(when startp
+         `(for offset from ,start))
+
+     do ,(if startp
+             `(setf (elt ,into offset) byte)
+             `(write-byte byte ,into))
+
+     finally
+        (return (values))))
+
 (declaim
  (ftype (function
-         ((integer 0) (simple-array (unsigned-byte 8) (*)) fixnum fixnum)
+         ((integer 0)
+          (or stream (simple-array (unsigned-byte 8) (*)))
+          fixnum
+          &optional fixnum)
          (values &optional))
         integer->big-endian)
  (inline integer->big-endian))
-(defun integer->big-endian (integer bytes start end)
-  (loop
-    for offset from start below end
-    for shift = (* 8 (the fixnum (1- (- end offset)))) then (- shift 8)
-    for byte of-type (unsigned-byte 8) = (logand #xff (ash integer (- shift)))
-    do (setf (elt bytes offset) byte)
-
-    finally
-       (return (values))))
+(defun integer->big-endian (integer into length &optional (start 0))
+  (etypecase into
+    (stream
+     (to-big-endian integer into length))
+    ((simple-array (unsigned-byte 8) (*))
+     (to-big-endian integer into length start))))
 (declaim (notinline integer->big-endian))
 
 ;; twos-complement
@@ -485,17 +506,21 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 (declaim (notinline read-twos-complement))
 
 (declaim
- (ftype (function (integer (simple-array (unsigned-byte 8) (*)) fixnum fixnum)
-                  (values &optional))
+ (ftype (function
+         (integer
+          (or stream (simple-array (unsigned-byte 8) (*)))
+          fixnum
+          &optional fixnum)
+         (values &optional))
         write-twos-complement)
  (inline write-twos-complement))
-(defun write-twos-complement (integer bytes start end)
+(defun write-twos-complement (integer into length &optional (start 0))
   (declare (inline integer->big-endian))
   (let ((value (if (minusp integer)
-                   (let ((bits (* (- end start) 8)))
+                   (let ((bits (* length 8)))
                      (+ integer (expt 2 bits)))
                    integer)))
-    (integer->big-endian value bytes start end)))
+    (integer->big-endian value into length start)))
 (declaim (notinline write-twos-complement))
 
 ;; serialize
@@ -519,30 +544,31 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
            buf-length)
         buf-length)))
 
-(defmethod serialize-into
-    ((object schema:decimal-object) (vector simple-array) (start fixnum))
-  "Write decimal into VECTOR."
-  (declare (inline min-buf-length write-twos-complement)
-           ((simple-array (unsigned-byte 8) (*)) vector))
-  (let* ((underlying (schema:underlying (class-of object)))
-         (unscaled (schema:unscaled object))
-         (min-length (min-buf-length unscaled underlying)))
-    (if (eq underlying 'schema:bytes)
-        (let* ((bytes-written (serialize-into min-length vector start))
-               (new-start (+ start bytes-written))
-               (end (+ new-start min-length)))
-          (declare (fixnum bytes-written new-start end))
-          (write-twos-complement unscaled vector new-start end)
-          (the fixnum (- end start)))
-        (let ((end (+ start min-length)))
-          (declare (fixnum end))
-          (write-twos-complement unscaled vector start end)
-          (the fixnum (- end start))))))
+(define-serialize-into schema:decimal-object
+  "Write decimal."
+  (declare (inline min-buf-length write-twos-complement))
+  `(let* ((underlying (schema:underlying (class-of object)))
+          (unscaled (schema:unscaled object))
+          (min-length (min-buf-length unscaled underlying)))
+     (if (eq underlying 'schema:bytes)
+         (let ((bytes-written
+                 ,(if vectorp
+                      '(serialize-into-vector min-length vector start)
+                      '(serialize-into-stream min-length stream))))
+           (declare (fixnum bytes-written))
+           ,(if vectorp
+                '(write-twos-complement unscaled vector min-length (+ start bytes-written))
+                '(write-twos-complement unscaled stream min-length))
+           (+ min-length bytes-written))
+         (prog1 min-length
+           ,(if vectorp
+                '(write-twos-complement unscaled vector min-length start)
+                '(write-twos-complement unscaled stream min-length))))))
 
 ;; deserialize
 
-;; Read decimal from STREAM.
 (define-deserialize-from schema:decimal
+  "Read decimal."
   (declare (inline read-twos-complement))
   `(let ((underlying (schema:underlying schema)))
      (multiple-value-bind (bytes bytes-read)
