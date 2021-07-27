@@ -146,6 +146,7 @@
    (:module "io"
     :depends-on ("schema")
     :components ((:file "base")
+                 (:file "underlying")
                  (:file "schema"
                   :depends-on ("base"))
                  (:file "primitive"
@@ -153,7 +154,7 @@
                  (:file "complex"
                   :depends-on ("base"))
                  (:file "logical"
-                  :depends-on ("base" "primitive"))
+                  :depends-on ("base" "primitive" "underlying"))
                  (:file "compare"
                   :depends-on ("base"))
                  (:module "resolution"
