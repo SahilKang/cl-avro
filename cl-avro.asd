@@ -160,14 +160,13 @@
                  (:module "resolution"
                   :depends-on ("base")
                   :components ((:file "assert-match")
-                               (:file "resolve"
-                                :depends-on ("assert-match"))
-                               (:file "promoted"
-                                :depends-on ("assert-match" "resolve"))
-                               (:file "logical"
-                                :depends-on ("assert-match" "resolve"))
+                               (:file "make-resolver")
+                               (:file "promoted")
+                               (:file "logical")
                                (:file "package"
-                                :depends-on ("resolve" "logical" "promoted"))))
+                                :depends-on ("make-resolver"
+                                             "logical"
+                                             "promoted"))))
                  (:file "package"
                   :depends-on ("schema"
                                "primitive"
@@ -203,14 +202,13 @@
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
-  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables)
+  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables #:babel)
   :perform (test-op (op sys) (uiop:symbol-call :1am :run))
   :pathname "test"
   :components
   ((:file "common")
    (:file "compare")
    (:file "object-container-file")
-   (:file "resolve")
    (:file "single-object-encoding")
    (:module "complex"
     :depends-on ("common")
@@ -241,4 +239,30 @@
                  (:file "int")
                  (:file "long")
                  (:file "null")
-                 (:file "string")))))
+                 (:file "string")))
+   (:module "resolution"
+    :components ((:file "base")
+                 (:file "primitive"
+                  :depends-on ("base"))
+                 (:file "promote"
+                  :depends-on ("base"))
+                 (:module "complex"
+                  :depends-on ("base")
+                  :components ((:file "array")
+                               (:file "enum")
+                               (:file "fixed")
+                               (:file "map")
+                               (:file "record")
+                               (:file "union")))
+                 (:module "logical"
+                  :depends-on ("base")
+                  :components ((:file "date")
+                               (:file "decimal")
+                               (:file "duration")
+                               (:file "local-timestamp-micros")
+                               (:file "local-timestamp-millis")
+                               (:file "time-micros")
+                               (:file "time-millis")
+                               (:file "timestamp-micros")
+                               (:file "timestamp-millis")
+                               (:file "uuid")))))))

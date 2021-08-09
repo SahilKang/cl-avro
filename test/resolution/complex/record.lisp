@@ -1,0 +1,178 @@
+;;; Copyright 2021 Google LLC
+;;;
+;;; This file is part of cl-avro.
+;;;
+;;; cl-avro is free software: you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation, either version 3 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; cl-avro is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
+
+(in-package #:cl-user)
+(defpackage #:test/resolution/record
+  (:use #:cl #:1am))
+(in-package #:test/resolution/record)
+
+(defclass array<int> ()
+  ()
+  (:metaclass avro:array)
+  (:items avro:int))
+
+(defclass array<float> ()
+  ()
+  (:metaclass avro:array)
+  (:items avro:float))
+
+(defclass writer_schema? ()
+  ()
+  (:metaclass avro:union)
+  (:schemas avro:null writer_schema))
+
+(defclass writer_schema ()
+  ((nums
+    :type array<int>
+    :reader nums)
+   (num
+    :type avro:int
+    :reader num)
+   (str
+    :type avro:string
+    :reader str)
+   (record
+    :type writer_schema?
+    :reader record)
+   (extra
+    :type avro:boolean
+    :reader extra))
+  (:metaclass avro:record))
+
+(defclass reader_schema? ()
+  ()
+  (:metaclass avro:union)
+  (:schemas avro:null reader_schema))
+
+(defclass reader_schema ()
+  ((reader_num
+    :type avro:long
+    :reader reader_num
+    :aliases ("NUM"))
+   (reader_nums
+    :type array<float>
+    :reader reader_nums
+    :aliases ("NUMS"))
+   (str
+    :type avro:string
+    :reader str)
+   (reader_record
+    :type reader_schema?
+    :reader reader_record
+    :aliases ("RECORD"))
+   (exclusive
+    :type avro:string
+    :reader exclusive
+    :default "foo"))
+  (:metaclass avro:record)
+  (:aliases "WRITER_SCHEMA"))
+
+(defclass reader_schema_no_default ()
+  ((reader_nums
+    :type array<float>
+    :reader reader_nums
+    :aliases ("NUMS"))
+   (str
+    :type avro:string
+    :reader str)
+   (reader_num
+    :type avro:long
+    :reader reader_num
+    :aliases ("NUM"))
+   (reader_record
+    :type reader_schema?
+    :reader reader_record
+    :aliases ("RECORD"))
+   (exclusive
+    :type avro:string
+    :reader exclusive))
+  (:metaclass avro:record)
+  (:aliases "WRITER_SCHEMA"))
+
+(test record->record
+  (let* ((writer
+           (make-instance
+            'writer_schema
+            :nums (make-instance 'array<int> :initial-contents '(2 4 6))
+            :num 8
+            :str "foo"
+            :extra 'avro:true
+            :record (make-instance
+                     'writer_schema?
+                     :object (make-instance
+                              'writer_schema
+                              :nums (make-instance 'array<int> :initial-contents '(8 10 12))
+                              :num 14
+                              :str "bar"
+                              :extra 'avro:false))))
+         (reader
+           (avro:deserialize
+            'writer_schema
+            (avro:serialize writer)
+            :reader-schema 'reader_schema)))
+    (is (typep writer 'writer_schema))
+    (is (typep reader 'reader_schema))
+
+    (is (every #'= (nums writer) (reader_nums reader)))
+    (is (= (num writer) (reader_num reader)))
+    (is (string= (str writer) (str reader)))
+    (is (string= "foo" (exclusive reader)))
+
+    (let* ((writer? (record writer))
+           (reader? (reader_record reader))
+           (writer (avro:object writer?))
+           (reader (avro:object reader?)))
+      (is (typep writer? 'writer_schema?))
+      (is (typep reader? 'reader_schema?))
+      (is (typep writer 'writer_schema))
+      (is (typep reader 'reader_schema))
+
+      (is (every #'= (nums writer) (reader_nums reader)))
+      (is (= (num writer) (reader_num reader)))
+      (is (string= (str writer) (str reader)))
+      (is (string= "foo" (exclusive reader)))
+
+      (let* ((writer? (record writer))
+             (reader? (reader_record reader))
+             (writer (avro:object writer?))
+             (reader (avro:object reader?)))
+        (is (typep writer? 'writer_schema?))
+        (is (typep reader? 'reader_schema?))
+        (is (typep writer 'avro:null))
+        (is (typep reader 'avro:null))))))
+
+(test no-default
+  (let ((writer
+          (make-instance
+           'writer_schema
+           :nums (make-instance 'array<int> :initial-contents '(2 4 6))
+           :num 8
+           :str "foo"
+           :extra 'avro:true
+           :record (make-instance
+                    'writer_schema?
+                    :object (make-instance
+                             'writer_schema
+                             :nums (make-instance 'array<int> :initial-contents '(8 10 12))
+                             :num 14
+                             :str "bar"
+                             :extra 'avro:false)))))
+    (signals error
+      (avro:deserialize
+       'writer_schema
+       (avro:serialize writer)
+       :reader-schema 'reader_schema_no_default))))

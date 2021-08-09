@@ -137,36 +137,3 @@
 (defmethod assert-match
     (reader (writer schema:union))
   (declare (ignore reader writer)))
-
-;; logical schemas
-
-(defmethod assert-match
-    ((reader schema:logical-schema) writer)
-  (assert-match (schema:underlying reader) writer))
-
-(defmethod assert-match
-    (reader (writer schema:logical-schema))
-  (assert-match reader (schema:underlying writer)))
-
-;; decimal schema
-
-(defmethod assert-match
-    ((reader schema:decimal) (writer schema:decimal))
-  (let ((reader-scale (schema:scale reader))
-        (writer-scale (schema:scale writer))
-        (reader-precision (schema:precision reader))
-        (writer-precision (schema:precision writer)))
-    (declare ((integer 0) reader-scale writer-scale)
-             ((integer 1) reader-precision writer-precision))
-    (unless (= reader-scale writer-scale)
-      (error "Reader and writer's decimal scales don't match: ~S and ~S"
-             reader-scale writer-scale))
-    (unless (= reader-precision writer-precision)
-      (error "Reader and writer's decimal precisions don't match: ~S and ~S"
-             reader-precision writer-precision))))
-
-;; duration schema
-
-(defmethod assert-match
-    ((reader schema:duration) (writer schema:duration))
-  (assert-match (schema:underlying reader) (schema:underlying writer)))
