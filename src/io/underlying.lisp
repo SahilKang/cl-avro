@@ -57,7 +57,7 @@
 
 (defmethod to-underlying
     ((date schema:date))
-  (let* ((unix-epoch (unix-epoch (schema:timezone date)))
+  (let* ((unix-epoch (unix-epoch local-time:+utc-zone+))
          (diff (local-time-duration:timestamp-difference date unix-epoch))
          (day-diff (local-time-duration:duration-as diff :day)))
     (the schema:int day-diff)))
@@ -68,8 +68,9 @@
            (schema:int days))
   (let ((timestamp
           (local-time:adjust-timestamp!
-              (unix-epoch local-time:*default-timezone*)
-            (offset :day days))))
+              (unix-epoch local-time:+utc-zone+)
+            (offset :day days)
+            (timezone local-time:+utc-zone+))))
     (change-class timestamp 'schema:date)))
 
 ;;; time-millis schema

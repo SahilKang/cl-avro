@@ -102,7 +102,7 @@
                                 :depends-on ("base"))
                                (:file "timezone")
                                (:file "date"
-                                :depends-on ("base" "timezone"))
+                                :depends-on ("base"))
                                (:file "time"
                                 :depends-on ("base" "timezone"))
                                (:file "timestamp"

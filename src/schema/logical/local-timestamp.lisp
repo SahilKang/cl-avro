@@ -24,7 +24,6 @@
   (:import-from #:cl-avro.schema.primitive
                 #:long)
   (:import-from #:cl-avro.schema.logical.date
-                #:date-mixin
                 #:year
                 #:month
                 #:day)
@@ -34,6 +33,7 @@
                 #:hour
                 #:minute)
   (:import-from #:cl-avro.schema.logical.timezone
+                #:timezone-mixin
                 #:timezone)
   (:import-from #:cl-avro.schema.complex
                 #:scalarize-class)
@@ -54,6 +54,25 @@
            #:second
            #:timezone))
 (in-package #:cl-avro.schema.logical.local-timestamp)
+
+;;; date-mixin
+
+(defclass date-mixin (local-time:timestamp timezone-mixin)
+  ()
+  (:documentation
+   "Date mixin."))
+
+(defmethod year
+    ((instance date-mixin) &key)
+  (local-time:timestamp-year instance :timezone (timezone instance)))
+
+(defmethod month
+    ((instance date-mixin) &key)
+  (local-time:timestamp-month instance :timezone (timezone instance)))
+
+(defmethod day
+    ((instance date-mixin) &key)
+  (local-time:timestamp-day instance :timezone (timezone instance)))
 
 ;;; local-timestamp-millis
 
