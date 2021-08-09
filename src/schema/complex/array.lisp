@@ -79,7 +79,7 @@
   ((buffer
     :accessor buffer
     :reader raw-buffer
-    :type (vector schema)))
+    :type vector))
   (:metaclass complex-schema)
   (:documentation
    "Base class for objects adhering to an avro array schema."))
