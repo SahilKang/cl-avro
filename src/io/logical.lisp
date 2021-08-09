@@ -30,6 +30,9 @@
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
+  (:import-from #:cl-avro.io.underlying
+                #:to-underlying
+                #:from-underlying)
   (:export #:serialize-into-vector
            #:serialize-into-stream
            #:serialized-size
@@ -40,13 +43,13 @@
 ;;; uuid schema
 
 (defmethod serialized-size ((object schema:uuid))
-  (serialized-size (schema:uuid object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:uuid
   "Write uuid string."
   (if vectorp
-      '(serialize-into-vector (schema:uuid object) vector start)
-      '(serialize-into-stream (schema:uuid object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:uuid-schema
   "Read a uuid string."
@@ -54,48 +57,22 @@
        ,(if vectorp
             `(deserialize-from-vector 'schema:string vector start)
             `(deserialize-from-stream 'schema:string stream))
-     (values (make-instance schema :uuid uuid) bytes-read)))
+     (values (from-underlying schema uuid) bytes-read)))
 
 ;; TODO add symbol/class-name specializations (eql 'schema:uuid)
 
-;;; unix time util
-
-(declaim
- (ftype (function (local-time::timezone) (values integer &optional))
-        utc-offset))
-(defun utc-offset (timezone)
-  (nth-value 9 (local-time:decode-timestamp (local-time:now) :timezone timezone)))
-
-(declaim
- (ftype (function (local-time::timezone)
-                  (values local-time:timestamp &optional))
-        make-unix-epoch))
-(defun make-unix-epoch (timezone)
-  (local-time:encode-timestamp 0 0 0 0 1 1 1970 :offset (utc-offset timezone)))
-
 ;;; date schema
 
-(declaim
- (ftype (function (schema:date) (values schema:int &optional)) process-date)
- (inline process-date))
-(defun process-date (date)
-  (let* ((unix-epoch (make-unix-epoch (schema:timezone date)))
-         (diff (local-time-duration:timestamp-difference date unix-epoch))
-         (day-diff (local-time-duration:duration-as diff :day)))
-    day-diff))
-(declaim (notinline process-date))
-
 (defmethod serialized-size ((object schema:date))
-  (serialized-size (process-date object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:date
   "Write date.
 
 Serialized as the number of days from the ISO unix epoch 1970-01-01."
-  (declare (inline process-date))
   (if vectorp
-      '(serialize-into-vector (process-date object) vector start)
-      '(serialize-into-stream (process-date object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:date-schema
   "Read a date."
@@ -103,40 +80,20 @@ Serialized as the number of days from the ISO unix epoch 1970-01-01."
        ,(if vectorp
             `(deserialize-from-vector 'schema:int vector start)
             `(deserialize-from-stream 'schema:int stream))
-     (let ((timestamp
-             (local-time:adjust-timestamp!
-                 (local-time:encode-timestamp 0 0 0 0 1 1 1970)
-               (offset :day days))))
-       (values (change-class timestamp schema) bytes-read))))
+     (values (from-underlying schema days) bytes-read)))
 
 ;;; time-millis schema
 
-(declaim
- (ftype (function (schema:time-millis) (values schema:int &optional))
-        process-time-millis)
- (inline process-time-millis))
-(defun process-time-millis (time-millis)
-  (let ((hour (schema:hour time-millis))
-        (minute (schema:minute time-millis)))
-    (multiple-value-bind (second remainder)
-        (schema:second time-millis)
-      (+ (* hour 60 60 1000)
-         (* minute 60 1000)
-         (* second 1000)
-         (* remainder 1000)))))
-(declaim (notinline process-time-millis))
-
 (defmethod serialized-size ((object schema:time-millis))
-  (serialized-size (process-time-millis object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:time-millis
   "Write time of day.
 
 Serialized as the number of milliseconds after midnight, 00:00:00.000."
-  (declare (inline process-time-millis))
   (if vectorp
-      '(serialize-into-vector (process-time-millis object) vector start)
-      '(serialize-into-stream (process-time-millis object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:time-millis-schema
   "Read time of day."
@@ -144,48 +101,20 @@ Serialized as the number of milliseconds after midnight, 00:00:00.000."
        ,(if vectorp
             `(deserialize-from-vector 'schema:int vector start)
             `(deserialize-from-stream 'schema:int stream))
-     (declare ((and (integer 0) schema:int) milliseconds-after-midnight))
-     (let* ((hour (multiple-value-bind (hour remainder)
-                      (truncate milliseconds-after-midnight (* 60 60 1000))
-                    (setf milliseconds-after-midnight remainder)
-                    hour))
-            (minute (multiple-value-bind (minute remainder)
-                        (truncate milliseconds-after-midnight (* 60 1000))
-                      (setf milliseconds-after-midnight remainder)
-                      minute)))
-       (values
-        (make-instance schema :hour hour :minute minute
-                              :millisecond milliseconds-after-midnight)
-        bytes-read))))
+     (values (from-underlying schema milliseconds-after-midnight) bytes-read)))
 
 ;;; time-micros schema
 
-(declaim
- (ftype (function (schema:time-micros) (values schema:long &optional))
-        process-time-micros)
- (inline process-time-micros))
-(defun process-time-micros (time-micros)
-  (let ((hour (schema:hour time-micros))
-        (minute (schema:minute time-micros)))
-    (multiple-value-bind (second remainder)
-        (schema:second time-micros)
-      (+ (* hour 60 60 1000 1000)
-         (* minute 60 1000 1000)
-         (* second 1000 1000)
-         (* remainder 1000 1000)))))
-(declaim (notinline process-time-micros))
-
 (defmethod serialized-size ((object schema:time-micros))
-  (serialized-size (process-time-micros object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:time-micros
   "Write time of day.
 
 Serialized as the number of microseconds after midnight, 00:00:00.000000."
-  (declare (inline process-time-micros))
   (if vectorp
-      '(serialize-into-vector (process-time-micros object) vector start)
-      '(serialize-into-stream (process-time-micros object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:time-micros-schema
   "Read time of day."
@@ -193,45 +122,20 @@ Serialized as the number of microseconds after midnight, 00:00:00.000000."
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
-     (declare ((and (integer 0) schema:long) microseconds-after-midnight))
-     (let* ((hour (multiple-value-bind (hour remainder)
-                      (truncate microseconds-after-midnight (* 60 60 1000 1000))
-                    (setf microseconds-after-midnight remainder)
-                    hour))
-            (minute (multiple-value-bind (minute remainder)
-                        (truncate microseconds-after-midnight (* 60 1000 1000))
-                      (setf microseconds-after-midnight remainder)
-                      minute)))
-       (values
-        (make-instance schema :hour hour :minute minute
-                              :microsecond microseconds-after-midnight)
-        bytes-read))))
+     (values (from-underlying schema microseconds-after-midnight) bytes-read)))
 
 ;;; timestamp-millis schema
 
-(declaim
- (ftype (function (schema:timestamp-millis) (values schema:long &optional))
-        process-timestamp-millis)
- (inline process-timestamp-millis))
-(defun process-timestamp-millis (timestamp-millis)
-  (let* ((unix-epoch (make-unix-epoch local-time:+utc-zone+))
-         (diff (local-time-duration:timestamp-difference
-                timestamp-millis unix-epoch))
-         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
-    (nth-value 0 (truncate nanosecond-diff (* 1000 1000)))))
-(declaim (notinline process-timestamp-millis))
-
 (defmethod serialized-size ((object schema:timestamp-millis))
-  (serialized-size (process-timestamp-millis object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:timestamp-millis
   "Write timestamp into VECTOR.
 
 Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
-  (declare (inline process-timestamp-millis))
   (if vectorp
-      '(serialize-into-vector (process-timestamp-millis object) vector start)
-      '(serialize-into-stream (process-timestamp-millis object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:timestamp-millis-schema
   "Read a timestamp."
@@ -239,46 +143,20 @@ Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:0
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
-     (declare (schema:long milliseconds-from-unix-epoch))
-     (let* ((seconds-from-unix-epoch
-              (multiple-value-bind (seconds remainder)
-                  (truncate milliseconds-from-unix-epoch 1000)
-                (setf milliseconds-from-unix-epoch remainder)
-                seconds))
-            (nanoseconds-from-unix-epoch
-              (* milliseconds-from-unix-epoch 1000 1000))
-            (timestamp
-              (local-time:adjust-timestamp!
-                  (make-unix-epoch local-time:+utc-zone+)
-                (offset :sec seconds-from-unix-epoch)
-                (offset :nsec nanoseconds-from-unix-epoch))))
-       (values (change-class timestamp schema) bytes-read))))
+     (values (from-underlying schema milliseconds-from-unix-epoch) bytes-read)))
 
 ;;; timestamp-micros schema
 
-(declaim
- (ftype (function (schema:timestamp-micros) (values schema:long &optional))
-        process-timestamp-micros)
- (inline process-timestamp-micros))
-(defun process-timestamp-micros (timestamp-micros)
-  (let* ((unix-epoch (make-unix-epoch local-time:+utc-zone+))
-         (diff (local-time-duration:timestamp-difference
-                timestamp-micros unix-epoch))
-         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
-    (nth-value 0 (truncate nanosecond-diff 1000))))
-(declaim (notinline process-timestamp-micros))
-
 (defmethod serialized-size ((object schema:timestamp-micros))
-  (serialized-size (process-timestamp-micros object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:timestamp-micros
   "Write timestamp.
 
 Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:00:00.000000."
-  (declare (inline process-timestamp-micros))
   (if vectorp
-      '(serialize-into-vector (process-timestamp-micros object) vector start)
-      '(serialize-into-stream (process-timestamp-micros object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:timestamp-micros-schema
   "Read timestamp."
@@ -286,47 +164,20 @@ Serialized as the number of microseconds from the UTC unix epoch 1970-01-01T00:0
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
-     (declare (schema:long microseconds-from-unix-epoch))
-     (let* ((seconds-from-unix-epoch
-              (multiple-value-bind (seconds remainder)
-                  (truncate microseconds-from-unix-epoch (* 1000 1000))
-                (setf microseconds-from-unix-epoch remainder)
-                seconds))
-            (nanoseconds-from-unix-epoch
-              (* microseconds-from-unix-epoch 1000))
-            (timestamp
-              (local-time:adjust-timestamp!
-                  (make-unix-epoch local-time:+utc-zone+)
-                (offset :sec seconds-from-unix-epoch)
-                (offset :nsec nanoseconds-from-unix-epoch))))
-       (values (change-class timestamp schema) bytes-read))))
+     (values (from-underlying schema microseconds-from-unix-epoch) bytes-read)))
 
 ;;; local-timestamp-millis schema
 
-(declaim
- (ftype (function (schema:local-timestamp-millis)
-                  (values schema:long &optional))
-        process-local-timestamp-millis)
- (inline process-local-timestamp-millis))
-(defun process-local-timestamp-millis (local-timestamp-millis)
-  (let* ((unix-epoch (make-unix-epoch (schema:timezone local-timestamp-millis)))
-         (diff (local-time-duration:timestamp-difference
-                local-timestamp-millis unix-epoch))
-         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
-    (nth-value 0 (truncate nanosecond-diff (* 1000 1000)))))
-(declaim (notinline process-local-timestamp-millis))
-
 (defmethod serialized-size ((object schema:local-timestamp-millis))
-  (serialized-size (process-local-timestamp-millis object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:local-timestamp-millis
   "Write local timestamp.
 
 Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
-  (declare (inline process-local-timestamp-millis))
   (if vectorp
-      '(serialize-into-vector (process-local-timestamp-millis object) vector start)
-      '(serialize-into-stream (process-local-timestamp-millis object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:local-timestamp-millis-schema
   "Read local timestamp."
@@ -334,47 +185,20 @@ Serialized as the number of milliseconds from 1970-01-01T00:00:00.000."
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
-     (declare (schema:long milliseconds-from-epoch))
-     (let* ((seconds-from-epoch
-              (multiple-value-bind (seconds remainder)
-                  (truncate milliseconds-from-epoch 1000)
-                (setf milliseconds-from-epoch remainder)
-                seconds))
-            (nanoseconds-from-epoch
-              (* milliseconds-from-epoch 1000 1000))
-            (timestamp
-              (local-time:adjust-timestamp!
-                  (make-unix-epoch local-time:*default-timezone*)
-                (offset :sec seconds-from-epoch)
-                (offset :nsec nanoseconds-from-epoch))))
-       (values (change-class timestamp schema) bytes-read))))
+     (values (from-underlying schema milliseconds-from-epoch) bytes-read)))
 
 ;;; local-timestamp-micros schema
 
-(declaim
- (ftype (function (schema:local-timestamp-micros)
-                  (values schema:long &optional))
-        process-local-timestamp-micros)
- (inline process-local-timestamp-micros))
-(defun process-local-timestamp-micros (local-timestamp-micros)
-  (let* ((unix-epoch (make-unix-epoch (schema:timezone local-timestamp-micros)))
-         (diff (local-time-duration:timestamp-difference
-                local-timestamp-micros unix-epoch))
-         (nanosecond-diff (local-time-duration:duration-as diff :nsec)))
-    (nth-value 0 (truncate nanosecond-diff 1000))))
-(declaim (notinline process-local-timestamp-micros))
-
 (defmethod serialized-size ((object schema:local-timestamp-micros))
-  (serialized-size (process-local-timestamp-micros object)))
+  (serialized-size (to-underlying object)))
 
 (define-serialize-into schema:local-timestamp-micros
   "Write local timestamp.
 
 Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
-  (declare (inline process-local-timestamp-micros))
   (if vectorp
-      '(serialize-into-vector (process-local-timestamp-micros object) vector start)
-      '(serialize-into-stream (process-local-timestamp-micros object) stream)))
+      '(serialize-into-vector (to-underlying object) vector start)
+      '(serialize-into-stream (to-underlying object) stream)))
 
 (define-deserialize-from schema:local-timestamp-micros-schema
   "Read local timestamp."
@@ -382,20 +206,7 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
        ,(if vectorp
             `(deserialize-from-vector 'schema:long vector start)
             `(deserialize-from-stream 'schema:long stream))
-     (declare (schema:long microseconds-from-epoch))
-     (let* ((seconds-from-epoch
-              (multiple-value-bind (seconds remainder)
-                  (truncate microseconds-from-epoch (* 1000 1000))
-                (setf microseconds-from-epoch remainder)
-                seconds))
-            (nanoseconds-from-epoch
-              (* microseconds-from-epoch 1000))
-            (timestamp
-              (local-time:adjust-timestamp!
-                  (make-unix-epoch local-time:*default-timezone*)
-                (offset :sec seconds-from-epoch)
-                (offset :nsec nanoseconds-from-epoch))))
-       (values (change-class timestamp schema) bytes-read))))
+     (values (from-underlying schema microseconds-from-epoch) bytes-read)))
 
 ;;; duration schema
 

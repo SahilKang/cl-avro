@@ -21,19 +21,13 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:deserialize-from-vector
-                #:deserialize-from-stream
-                #:define-deserialize-from
-                #:resolve
-                #:assert-match)
-  (:import-from #:cl-avro.io.resolution.resolve
-                #:resolved
-                #:reader
-                #:writer)
-  (:export #:deserialize-from-vector
-           #:deserialize-from-stream
-           #:resolve
-           #:assert-match))
+                #:assert-match
+                #:make-resolver)
+  (:import-from #:cl-avro.io.underlying
+                #:to-underlying
+                #:from-underlying)
+  (:export #:assert-match
+           #:make-resolver))
 (in-package #:cl-avro.io.resolution.logical)
 
 (eval-when (:compile-toplevel)
@@ -51,329 +45,229 @@
         (list
          (unless (eq (first type) 'eql)
            (error "Expected eql specifier: ~S" type))
-         `(eql ',(second type)))))))
+         `(eql ',(second type))))))
+
+  (declaim
+   (ftype (function ((or cons symbol) (or cons symbol))
+                    (values cons &optional))
+          defassert))
+  (defun defassert (reader writer)
+    `(defmethod assert-match
+         ((reader ,reader) (writer ,writer))
+       (declare (ignore reader writer))
+       (values)))
+
+  (declaim
+   (ftype (function ((or cons symbol)
+                     (or cons symbol)
+                     (or (eql from-underlying) (eql to-underlying)))
+                    (values cons &optional))
+          defresolver))
+  (defun defresolver (reader writer from/to)
+    `(defmethod make-resolver
+         ((reader ,reader) (writer ,writer))
+       (declare (ignore writer))
+       ,(ecase from/to
+          (from-underlying '(lambda (writer-object)
+                             (from-underlying reader writer-object)))
+          (to-underlying '#'to-underlying)))))
 
 (defmacro defunderlying (schema)
   (declare (symbol schema))
   (let* ((class (find-class (find-symbol (string schema) 'schema)))
-         (class-name (class-name class))
-         (underlying (underlying-type class)))
-    (unless (subtypep class 'schema:logical-schema)
+         (metaclass-name (class-name (class-of class)))
+         (underlying (schema:underlying class))
+         (underlying-type (underlying-type (class-of class))))
+    (unless (subtypep (class-of class) 'schema:logical-schema)
       (error "~S does not name a logical-schema" schema))
     `(progn
-       (defmethod assert-match
-           ((reader ,class-name) (writer ,class-name))
-         (declare (ignore reader writer))
-         (values))
+       ,(defassert metaclass-name metaclass-name)
+
+       ,(defassert metaclass-name underlying-type)
+       ,(defresolver metaclass-name underlying-type 'from-underlying)
+
+       ,(defassert underlying-type metaclass-name)
+       ,(defresolver underlying-type metaclass-name 'to-underlying)
 
        (defmethod assert-match
-           ((reader ,class-name) (writer ,underlying))
-         (declare (ignore reader writer))
-         (values))
+           ((reader ,metaclass-name) writer)
+         (declare (ignore reader))
+         (assert-match ',underlying writer))
+
+       (defmethod make-resolver
+           ((reader ,metaclass-name) writer)
+         (let ((resolve (make-resolver ',underlying writer)))
+           (lambda (writer-object)
+             (from-underlying reader (funcall resolve writer-object)))))
 
        (defmethod assert-match
-           ((reader ,underlying) (writer ,class-name))
-         (declare (ignore reader writer))
-         (values)))))
+           (reader (writer ,metaclass-name))
+         (declare (ignore writer))
+         (assert-match reader ',underlying))
 
-;; uuid schema
+       (defmethod make-resolver
+           (reader (writer ,metaclass-name))
+         (declare (ignore writer))
+         (let ((resolve (make-resolver reader ',underlying)))
+           (lambda (writer-object)
+             (funcall resolve (to-underlying writer-object))))))))
 
-(defunderlying uuid-schema)
+(eval-when (:compile-toplevel)
+  (declaim (ftype (function (symbol) (values symbol &optional)) find-metaclass))
+  (defun find-metaclass (symbol)
+    (multiple-value-bind (metaclass status)
+        (find-symbol (format nil "~A-SCHEMA" symbol) 'schema)
+      (unless (eq status :external)
+        (error "~S does not name a metaclass" symbol))
+      metaclass))
 
-;; date schema
+  (declaim (ftype (function (symbol) (values symbol &optional)) find-schema))
+  (defun find-schema (symbol)
+    (multiple-value-bind (schema status)
+        (find-symbol (string symbol) 'schema)
+      (unless (eq status :external)
+        (error "~S does not name a schema" symbol))
+      schema)))
 
-(defunderlying date-schema)
+(defmacro deffrom (to (&rest from) &body initargs)
+  (declare (symbol to))
+  (let ((reader-class (find-metaclass to))
+        (reader-schema (find-schema to)))
+    (flet ((defresolve (arg writer-class)
+               (declare (symbol arg writer-class))
+             `(defmethod make-resolver
+                  ((reader ,reader-class) (writer ,writer-class))
+                (declare (ignore reader writer))
+                (lambda (,arg)
+                  (make-instance
+                   ',reader-schema
+                   ,@(subst arg '% initargs :test #'eq))))))
+      `(progn
+         ,@(loop
+             for writer in from
+             for writer-class = (find-metaclass writer)
+             collect (defassert reader-class writer-class)
+             collect (defresolve writer writer-class))))))
 
-(defclass resolved-date (resolved)
-  ((reader
-    :type schema:date-schema)
-   (writer
-    :type (or schema:timestamp-millis-schema
-              schema:timestamp-micros-schema))))
+;;; uuid schema
 
-(defmethod assert-match
-    ((reader schema:date-schema) (writer schema:timestamp-millis-schema))
-  (declare (ignore reader writer))
-  (values))
+(defunderlying uuid)
 
-(defmethod resolve
-    ((reader schema:date-schema) (writer schema:timestamp-millis-schema))
-  (make-instance 'resolved-date :reader reader :writer writer))
+;;; date schema
 
-(defmethod assert-match
-    ((reader schema:date-schema) (writer schema:timestamp-micros-schema))
-  (declare (ignore reader writer))
-  (values))
+(defunderlying date)
 
-(defmethod resolve
-    ((reader schema:date-schema) (writer schema:timestamp-micros-schema))
-  (make-instance 'resolved-date :reader reader :writer writer))
+(deffrom date
+    (timestamp-millis
+     timestamp-micros
+     local-timestamp-millis
+     local-timestamp-micros)
+  :year (schema:year %)
+  :month (schema:month %)
+  :day (schema:day %))
 
-(define-deserialize-from resolved-date
-  `(multiple-value-bind (timestamp bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :year (schema:year timestamp)
-       :month (schema:month timestamp)
-       :day (schema:day timestamp))
-      bytes-read)))
+;;; time-millis schema
 
-;; time-millis schema
+(defunderlying time-millis)
 
-(defunderlying time-millis-schema)
+(deffrom time-millis
+    (time-micros
+     timestamp-millis
+     timestamp-micros
+     local-timestamp-millis
+     local-timestamp-micros)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :millisecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (truncate
+                  (+ (* 1000 second)
+                     (* 1000 remainder)))))
 
-(defclass resolved-time-millis (resolved)
-  ((reader
-    :type schema:time-millis-schema)
-   (writer
-    :type schema:time-micros-schema)))
+;;; time-micros schema
 
-(defmethod assert-match
-    ((reader schema:time-millis-schema) (writer schema:time-micros-schema))
-  (declare (ignore reader writer))
-  (values))
+(defunderlying time-micros)
 
-(defmethod resolve
-    ((reader schema:time-millis-schema) (writer schema:time-micros-schema))
-  (make-instance 'resolved-time-millis :reader reader :writer writer))
+(deffrom time-micros
+    (time-millis
+     timestamp-millis
+     timestamp-micros
+     local-timestamp-millis
+     local-timestamp-micros)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :microsecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (+ (* 1000 1000 second)
+                    (* 1000 1000 remainder))))
 
-(declaim
- (ftype (function (local-time:timestamp) (values (integer 0 59999) &optional))
-        get-millisecond)
- (inline get-millisecond))
-(defun get-millisecond (timestamp)
-  (let ((second (local-time:timestamp-second timestamp))
-        (millisecond (local-time:timestamp-millisecond timestamp)))
-    (declare ((integer 0 59) second)
-             ((integer 0 999) millisecond))
-    (+ (* second 1000) millisecond)))
-(declaim (notinline get-millisecond))
+;;; timestamp-millis schema
 
-(define-deserialize-from resolved-time-millis
-  (declare (inline get-millisecond))
-  `(multiple-value-bind (time-micros bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :hour (schema:hour time-micros)
-       :minute (schema:minute time-micros)
-       :millisecond (get-millisecond time-micros))
-      bytes-read)))
+(defunderlying timestamp-millis)
 
-;; time-micros schema
+(deffrom timestamp-millis
+    (timestamp-micros)
+  :year (schema:year %)
+  :month (schema:month %)
+  :day (schema:day %)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :millisecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (truncate
+                  (+ (* 1000 second)
+                     (* 1000 remainder)))))
 
-(defunderlying time-micros-schema)
+;;; timestamp-micros schema
 
-(defclass resolved-time-micros (resolved)
-  ((reader
-    :type schema:time-micros-schema)
-   (writer
-    :type schema:time-millis-schema)))
+(defunderlying timestamp-micros)
 
-(defmethod assert-match
-    ((reader schema:time-micros-schema) (writer schema:time-millis-schema))
-  (declare (ignore reader writer))
-  (values))
+(deffrom timestamp-micros
+    (timestamp-millis)
+  :year (schema:year %)
+  :month (schema:month %)
+  :day (schema:day %)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :microsecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (+ (* 1000 1000 second)
+                    (* 1000 1000 remainder))))
 
-(defmethod resolve
-    ((reader schema:time-micros-schema) (writer schema:time-millis-schema))
-  (make-instance 'resolved-time-micros :reader reader :writer writer))
+;;; local-timestamp-millis schema
 
-(declaim
- (ftype (function (local-time:timestamp)
-                  (values (integer 0 59999999) &optional))
-        get-microsecond)
- (inline get-microsecond))
-(defun get-microsecond (timestamp)
-  (let ((second (local-time:timestamp-second timestamp))
-        (microsecond (local-time:timestamp-microsecond timestamp)))
-    (declare ((integer 0 59) second)
-             ((integer 0 999999) microsecond))
-    (+ (* second 1000 1000) microsecond)))
-(declaim (notinline get-microsecond))
+(defunderlying local-timestamp-millis)
 
-(define-deserialize-from resolved-time-micros
-  (declare (inline get-microsecond))
-  `(multiple-value-bind (time-millis bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :hour (schema:hour time-millis)
-       :minute (schema:minute time-millis)
-       :microsecond (get-microsecond time-millis))
-      bytes-read)))
+(deffrom local-timestamp-millis
+    (local-timestamp-micros)
+  :year (schema:year %)
+  :month (schema:month %)
+  :day (schema:day %)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :millisecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (truncate
+                  (+ (* 1000 second)
+                     (* 1000 remainder)))))
 
-;; timestamp-millis schema
+;;; local-timestamp-micros schema
 
-(defunderlying timestamp-millis-schema)
+(defunderlying local-timestamp-micros)
 
-(defclass resolved-timestamp-millis (resolved)
-  ((reader
-    :type schema:timestamp-millis-schema)
-   (writer
-    :type schema:timestamp-micros-schema)))
+(deffrom local-timestamp-micros
+    (local-timestamp-millis)
+  :year (schema:year %)
+  :month (schema:month %)
+  :day (schema:day %)
+  :hour (schema:hour %)
+  :minute (schema:minute %)
+  :microsecond (multiple-value-bind (second remainder)
+                   (schema:second %)
+                 (+ (* 1000 1000 second)
+                    (* 1000 1000 remainder))))
 
-(defmethod assert-match
-    ((reader schema:timestamp-millis-schema)
-     (writer schema:timestamp-micros-schema))
-  (declare (ignore reader writer))
-  (values))
-
-(defmethod resolve
-    ((reader schema:timestamp-millis-schema)
-     (writer schema:timestamp-micros-schema))
-  (make-instance 'resolved-timestamp-millis :reader reader :writer writer))
-
-(define-deserialize-from resolved-timestamp-millis
-  (declare (inline get-millisecond))
-  `(multiple-value-bind (timestamp-micros bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :year (schema:year timestamp-micros)
-       :month (schema:month timestamp-micros)
-       :day (schema:day timestamp-micros)
-       :hour (schema:hour timestamp-micros)
-       :minute (schema:minute timestamp-micros)
-       :millisecond (get-millisecond timestamp-micros))
-      bytes-read)))
-
-;; timestamp-micros schema
-
-(defunderlying timestamp-micros-schema)
-
-(defclass resolved-timestamp-micros (resolved)
-  ((reader
-    :type schema:timestamp-micros-schema)
-   (writer
-    :type schema:timestamp-millis-schema)))
-
-(defmethod assert-match
-    ((reader schema:timestamp-micros-schema)
-     (writer schema:timestamp-millis-schema))
-  (declare (ignore reader writer))
-  (values))
-
-(defmethod resolve
-    ((reader schema:timestamp-micros-schema)
-     (writer schema:timestamp-millis-schema))
-  (make-instance 'resolved-timestamp-micros :reader reader :writer writer))
-
-(define-deserialize-from resolved-timestamp-micros
-  (declare (inline get-microsecond))
-  `(multiple-value-bind (timestamp-millis bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :year (schema:year timestamp-millis)
-       :month (schema:month timestamp-millis)
-       :day (schema:day timestamp-millis)
-       :hour (schema:hour timestamp-millis)
-       :minute (schema:minute timestamp-millis)
-       :microsecond (get-microsecond timestamp-millis))
-      bytes-read)))
-
-;; local-timestamp-millis schema
-
-(defunderlying local-timestamp-millis-schema)
-
-(defclass resolved-local-timestamp-millis (resolved)
-  ((reader
-    :type schema:local-timestamp-millis-schema)
-   (writer
-    :type schema:local-timestamp-micros-schema)))
-
-(defmethod assert-match
-    ((reader schema:local-timestamp-millis-schema)
-     (writer schema:local-timestamp-micros-schema))
-  (declare (ignore reader writer))
-  (values))
-
-(defmethod resolve
-  ((reader schema:local-timestamp-millis-schema)
-   (writer schema:local-timestamp-micros-schema))
-  (make-instance 'resolved-local-timestamp-millis
-                 :reader reader :writer writer))
-
-(define-deserialize-from resolved-local-timestamp-millis
-  (declare (inline get-millisecond))
-  `(multiple-value-bind (local-timestamp-micros bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :year (schema:year local-timestamp-micros)
-       :month (schema:month local-timestamp-micros)
-       :day (schema:day local-timestamp-micros)
-       :hour (schema:hour local-timestamp-micros)
-       :minute (schema:minute local-timestamp-micros)
-       :millisecond (get-millisecond local-timestamp-micros))
-      bytes-read)))
-
-;; local-timestamp-micros schema
-
-(defunderlying local-timestamp-micros-schema)
-
-(defclass resolved-local-timestamp-micros (resolved)
-  ((reader
-    :type schema:local-timestamp-micros-schema)
-   (writer
-    :type schema:local-timestamp-millis-schema)))
-
-(defmethod assert-match
-    ((reader schema:local-timestamp-micros-schema)
-     (writer schema:local-timestamp-millis-schema))
-  (declare (ignore reader writer))
-  (values))
-
-(defmethod resolve
-    ((reader schema:local-timestamp-micros-schema)
-     (writer schema:local-timestamp-millis-schema))
-  (make-instance 'resolved-local-timestamp-micros
-                 :reader reader :writer writer))
-
-(define-deserialize-from resolved-local-timestamp-micros
-  (declare (inline get-microsecond))
-  `(multiple-value-bind (local-timestamp-millis bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :year (schema:year local-timestamp-millis)
-       :month (schema:month local-timestamp-millis)
-       :day (schema:day local-timestamp-millis)
-       :hour (schema:hour local-timestamp-millis)
-       :minute (schema:minute local-timestamp-millis)
-       :microsecond (get-microsecond local-timestamp-millis))
-      bytes-read)))
-
-;; decimal schema
-
-(defclass resolved-decimal (resolved)
-  ((reader
-    :type schema:decimal)
-   (writer
-    :type schema:decimal)))
+;;; decimal schema
 
 (defmethod assert-match
     ((reader schema:decimal) (writer schema:decimal))
@@ -390,47 +284,25 @@
       (error "Reader's decimal precision of ~S does not match writer's ~S"
              reader-precision writer-precision))))
 
-(defmethod resolve
+(defmethod make-resolver
     ((reader schema:decimal) (writer schema:decimal))
-  (make-instance 'resolved-decimal :reader reader :writer writer))
+  (declare (ignore writer))
+  (lambda (writer-decimal)
+    (make-instance reader :unscaled (schema:unscaled writer-decimal))))
 
-(define-deserialize-from resolved-decimal
-  `(multiple-value-bind (decimal bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :unscaled (schema:unscaled decimal))
-      bytes-read)))
-
-;; duration schema
-
-(defclass resolved-duration (resolved)
-  ((reader
-    :type schema:duration)
-   (writer
-    :type schema:duration)))
+;;; duration schema
 
 (defmethod assert-match
     ((reader schema:duration) (writer schema:duration))
   (declare (ignore reader writer))
   (values))
 
-(defmethod resolve
+(defmethod make-resolver
     ((reader schema:duration) (writer schema:duration))
-  (make-instance 'resolved-duration :reader reader :writer writer))
-
-(define-deserialize-from resolved-duration
-  `(multiple-value-bind (duration bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values
-      (make-instance
-       (reader schema)
-       :months (schema:months duration)
-       :days (schema:days duration)
-       :milliseconds (schema:milliseconds duration))
-      bytes-read)))
+  (declare (ignore writer))
+  (lambda (writer-duration)
+    (make-instance
+     reader
+     :months (schema:months writer-duration)
+     :days (schema:days writer-duration)
+     :milliseconds (schema:milliseconds writer-duration))))

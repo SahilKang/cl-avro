@@ -21,46 +21,19 @@
   (:import-from #:cl-avro.schema.logical.base
                 #:logical-schema
                 #:underlying)
-  (:import-from #:cl-avro.schema.logical.timezone
-                #:timezone-mixin
-                #:timezone)
   (:import-from #:cl-avro.schema.primitive
                 #:int)
   (:import-from #:cl-avro.schema.complex
                 #:scalarize-class)
   (:export #:date-schema
            #:underlying
-           #:date-mixin
            #:date
            #:year
            #:month
-           #:day
-           #:timezone))
+           #:day))
 (in-package #:cl-avro.schema.logical.date)
 
-;;; mixin
-
-(defclass date-mixin (local-time:timestamp timezone-mixin)
-  ()
-  (:documentation
-   "Date mixin."))
-
-(defgeneric year (date &key &allow-other-keys)
-  (:documentation "Return year.")
-  (:method ((instance date-mixin) &key)
-    (local-time:timestamp-year instance :timezone (timezone instance))))
-
-(defgeneric month (date &key &allow-other-keys)
-  (:documentation "Return month.")
-  (:method ((instance date-mixin) &key)
-    (local-time:timestamp-month instance :timezone (timezone instance))))
-
-(defgeneric day (date &key &allow-other-keys)
-  (:documentation "Return day.")
-  (:method ((instance date-mixin) &key)
-    (local-time:timestamp-day instance :timezone (timezone instance))))
-
-;;; date
+;;; schema
 
 (defclass date-schema (logical-schema)
   ((underlying
@@ -75,7 +48,9 @@
     ((class date-schema) (superclass logical-schema))
   t)
 
-(defclass date (date-mixin)
+;;; object
+
+(defclass date (local-time:timestamp)
   ()
   (:metaclass date-schema)
   (:documentation
@@ -88,4 +63,19 @@ particular timezone or time-of-day."))
     ((instance date) &key year month day)
   (when (or year month)
     (local-time:encode-timestamp
-     0 0 0 0 day month year :into instance :timezone (timezone instance))))
+     0 0 0 0 day month year :into instance :timezone local-time:+utc-zone+)))
+
+(defgeneric year (date &key &allow-other-keys)
+  (:documentation "Return year.")
+  (:method ((instance date) &key)
+    (local-time:timestamp-year instance :timezone local-time:+utc-zone+)))
+
+(defgeneric month (date &key &allow-other-keys)
+  (:documentation "Return month.")
+  (:method ((instance date) &key)
+    (local-time:timestamp-month instance :timezone local-time:+utc-zone+)))
+
+(defgeneric day (date &key &allow-other-keys)
+  (:documentation "Return day.")
+  (:method ((instance date) &key)
+    (local-time:timestamp-day instance :timezone local-time:+utc-zone+)))

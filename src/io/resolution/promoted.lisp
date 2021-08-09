@@ -21,52 +21,11 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:import-from #:cl-avro.io.base
-                #:deserialize-from-vector
-                #:deserialize-from-stream
-                #:define-deserialize-from
-                #:resolve
-                #:assert-match)
-  (:import-from #:cl-avro.io.resolution.resolve
-                #:resolved
-                #:reader
-                #:writer)
-  (:export #:deserialize-from-vector
-           #:deserialize-from-stream
-           #:resolve
-           #:assert-match))
+                #:assert-match
+                #:make-resolver)
+  (:export #:assert-match
+           #:make-resolver))
 (in-package #:cl-avro.io.resolution.promoted)
-
-;; promoted
-
-(eval-when (:compile-toplevel :load-toplevel)
-  (defclass promoted (resolved)
-    ((reader
-      :type schema:primitive-schema)
-     (writer
-      :type schema:primitive-schema))))
-
-(define-deserialize-from promoted
-  `(multiple-value-bind (value bytes-read)
-       ,(if vectorp
-            `(deserialize-from-vector (writer schema) vector start)
-            `(deserialize-from-stream (writer schema) stream))
-     (values (coerce value (reader schema)) bytes-read)))
-
-;; promoted-string-or-bytes
-
-(eval-when (:compile-toplevel :load-toplevel)
-  (defclass promoted-string-or-bytes (resolved)
-    ((reader
-      :type (or schema:string schema:bytes))
-     (writer
-      :type (or schema:string schema:bytes)))))
-
-(define-deserialize-from promoted-string-or-bytes
-  (if vectorp
-      `(deserialize-from-vector (reader schema) vector start)
-      `(deserialize-from-stream (reader schema) stream)))
-
-;; promote
 
 (eval-when (:compile-toplevel)
   (declaim
@@ -77,30 +36,57 @@
       (check-type schema schema:primitive-schema)
       schema)))
 
-(defmacro promote (from (&rest tos) &optional (resolved-class 'promoted))
-  (unless (subtypep resolved-class 'resolved)
-    (error "~S is not a subclass of resolved" resolved-class))
-  (let ((from-schema (find-schema from))
-        (to-schemas (mapcar #'find-schema tos)))
-    (flet ((make-defmethods (to-schema)
-             `((defmethod assert-match
-                   ((reader (eql ',to-schema)) (writer (eql ',from-schema)))
-                 (declare (ignore reader writer))
-                 (values))
+(defmacro promote (from to &body body)
+  (let ((from (find-schema from))
+        (to (find-schema to)))
+    `(progn
+       (defmethod assert-match
+           ((reader (eql ',to)) (writer (eql ',from)))
+         (declare (ignore reader writer))
+         (values))
 
-               (defmethod resolve
-                   ((reader (eql ',to-schema)) (writer (eql ',from-schema)))
-                 (make-instance ',resolved-class
-                                :reader reader :writer writer)))))
-      `(progn
-         ,@(mapcan #'make-defmethods to-schemas)))))
+       (defmethod make-resolver
+           ((reader (eql ',to)) (writer (eql ',from)))
+         (declare (ignore reader writer))
+         ,@body))))
 
-(promote int (long float double))
+;;; int to long, float, or double
 
-(promote long (float double))
+(promote int long
+  #'identity)
 
-(promote float (double))
+(promote int float
+  (lambda (writer-int)
+    (coerce writer-int 'schema:float)))
 
-(promote string (bytes) promoted-string-or-bytes)
+(promote int double
+  (lambda (writer-int)
+    (coerce writer-int 'schema:double)))
 
-(promote bytes (string) promoted-string-or-bytes)
+;;; long to float or double
+
+(promote long float
+  (lambda (writer-long)
+    (coerce writer-long 'schema:float)))
+
+(promote long double
+  (lambda (writer-long)
+    (coerce writer-long 'schema:double)))
+
+;;; float to double
+
+(promote float double
+  (lambda (writer-float)
+    (coerce writer-float 'schema:double)))
+
+;;; string to bytes
+
+(promote string bytes
+  (lambda (writer-string)
+    (babel:string-to-octets writer-string :encoding :utf-8)))
+
+;;; bytes to string
+
+(promote bytes string
+  (lambda (writer-bytes)
+    (babel:octets-to-string writer-bytes :encoding :utf-8)))

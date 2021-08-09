@@ -30,7 +30,7 @@
            #:deserialize-from-stream
            #:define-deserialize-from
            #:assert-match
-           #:resolve))
+           #:make-resolver))
 (in-package #:cl-avro.io.base)
 
 ;;; serialize
@@ -79,21 +79,35 @@ Return (values INTO number-of-serialized-bytes)"
   (:documentation
    "Asserts that schemas match for schema resolution."))
 
-(defgeneric resolve (reader writer)
+(defgeneric make-resolver (reader writer)
   (:method :before (reader writer)
     (assert-match reader writer))
 
   (:method :around ((reader symbol) writer)
     (if (typep reader 'schema:primitive-schema)
         (call-next-method)
-        (resolve (find-class reader) writer)))
+        (make-resolver (find-class reader) writer)))
+
+  (:method :around ((reader null) writer)
+    (declare (ignore reader writer))
+    #'identity)
+
+  (:method :around (reader writer)
+    (if (eq reader writer)
+        #'identity
+        (call-next-method)))
 
   (:method (reader writer)
-    (declare (ignore writer))
-    reader)
+    (error "Schemas don't resolve."))
 
   (:documentation
-   "Return a schema that resolves the differences between the inputs."))
+   "Return a function to resolve READER and WRITER schemas.
+
+The returned function will have a signature like:
+  (function (WRITER) (values READER &optional))
+
+That is, it'll accept an instance of WRITER and return an instance of
+READER."))
 
 ;;; deserialize
 
@@ -118,21 +132,22 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
   (:method (schema (input simple-array) &key reader-schema (start 0))
     (check-type input (simple-array (unsigned-byte 8) (*)))
     (check-type start (and (integer 0) fixnum))
-    (deserialize-from-vector
-     (if reader-schema (resolve reader-schema schema) schema)
-     input
-     start))
+    (let ((resolve (make-resolver reader-schema schema)))
+      (multiple-value-bind (deserialized bytes-read)
+          (deserialize-from-vector schema input start)
+        (values (funcall resolve deserialized) bytes-read))))
 
   (:method (schema (input stream) &key reader-schema)
-    (deserialize-from-stream
-     (if reader-schema (resolve reader-schema schema) schema)
-     input))
+    (let ((resolve (make-resolver reader-schema schema)))
+      (multiple-value-bind (deserialized bytes-read)
+          (deserialize-from-stream schema input)
+        (values (funcall resolve deserialized) bytes-read))))
 
   (:documentation
    "Deserialize an instance of SCHEMA from INPUT.
 
-If READER-SCHEMA is provided, then deserialization is performed on the
-resolved schema."))
+If READER-SCHEMA is provided, then schema resolution is performed to
+return an instance of READER-SCHEMA, instead."))
 
 ;;; macros
 

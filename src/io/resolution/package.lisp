@@ -18,8 +18,8 @@
 (in-package #:cl-user)
 
 (defpackage #:cl-avro.io.resolution
-  (:use #:cl-avro.io.resolution.resolve
+  (:use #:cl-avro.io.resolution.make-resolver
         #:cl-avro.io.resolution.logical
         #:cl-avro.io.resolution.promoted)
-  (:export #:deserialize-from-vector
-           #:deserialize-from-stream))
+  (:export #:assert-match
+           #:make-resolver))
