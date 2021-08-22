@@ -59,18 +59,8 @@
     ((class wrapper-class) (superclass standard-class))
   t)
 
-(declaim
- (ftype (function (schema) (values cons &optional)) make-wrapped-object-slot))
-(defun make-wrapped-object-slot (type)
-  (list :name 'wrapped-object
-        :type type))
-
 (defmethod initialize-instance :around
-    ((instance wrapper-class)
-     &rest initargs
-     &key (type (error "Must supply TYPE")))
-  (let ((wrapped-object-slot (make-wrapped-object-slot type)))
-    (push wrapped-object-slot (getf initargs :direct-slots)))
+    ((instance wrapper-class) &rest initargs)
   (ensure-superclass wrapper-object)
   (apply #'call-next-method instance initargs))
 
@@ -196,7 +186,7 @@
     for schema across schemas
     for i from 0
 
-    for wrapper-class = (make-instance 'wrapper-class :position i :type schema)
+    for wrapper-class = (make-instance 'wrapper-class :position i)
     do
        (setf (elt wrapper-classes i) wrapper-class)
 
