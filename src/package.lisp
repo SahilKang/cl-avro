@@ -23,7 +23,8 @@
   (:use #:cl-avro.schema
         #:cl-avro.io
         #:cl-avro.single-object-encoding
-        #:cl-avro.object-container-file)
+        #:cl-avro.object-container-file
+        #:cl-avro.ipc)
   (:export #:schema
            #:object
            #:schema-of
@@ -158,4 +159,38 @@
            #:duration-object
            #:months
            #:days
-           #:milliseconds))
+           #:milliseconds
+
+           #:rpc-error
+           #:metadata
+
+           #:undeclared-rpc-error
+           #:message
+
+           #:declared-rpc-error
+           #:define-error
+
+           #:message
+           #:request
+           #:response
+           #:errors
+           #:one-way
+
+           #:protocol
+           #:messages
+           #:types
+           #:md5
+
+           #:protocol-object
+           #:transceiver
+           #:receive-from-unconnected-client
+           #:receive-from-connected-client
+
+           #:stateless-client
+           #:stateful-client
+           #:send
+           #:send-and-receive
+           #:send-handshake-p
+
+           #:server
+           #:client-protocol))

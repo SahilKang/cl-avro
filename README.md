@@ -8,11 +8,7 @@
 A Common Lisp implementation of the
 [Apache Avro](https://github.com/apache/avro) data serialization system.
 
-This was written against the
-[Avro 1.10.1 spec](http://avro.apache.org/docs/1.10.1/spec.html)
-and there are a few TODOS:
-
-* [Avro RPC](http://avro.apache.org/docs/1.10.1/spec.html#Protocol+Declaration)
-is not implemented.
-* [JSON Encoding](http://avro.apache.org/docs/1.10.1/spec.html#json_encoding)
-is not implemented.
+The API is still baking :bread:, but this is by and large a complete
+implementation: recursive schemas, serialization, ipc/rpc,
+fingerprinting, schema resolution, object container files, and single
+object encodings are all supported.

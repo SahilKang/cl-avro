@@ -67,7 +67,8 @@
                           #:map
                           #:values
                           #:type)
-  (:export #:schema->json))
+  (:export #:schema->json
+           #:to-jso))
 (in-package #:cl-avro.schema.io.write)
 
 (declaim

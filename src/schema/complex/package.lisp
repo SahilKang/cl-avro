@@ -32,7 +32,8 @@
                 #:late-class
                 #:parse-slot-value)
   (:import-from #:cl-avro.schema.complex.scalarize
-                #:scalarize-class)
+                #:scalarize-class
+                #:scalarize-value)
   (:export #:schema
            #:object
            #:which-one
@@ -40,6 +41,7 @@
            #:raw-buffer
            #:define-initializers
            #:scalarize-class
+           #:scalarize-value
            #:late-class
            #:parse-slot-value
 
@@ -53,6 +55,11 @@
            #:fullname
            #:aliases
            #:fullname->name
+           #:named-class
+           #:provided-name
+           #:provided-namespace
+           #:deduced-name
+           #:deduced-namespace
 
            #:array
            #:array-object
