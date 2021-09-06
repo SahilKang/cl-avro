@@ -16,12 +16,12 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.io.resolution.primitive
+(defpackage #:cl-avro.resolution.primitive
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:base #:cl-avro.io.resolution.base)))
-(in-package #:cl-avro.io.resolution.primitive)
+   (#:base #:cl-avro.resolution.base)))
+(in-package #:cl-avro.resolution.primitive)
 
 ;;; promote int to long
 

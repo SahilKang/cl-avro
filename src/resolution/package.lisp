@@ -17,6 +17,6 @@
 
 (in-package #:cl-user)
 
-(defpackage #:cl-avro.io.resolution
-  (:use #:cl-avro.io.resolution.base)
+(defpackage #:cl-avro.resolution
+  (:use #:cl-avro.resolution.base)
   (:export #:coerce))

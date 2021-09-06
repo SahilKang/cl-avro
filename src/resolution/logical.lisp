@@ -16,15 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.io.resolution.logical
+(defpackage #:cl-avro.resolution.logical
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:base #:cl-avro.io.resolution.base))
-  (:import-from #:cl-avro.io.underlying
+   (#:base #:cl-avro.resolution.base))
+  (:import-from #:cl-avro.underlying
                 #:to-underlying
                 #:from-underlying))
-(in-package #:cl-avro.io.resolution.logical)
+(in-package #:cl-avro.resolution.logical)
 
 (eval-when (:compile-toplevel)
   (declaim

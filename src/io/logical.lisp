@@ -30,7 +30,7 @@
                 #:deserialize-from-vector
                 #:deserialize-from-stream
                 #:define-deserialize-from)
-  (:import-from #:cl-avro.io.underlying
+  (:import-from #:cl-avro.underlying
                 #:to-underlying
                 #:from-underlying)
   (:export #:serialize-into-vector

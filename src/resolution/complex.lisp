@@ -16,12 +16,12 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.io.resolution.complex
+(defpackage #:cl-avro.resolution.complex
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:base #:cl-avro.io.resolution.base)))
-(in-package #:cl-avro.io.resolution.complex)
+   (#:base #:cl-avro.resolution.base)))
+(in-package #:cl-avro.resolution.complex)
 
 ;;; assert-matching-names
 

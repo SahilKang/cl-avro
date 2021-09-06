@@ -49,63 +49,59 @@
                 :object (make-instance 'array<int> :initial-contents '(2 4 6)))))
     (is (typep null 'writer-schema))
     (signals error
-      (avro:deserialize
-       'writer-schema
-       (avro:serialize null)
-       :reader-schema 'reader-schema))
+      (avro:coerce
+       (avro:deserialize 'writer-schema (avro:serialize null))
+       'reader-schema))
 
-    (let ((reader (avro:deserialize
-                   'writer-schema
-                   (avro:serialize string)
-                   :reader-schema 'reader-schema)))
+    (let ((reader (avro:coerce
+                   (avro:deserialize 'writer-schema (avro:serialize string))
+                   'reader-schema)))
       (is (typep string 'writer-schema))
       (is (typep reader 'reader-schema))
       (is (= 0 (nth-value 1 (avro:which-one reader))))
       (is (string= (avro:object string) (avro:object reader))))
 
-    (let ((reader (avro:deserialize
-                   'writer-schema
-                   (avro:serialize int)
-                   :reader-schema 'reader-schema)))
+    (let ((reader (avro:coerce
+                   (avro:deserialize 'writer-schema (avro:serialize int))
+                   'reader-schema)))
       (is (typep int 'writer-schema))
       (is (typep reader 'reader-schema))
       (is (= 1 (nth-value 1 (avro:which-one reader))))
       (is (= (avro:object int) (avro:object reader))))
 
-    (let ((reader (avro:deserialize
-                   'writer-schema
-                   (avro:serialize array)
-                   :reader-schema 'reader-schema)))
+    (let ((reader (avro:coerce
+                   (avro:deserialize 'writer-schema (avro:serialize array))
+                   'reader-schema)))
       (is (typep array 'writer-schema))
       (is (typep reader 'reader-schema))
       (is (= 3 (nth-value 1 (avro:which-one reader))))
       (is (every #'= (avro:object array) (avro:object reader))))))
 
 (test reader-union
-  (let ((reader (avro:deserialize
-                 'avro:int
-                 (avro:serialize 3)
-                 :reader-schema 'reader-schema)))
+  (let ((reader (avro:coerce
+                 (avro:deserialize 'avro:int (avro:serialize 3))
+                 'reader-schema)))
     (is (typep reader 'reader-schema))
     (is (= 1 (nth-value 1 (avro:which-one reader))))
     (is (= 3 (avro:object reader))))
 
   (signals error
-    (avro:deserialize
-     'avro:null
-     (avro:serialize nil)
-     :reader-schema 'reader-schema)))
+    (avro:coerce
+     (avro:deserialize 'avro:null (avro:serialize nil))
+     'reader-schema)))
 
 (test writer-union
-  (let ((reader (avro:deserialize
-                 'writer-schema
-                 (avro:serialize (make-instance 'writer-schema :object 3))
-                 :reader-schema 'avro:long)))
+  (let ((reader (avro:coerce
+                 (avro:deserialize
+                  'writer-schema
+                  (avro:serialize (make-instance 'writer-schema :object 3)))
+                 'avro:long)))
     (is (typep reader 'avro:long))
     (is (= 3 reader)))
 
   (signals error
-    (avro:deserialize
-     'writer-schema
-     (avro:serialize (make-instance 'writer-schema :object 3))
-     :reader-schema 'avro:string)))
+    (avro:coerce
+     (avro:deserialize
+      'writer-schema
+      (avro:serialize (make-instance 'writer-schema :object 3)))
+     'avro:string)))

@@ -120,10 +120,9 @@
                               :str "bar"
                               :extra 'avro:false))))
          (reader
-           (avro:deserialize
-            'writer_schema
-            (avro:serialize writer)
-            :reader-schema 'reader_schema)))
+           (avro:coerce
+            (avro:deserialize 'writer_schema (avro:serialize writer))
+            'reader_schema)))
     (is (typep writer 'writer_schema))
     (is (typep reader 'reader_schema))
 
@@ -172,7 +171,6 @@
                              :str "bar"
                              :extra 'avro:false)))))
     (signals error
-      (avro:deserialize
-       'writer_schema
-       (avro:serialize writer)
-       :reader-schema 'reader_schema_no_default))))
+      (avro:coerce
+       (avro:deserialize 'writer_schema (avro:serialize writer))
+       'reader_schema_no_default))))

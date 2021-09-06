@@ -21,6 +21,7 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema)
    (#:io #:cl-avro.io)
+   (#:resolution #:cl-avro.resolution)
    (#:message #:cl-avro.ipc.message)
    (#:error #:cl-avro.ipc.error)
    (#:transceiver #:cl-avro.ipc.protocol.object.transceiver)
@@ -43,10 +44,9 @@
         call-function))
 (defun call-function (client-request server-message request-stream)
   (let* ((parameters
-           (io:deserialize
-            client-request
-            request-stream
-            :reader-schema (message:request server-message)))
+           (resolution:coerce
+            (io:deserialize client-request request-stream)
+            (message:request server-message)))
          (lambda-list
            (map
             'list

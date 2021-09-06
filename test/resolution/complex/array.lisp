@@ -47,10 +47,10 @@
               (,reader-schema (make-instance 'avro:array :items ,to))
               (,writer-array (make-instance
                               ,writer-schema :initial-contents ,input))
-              (,reader-array (avro:deserialize
-                              ,writer-schema
-                              (avro:serialize ,writer-array)
-                              :reader-schema ,reader-schema)))
+              (,reader-array (avro:coerce
+                              (avro:deserialize
+                               ,writer-schema (avro:serialize ,writer-array))
+                              ,reader-schema)))
          (is (typep ,writer-array ,writer-schema))
          (is (typep ,reader-array ,reader-schema))
          (is (= (length ,writer-array) (length ,reader-array)))

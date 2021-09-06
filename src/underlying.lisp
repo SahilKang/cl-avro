@@ -16,13 +16,13 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.io.underlying
+(defpackage #:cl-avro.underlying
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema))
   (:export #:to-underlying
            #:from-underlying))
-(in-package #:cl-avro.io.underlying)
+(in-package #:cl-avro.underlying)
 
 (defgeneric to-underlying (logical-object)
   (:documentation

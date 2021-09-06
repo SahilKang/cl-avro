@@ -19,8 +19,7 @@
 (defpackage #:cl-avro.io.base
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema)
-   (#:resolution #:cl-avro.io.resolution))
+   (#:schema #:cl-avro.schema))
   (:export #:serialize
            #:deserialize
            #:serialized-size
@@ -89,27 +88,16 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
         (call-next-method)
         (apply #'deserialize (find-class schema) input keyword-args)))
 
-  (:method (schema (input simple-array) &key reader-schema (start 0))
+  (:method (schema (input simple-array) &key (start 0))
     (check-type input (simple-array (unsigned-byte 8) (*)))
     (check-type start (and (integer 0) fixnum))
-    (multiple-value-bind (deserialized bytes-read)
-        (deserialize-from-vector schema input start)
-      (values
-       (resolution:coerce deserialized (or reader-schema schema))
-       bytes-read)))
+    (deserialize-from-vector schema input start))
 
-  (:method (schema (input stream) &key reader-schema)
-    (multiple-value-bind (deserialized bytes-read)
-        (deserialize-from-stream schema input)
-      (values
-       (resolution:coerce deserialized (or reader-schema schema))
-       bytes-read)))
+  (:method (schema (input stream) &key)
+    (deserialize-from-stream schema input))
 
   (:documentation
-   "Deserialize an instance of SCHEMA from INPUT.
-
-If READER-SCHEMA is provided, then schema resolution is performed to
-return an instance of READER-SCHEMA, instead."))
+   "Deserialize an instance of SCHEMA from INPUT."))
 
 ;;; macros
 

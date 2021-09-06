@@ -42,10 +42,9 @@
 
 (test duration->duration
   (let* ((writer (make-instance 'writer-schema :months 3 :days 4 :milliseconds 5))
-         (reader (avro:deserialize
-                  'writer-schema
-                  (avro:serialize writer)
-                  :reader-schema 'reader-schema)))
+         (reader (avro:coerce
+                  (avro:deserialize 'writer-schema (avro:serialize writer))
+                  'reader-schema)))
     (is (typep writer 'writer-schema))
     (is (typep reader 'reader-schema))
     (is (= (avro:months writer) (avro:months reader)))

@@ -82,40 +82,36 @@
 
 (test fixed->fixed
   (let* ((writer (make-instance 'writer-fixed :unscaled 123))
-         (reader (avro:deserialize
-                  'writer-fixed
-                  (avro:serialize writer)
-                  :reader-schema 'reader-fixed)))
+         (reader (avro:coerce
+                  (avro:deserialize 'writer-fixed (avro:serialize writer))
+                  'reader-fixed)))
     (is (typep writer 'writer-fixed))
     (is (typep reader 'reader-fixed))
     (is (= (avro:unscaled writer) (avro:unscaled reader)))))
 
 (test fixed->bytes
   (let* ((writer (make-instance 'writer-fixed :unscaled 123))
-         (reader (avro:deserialize
-                  'writer-fixed
-                  (avro:serialize writer)
-                  :reader-schema 'reader-bytes)))
+         (reader (avro:coerce
+                  (avro:deserialize 'writer-fixed (avro:serialize writer))
+                  'reader-bytes)))
     (is (typep writer 'writer-fixed))
     (is (typep reader 'reader-bytes))
     (is (= (avro:unscaled writer) (avro:unscaled reader)))))
 
 (test bytes->bytes
   (let* ((writer (make-instance 'writer-bytes :unscaled 123))
-         (reader (avro:deserialize
-                  'writer-bytes
-                  (avro:serialize writer)
-                  :reader-schema 'reader-bytes)))
+         (reader (avro:coerce
+                  (avro:deserialize 'writer-bytes (avro:serialize writer))
+                  'reader-bytes)))
     (is (typep writer 'writer-bytes))
     (is (typep reader 'reader-bytes))
     (is (= (avro:unscaled writer) (avro:unscaled reader)))))
 
 (test bytes->fixed
   (let* ((writer (make-instance 'writer-bytes :unscaled 123))
-         (reader (avro:deserialize
-                  'writer-bytes
-                  (avro:serialize writer)
-                  :reader-schema 'reader-fixed)))
+         (reader (avro:coerce
+                  (avro:deserialize 'writer-bytes (avro:serialize writer))
+                  'reader-fixed)))
     (is (typep writer 'writer-bytes))
     (is (typep reader 'reader-fixed))
     (is (= (avro:unscaled writer) (avro:unscaled reader)))))
@@ -123,15 +119,13 @@
 (test mismatched-precision
   (let ((writer (make-instance 'writer-bytes :unscaled 123)))
     (signals error
-      (avro:deserialize
-       'writer-bytes
-       (avro:serialize writer)
-       :reader-schema 'bad-precision))))
+      (avro:coerce
+       (avro:deserialize 'writer-bytes (avro:serialize writer))
+       'bad-precision))))
 
 (test mismatched-scale
   (let ((writer (make-instance 'writer-bytes :unscaled 123)))
     (signals error
-      (avro:deserialize
-       'writer-bytes
-       (avro:serialize writer)
-       :reader-schema 'bad-scale)))) 
+      (avro:coerce
+       (avro:deserialize 'writer-bytes (avro:serialize writer))
+       'bad-scale))))

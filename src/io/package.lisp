@@ -22,7 +22,6 @@
         #:cl-avro.io.primitive
         #:cl-avro.io.complex
         #:cl-avro.io.logical
-        #:cl-avro.io.resolution
         #:cl-avro.io.compare)
   (:import-from #:cl-avro.io.base
                 #:serialized-size)

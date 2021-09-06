@@ -31,10 +31,10 @@
                          :aliases '("baz.bar")
                          :size 3))
          (writer-object (make-instance writer-schema :initial-contents '(2 4 6)))
-         (reader-object (avro:deserialize
-                         writer-schema
-                         (avro:serialize writer-object)
-                         :reader-schema reader-schema)))
+         (reader-object (avro:coerce
+                         (avro:deserialize
+                          writer-schema (avro:serialize writer-object))
+                         reader-schema)))
     (is (typep writer-object writer-schema))
     (is (typep reader-object reader-schema))
     (is (equal (coerce writer-object 'list) (coerce reader-object 'list)))))

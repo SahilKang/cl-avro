@@ -35,30 +35,27 @@
 
 (test time-micros->time-micros
   (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
-         (reader (avro:deserialize
-                  'avro:time-micros
-                  (avro:serialize writer)
-                  :reader-schema 'avro:time-micros)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:time-micros (avro:serialize writer))
+                  'avro:time-micros)))
     (is (typep writer 'avro:time-micros))
     (is (typep reader 'avro:time-micros))
     (assert= writer reader)))
 
 (test time-micros->long
   (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
-         (reader (avro:deserialize
-                  'avro:time-micros
-                  (avro:serialize writer)
-                  :reader-schema 'avro:long)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:time-micros (avro:serialize writer))
+                  'avro:long)))
     (is (typep writer 'avro:time-micros))
     (is (typep reader 'avro:long))
     (is (= 8732350450 reader))))
 
 (test long->time-micros
   (let* ((writer 8732350450)
-         (reader (avro:deserialize
-                  'avro:long
-                  (avro:serialize writer)
-                  :reader-schema 'avro:time-micros)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:long (avro:serialize writer))
+                  'avro:time-micros)))
     (is (typep writer 'avro:long))
     (is (typep reader 'avro:time-micros))
     (is (= 2 (avro:hour reader)))
@@ -70,20 +67,18 @@
 
 (test time-micros->float
   (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
-         (reader (avro:deserialize
-                  'avro:time-micros
-                  (avro:serialize writer)
-                  :reader-schema 'avro:float)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:time-micros (avro:serialize writer))
+                  'avro:float)))
     (is (typep writer 'avro:time-micros))
     (is (typep reader 'avro:float))
     (is (= 8732350450.0 reader))))
 
 (test int->time-micros
   (let* ((writer 8732350)
-         (reader (avro:deserialize
-                  'avro:int
-                  (avro:serialize writer)
-                  :reader-schema 'avro:time-micros)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:int (avro:serialize writer))
+                  'avro:time-micros)))
     (is (typep writer 'avro:int))
     (is (typep reader 'avro:time-micros))
     (is (= 0 (avro:hour reader)))
@@ -95,10 +90,9 @@
 
 (test time-millis->time-micros
   (let* ((writer (make-instance 'avro:time-millis :hour 2 :minute 25 :millisecond 32350))
-         (reader (avro:deserialize
-                  'avro:time-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:time-micros)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:time-millis (avro:serialize writer))
+                  'avro:time-micros)))
     (is (typep writer 'avro:time-millis))
     (is (typep reader 'avro:time-micros))
     (assert= writer reader)))
@@ -115,10 +109,9 @@
                        :hour 2 :minute 25 ,initarg ,(ecase initarg
                                                       (:millisecond 32350)
                                                       (:microsecond 32350450))))
-              (reader (avro:deserialize
-                       ',from
-                       (avro:serialize writer)
-                       :reader-schema 'avro:time-micros)))
+              (reader (avro:coerce
+                       (avro:deserialize ',from (avro:serialize writer))
+                       'avro:time-micros)))
          (is (typep writer ',from))
          (is (typep reader 'avro:time-micros))
          (assert= writer reader)))))

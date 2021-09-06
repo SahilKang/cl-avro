@@ -22,6 +22,7 @@
   (:nicknames #:avro)
   (:use #:cl-avro.schema
         #:cl-avro.io
+        #:cl-avro.resolution
         #:cl-avro.single-object-encoding
         #:cl-avro.object-container-file
         #:cl-avro.ipc)
@@ -29,6 +30,7 @@
            #:object
            #:schema-of
            #:raw-buffer
+           #:coerce
 
            #:fingerprint
            #:fingerprint64
