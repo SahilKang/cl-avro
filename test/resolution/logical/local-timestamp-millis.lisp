@@ -43,10 +43,10 @@
                   :hour 2
                   :minute 25
                   :millisecond 32350))
-         (reader (avro:deserialize
-                  'avro:local-timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:local-timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:local-timestamp-millis (avro:serialize writer))
+                  'avro:local-timestamp-millis)))
     (is (typep writer 'avro:local-timestamp-millis))
     (is (typep reader 'avro:local-timestamp-millis))
     (assert= writer reader)))
@@ -60,20 +60,19 @@
                   :hour 2
                   :minute 25
                   :millisecond 32350))
-         (reader (avro:deserialize
-                  'avro:local-timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:long)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:local-timestamp-millis (avro:serialize writer))
+                  'avro:long)))
     (is (typep writer 'avro:local-timestamp-millis))
     (is (typep reader 'avro:long))
     (is (= 1628303132350 reader))))
 
 (test long->local-timestamp-millis
   (let* ((writer 1628303132350)
-         (reader (avro:deserialize
-                  'avro:long
-                  (avro:serialize writer)
-                  :reader-schema 'avro:local-timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:long (avro:serialize writer))
+                  'avro:local-timestamp-millis)))
     (is (typep writer 'avro:long))
     (is (typep reader 'avro:local-timestamp-millis))
     (is (= 2021 (avro:year reader)))
@@ -95,20 +94,19 @@
                   :hour 2
                   :minute 25
                   :millisecond 32350))
-         (reader (avro:deserialize
-                  'avro:local-timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:float)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:local-timestamp-millis (avro:serialize writer))
+                  'avro:float)))
     (is (typep writer 'avro:local-timestamp-millis))
     (is (typep reader 'avro:float))
     (is (= 1628303132350.0 reader))))
 
 (test int->local-timestamp-millis
   (let* ((writer 8732350)
-         (reader (avro:deserialize
-                  'avro:int
-                  (avro:serialize writer)
-                  :reader-schema 'avro:local-timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:int (avro:serialize writer))
+                  'avro:local-timestamp-millis)))
     (is (typep writer 'avro:int))
     (is (typep reader 'avro:local-timestamp-millis))
     (is (= 1970 (avro:year reader)))
@@ -130,10 +128,10 @@
                   :hour 2
                   :minute 25
                   :microsecond 32350450))
-         (reader (avro:deserialize
-                  'avro:local-timestamp-micros
-                  (avro:serialize writer)
-                  :reader-schema 'avro:local-timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:local-timestamp-micros (avro:serialize writer))
+                  'avro:local-timestamp-millis)))
     (is (typep writer 'avro:local-timestamp-micros))
     (is (typep reader 'avro:local-timestamp-millis))
     (assert= writer reader)))

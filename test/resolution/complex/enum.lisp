@@ -36,27 +36,24 @@
          (bar (make-instance writer-enum :enum "BAR"))
          (baz (make-instance writer-enum :enum "BAZ")))
     (is (typep foo writer-enum))
-    (let ((foo (avro:deserialize
-                writer-enum
-                (avro:serialize foo)
-                :reader-schema reader-enum)))
+    (let ((foo (avro:coerce
+                (avro:deserialize writer-enum (avro:serialize foo))
+                reader-enum)))
       (is (typep foo reader-enum))
       (is (string= "FOO" (avro:which-one foo))))
 
     (is (typep bar writer-enum))
-    (let ((bar (avro:deserialize
-                writer-enum
-                (avro:serialize bar)
-                :reader-schema reader-enum)))
+    (let ((bar (avro:coerce
+                (avro:deserialize writer-enum (avro:serialize bar))
+                reader-enum)))
       (is (typep bar reader-enum))
       (is (string= "BAR" (avro:which-one bar))))
 
     (is (typep baz writer-enum))
     (signals error
-      (avro:deserialize
-       writer-enum
-       (avro:serialize baz)
-       :reader-schema reader-enum))))
+      (avro:coerce
+       (avro:deserialize writer-enum (avro:serialize baz))
+       reader-enum))))
 
 (test reader-default
   (let* ((writer-enum (make-instance
@@ -75,25 +72,22 @@
          (bar (make-instance writer-enum :enum "BAR"))
          (baz (make-instance writer-enum :enum "BAZ")))
     (is (typep foo writer-enum))
-    (let ((foo (avro:deserialize
-                writer-enum
-                (avro:serialize foo)
-                :reader-schema reader-enum)))
+    (let ((foo (avro:coerce
+                (avro:deserialize writer-enum (avro:serialize foo))
+                reader-enum)))
       (is (typep foo reader-enum))
       (is (string= "FOO" (avro:which-one foo))))
 
     (is (typep bar writer-enum))
-    (let ((bar (avro:deserialize
-                writer-enum
-                (avro:serialize bar)
-                :reader-schema reader-enum)))
+    (let ((bar (avro:coerce
+                (avro:deserialize writer-enum (avro:serialize bar))
+                reader-enum)))
       (is (typep bar reader-enum))
       (is (string= "BAR" (avro:which-one bar))))
 
     (is (typep baz writer-enum))
-    (let ((baz (avro:deserialize
-                writer-enum
-                (avro:serialize baz)
-                :reader-schema reader-enum)))
+    (let ((baz (avro:coerce
+                (avro:deserialize writer-enum (avro:serialize baz))
+                reader-enum)))
       (is (typep baz reader-enum))
       (is (string= "BAR" (avro:which-one baz))))))

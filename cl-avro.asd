@@ -146,10 +146,11 @@
                                "io"
                                "fingerprint"
                                "schema-of"))))
+   (:file "underlying"
+    :depends-on ("schema"))
    (:module "io"
-    :depends-on ("schema")
+    :depends-on ("schema" "underlying")
     :components ((:file "base")
-                 (:file "underlying")
                  (:file "schema"
                   :depends-on ("base"))
                  (:file "primitive"
@@ -157,26 +158,26 @@
                  (:file "complex"
                   :depends-on ("base"))
                  (:file "logical"
-                  :depends-on ("base" "primitive" "underlying"))
+                  :depends-on ("base" "primitive"))
                  (:file "compare"
                   :depends-on ("base"))
-                 (:module "resolution"
-                  :depends-on ("base")
-                  :components ((:file "assert-match")
-                               (:file "make-resolver")
-                               (:file "promoted")
-                               (:file "logical")
-                               (:file "package"
-                                :depends-on ("make-resolver"
-                                             "logical"
-                                             "promoted"))))
                  (:file "package"
                   :depends-on ("schema"
                                "primitive"
                                "complex"
                                "logical"
-                               "resolution"
                                "compare"))))
+   (:module "resolution"
+    :depends-on ("schema" "underlying")
+    :components ((:file "base")
+                 (:file "primitive"
+                  :depends-on ("base"))
+                 (:file "complex"
+                  :depends-on ("base"))
+                 (:file "logical"
+                  :depends-on ("base"))
+                 (:file "package"
+                  :depends-on ("base"))))
    (:file "single-object-encoding"
     :depends-on ("schema" "io"))
    (:module "object-container-file"
@@ -194,7 +195,7 @@
                                "file-input-stream"
                                "file-output-stream"))))
    (:module "ipc"
-    :depends-on ("schema" "io")
+    :depends-on ("schema" "io" "resolution")
     :components ((:file "handshake")
                  (:file "error"
                   :depends-on ("handshake"))
@@ -235,6 +236,7 @@
    (:file "package"
     :depends-on ("schema"
                  "io"
+                 "resolution"
                  "single-object-encoding"
                  "object-container-file"
                  "ipc"))))

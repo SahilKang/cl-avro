@@ -37,8 +37,9 @@
     `(test ,test-name
        (let* ((,input-object ,input)
               (,serialized (avro:serialize ,input-object))
-              (,deserialized (avro:deserialize
-                              ',from ,serialized :reader-schema ',to)))
+              (,deserialized (avro:coerce
+                              (avro:deserialize ',from ,serialized)
+                              ',to)))
          (is (typep ,input-object ',from))
          (is (typep ,deserialized ',to))
          (is (,function ,postprocessed ,deserialized))))))

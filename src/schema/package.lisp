@@ -25,6 +25,8 @@
         #:cl-avro.schema.fingerprint
         #:cl-avro.schema.schema-of)
   (:export #:+primitive->name+
+           #:+primitive->class+
+           #:primitive->class
            #:scalarize-class
            #:scalarize-value
            #:late-class

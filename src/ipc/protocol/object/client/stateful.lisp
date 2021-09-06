@@ -95,15 +95,7 @@
                     (lambda (field)
                       (let ((schema (schema:type field)))
                         (if (symbolp schema)
-                            (find-class
-                             (ecase schema
-                               (schema:null 'null)
-                               (schema:boolean 'symbol)
-                               ((schema:int schema:long) 'integer)
-                               (schema:float 'single-float)
-                               (schema:double 'double-float)
-                               (schema:bytes 'vector)
-                               (schema:string 'string)))
+                            (find-class (schema:primitive->class schema))
                             schema)))
                     (schema:fields request-schema)))
              (method

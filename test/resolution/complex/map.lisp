@@ -80,10 +80,10 @@
        (let* ((,writer-schema (make-instance 'avro:map :values ,from))
               (,reader-schema (make-instance 'avro:map :values ,to))
               (,writer-map (make-map ,writer-schema ,@input))
-              (,reader-map (avro:deserialize
-                            ,writer-schema
-                            (avro:serialize ,writer-map)
-                            :reader-schema ,reader-schema)))
+              (,reader-map (avro:coerce
+                            (avro:deserialize
+                             ,writer-schema (avro:serialize ,writer-map))
+                            ,reader-schema)))
          (is (typep ,writer-map ,writer-schema))
          (is (typep ,reader-map ,reader-schema))
          (assert-map= ,writer-map ,reader-map ,compare)))))

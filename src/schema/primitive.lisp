@@ -26,6 +26,8 @@
   (:export #:primitive-schema
            #:primitive-object
            #:+primitive->name+
+           #:+primitive->class+
+           #:primitive->class
 
            #:null
            #:boolean #:true #:false
@@ -108,4 +110,25 @@
          (make-pair (schema)
            (cons schema (name schema))))
       (mapcar #'make-pair *primitives*))
-    "An alist mapping primitive schemas to their names."))
+    "An alist mapping primitive schemas to their names.")
+
+  (defparameter +primitive->class+
+    (flet ((make-pair (schema)
+             (cons schema
+                   (ecase schema
+                     (null 'cl:null)
+                     (boolean 'cl:symbol)
+                     ((int long) 'cl:integer)
+                     (float 'cl:single-float)
+                     (double 'cl:double-float)
+                     (bytes 'cl:vector)
+                     (string 'cl:string)))))
+      (mapcar #'make-pair *primitives*))
+    "An alist mapping primitive schemas to their CLOS classes.")
+
+  (declaim
+   (ftype (function (primitive-schema)
+                    (values (and symbol (not null)) &optional))
+          primitive->class))
+  (defun primitive->class (schema)
+    (cdr (assoc schema +primitive->class+ :test #'eq))))

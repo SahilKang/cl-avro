@@ -25,10 +25,9 @@
 
 (test date->date
   (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
-         (reader (avro:deserialize
-                  'avro:date
-                  (avro:serialize writer)
-                  :reader-schema 'avro:date)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:date (avro:serialize writer))
+                  'avro:date)))
     (is (typep writer 'avro:date))
     (is (typep reader 'avro:date))
     (is (= (avro:year writer) (avro:year reader)))
@@ -37,20 +36,18 @@
 
 (test date->int
   (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
-         (reader (avro:deserialize
-                  'avro:date
-                  (avro:serialize writer)
-                  :reader-schema 'avro:int)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:date (avro:serialize writer))
+                  'avro:int)))
     (is (typep writer 'avro:date))
     (is (typep reader 'avro:int))
     (is (= 18845 reader))))
 
 (test int->date
   (let* ((writer 18845)
-         (reader (avro:deserialize
-                  'avro:int
-                  (avro:serialize writer)
-                  :reader-schema 'avro:date)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:int (avro:serialize writer))
+                  'avro:date)))
     (is (typep writer 'avro:int))
     (is (typep reader 'avro:date))
     (is (= 2021 (avro:year reader)))
@@ -59,10 +56,9 @@
 
 (test date->float
   (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
-         (reader (avro:deserialize
-                  'avro:date
-                  (avro:serialize writer)
-                  :reader-schema 'avro:float)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:date (avro:serialize writer))
+                  'avro:float)))
     (is (typep writer 'avro:date))
     (is (typep reader 'avro:float))
     (is (= 18845.0 reader))))
@@ -77,10 +73,9 @@
                        ',from
                        :year 2021 :month 8 :day 6
                        :hour 1 :minute 2 ,initarg 3))
-              (reader (avro:deserialize
-                       ',from
-                       (avro:serialize writer)
-                       :reader-schema 'avro:date)))
+              (reader (avro:coerce
+                       (avro:deserialize ',from (avro:serialize writer))
+                       'avro:date)))
          (is (typep writer ',from))
          (is (typep reader 'avro:date))
          (is (= (avro:year writer) (avro:year reader)))

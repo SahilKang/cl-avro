@@ -33,8 +33,9 @@
     `(test ,test-name
        (let* ((,expected-object ,expected)
               (,serialized (avro:serialize ,expected-object))
-              (,deserialized (avro:deserialize
-                              ',schema ,serialized :reader-schema ',schema)))
+              (,deserialized (avro:coerce
+                              (avro:deserialize ',schema ,serialized)
+                              ',schema)))
          (is (typep ,expected-object ',schema))
          (is (,function ,expected-object ,deserialized))))))
 

@@ -22,40 +22,36 @@
 
 (test uuid->uuid
   (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-         (reader (avro:deserialize
-                  'avro:uuid
-                  (avro:serialize writer)
-                  :reader-schema 'avro:uuid)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:uuid (avro:serialize writer))
+                  'avro:uuid)))
     (is (typep writer 'avro:uuid))
     (is (typep reader 'avro:uuid))
     (is (string= (avro:uuid writer) (avro:uuid reader)))))
 
 (test uuid->string
   (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-         (reader (avro:deserialize
-                  'avro:uuid
-                  (avro:serialize writer)
-                  :reader-schema 'avro:string)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:uuid (avro:serialize writer))
+                  'avro:string)))
     (is (typep writer 'avro:uuid))
     (is (typep reader 'avro:string))
     (is (string= (avro:uuid writer) reader))))
 
 (test string->uuid
   (let* ((writer "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-         (reader (avro:deserialize
-                  'avro:string
-                  (avro:serialize writer)
-                  :reader-schema 'avro:uuid)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:string (avro:serialize writer))
+                  'avro:uuid)))
     (is (typep writer 'avro:string))
     (is (typep reader 'avro:uuid))
     (is (string= writer (avro:uuid reader)))))
 
 (test uuid->bytes
   (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-         (reader (avro:deserialize
-                  'avro:uuid
-                  (avro:serialize writer)
-                  :reader-schema 'avro:bytes)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:uuid (avro:serialize writer))
+                  'avro:bytes)))
     (is (typep writer 'avro:uuid))
     (is (typep reader 'avro:bytes))
     (is (string= (avro:uuid writer) (babel:octets-to-string reader :encoding :utf-8)))))
@@ -63,10 +59,9 @@
 (test bytes->uuid
   (let* ((writer (babel:string-to-octets
                   "6ba7b810-9dad-11d1-80b4-00c04fd430c8" :encoding :utf-8))
-         (reader (avro:deserialize
-                  'avro:bytes
-                  (avro:serialize writer)
-                  :reader-schema 'avro:uuid)))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:bytes (avro:serialize writer))
+                  'avro:uuid)))
     (is (typep writer 'avro:bytes))
     (is (typep reader 'avro:uuid))
     (is (string= (babel:octets-to-string writer :encoding :utf-8) (avro:uuid reader)))))

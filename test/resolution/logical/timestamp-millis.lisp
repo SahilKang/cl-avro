@@ -43,10 +43,10 @@
                   :hour 2
                   :minute 25
                   :millisecond 32350))
-         (reader (avro:deserialize
-                  'avro:timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:timestamp-millis (avro:serialize writer))
+                  'avro:timestamp-millis)))
     (is (typep writer 'avro:timestamp-millis))
     (is (typep reader 'avro:timestamp-millis))
     (assert= writer reader)))
@@ -61,20 +61,19 @@
                   :minute 25
                   :millisecond 32350
                   :timezone local-time:+utc-zone+))
-         (reader (avro:deserialize
-                  'avro:timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:long)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:timestamp-millis (avro:serialize writer))
+                  'avro:long)))
     (is (typep writer 'avro:timestamp-millis))
     (is (typep reader 'avro:long))
     (is (= 1628328332350 reader))))
 
 (test long->timestamp-millis
   (let* ((writer 1628328332350)
-         (reader (avro:deserialize
-                  'avro:long
-                  (avro:serialize writer)
-                  :reader-schema 'avro:timestamp-millis))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:long (avro:serialize writer))
+                  'avro:timestamp-millis))
          (local-time:*default-timezone* local-time:+utc-zone+))
     (is (typep writer 'avro:long))
     (is (typep reader 'avro:timestamp-millis))
@@ -98,20 +97,19 @@
                   :minute 25
                   :millisecond 32350
                   :timezone local-time:+utc-zone+))
-         (reader (avro:deserialize
-                  'avro:timestamp-millis
-                  (avro:serialize writer)
-                  :reader-schema 'avro:float)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:timestamp-millis (avro:serialize writer))
+                  'avro:float)))
     (is (typep writer 'avro:timestamp-millis))
     (is (typep reader 'avro:float))
     (is (= 1628328332350.0 reader))))
 
 (test int->timestamp-millis
   (let* ((writer 8732350)
-         (reader (avro:deserialize
-                  'avro:int
-                  (avro:serialize writer)
-                  :reader-schema 'avro:timestamp-millis))
+         (reader (avro:coerce
+                  (avro:deserialize 'avro:int (avro:serialize writer))
+                  'avro:timestamp-millis))
          (local-time:*default-timezone* local-time:+utc-zone+))
     (is (typep writer 'avro:int))
     (is (typep reader 'avro:timestamp-millis))
@@ -134,10 +132,10 @@
                   :hour 2
                   :minute 25
                   :microsecond 32350450))
-         (reader (avro:deserialize
-                  'avro:timestamp-micros
-                  (avro:serialize writer)
-                  :reader-schema 'avro:timestamp-millis)))
+         (reader (avro:coerce
+                  (avro:deserialize
+                   'avro:timestamp-micros (avro:serialize writer))
+                  'avro:timestamp-millis)))
     (is (typep writer 'avro:timestamp-micros))
     (is (typep reader 'avro:timestamp-millis))
     (assert= writer reader)))

@@ -17,9 +17,6 @@
 
 (in-package #:cl-user)
 
-(defpackage #:cl-avro.io.resolution
-  (:use #:cl-avro.io.resolution.make-resolver
-        #:cl-avro.io.resolution.logical
-        #:cl-avro.io.resolution.promoted)
-  (:export #:assert-match
-           #:make-resolver))
+(defpackage #:cl-avro.resolution
+  (:use #:cl-avro.resolution.base)
+  (:export #:coerce))

@@ -21,6 +21,7 @@
   (:local-nicknames
    (#:schema #:cl-avro.schema)
    (#:io #:cl-avro.io)
+   (#:resolution #:cl-avro.resolution)
    (#:message #:cl-avro.ipc.message)
    (#:error #:cl-avro.ipc.error)
    (#:transceiver #:cl-avro.ipc.protocol.object.transceiver)
@@ -104,16 +105,15 @@
         (error
          (make-error
           conditions
-          (io:deserialize
-           (nth-value 1 (message:errors server-message))
-           response-stream
-           :reader-schema errors-union)
+          (resolution:coerce
+           (io:deserialize
+            (nth-value 1 (message:errors server-message)) response-stream)
+           errors-union)
           metadata))
         (values
-         (io:deserialize
-          (message:response server-message)
-          response-stream
-          :reader-schema response-schema)
+         (resolution:coerce
+          (io:deserialize (message:response server-message) response-stream)
+          response-schema)
          metadata))))
 
 (declaim
