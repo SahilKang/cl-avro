@@ -34,27 +34,14 @@
         (find-symbol (string name) 'schema)
       (unless (eq status :external)
         (error "~S does not name a schema" name))
-      schema-name))
-
-  (declaim
-   (ftype (function (schema:primitive-schema) (values symbol &optional))
-          primitive-specializer))
-  (defun primitive-specializer (schema)
-    (ecase schema
-      (schema:null 'null)
-      (schema:boolean 'symbol)
-      ((schema:int schema:long) 'integer)
-      (schema:float 'single-float)
-      (schema:double 'double-float)
-      (schema:bytes 'vector)
-      (schema:string 'string))))
+      schema-name)))
 
 (defmacro defunderlying (schema)
   (declare (symbol schema))
   (let* ((schema-name (find-schema-name schema))
          (metaclass-name (class-name (class-of (find-class schema-name))))
          (underlying (schema:underlying (find-class schema-name)))
-         (underlying-specializer (primitive-specializer underlying)))
+         (underlying-specializer (schema:primitive->class underlying)))
     (check-type underlying schema:primitive-schema)
     `(progn
        (defmethod base:coerce
