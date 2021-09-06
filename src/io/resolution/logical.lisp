@@ -19,135 +19,75 @@
 (defpackage #:cl-avro.io.resolution.logical
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
-  (:import-from #:cl-avro.io.base
-                #:assert-match
-                #:make-resolver)
+   (#:schema #:cl-avro.schema)
+   (#:base #:cl-avro.io.resolution.base))
   (:import-from #:cl-avro.io.underlying
                 #:to-underlying
-                #:from-underlying)
-  (:export #:assert-match
-           #:make-resolver))
+                #:from-underlying))
 (in-package #:cl-avro.io.resolution.logical)
 
 (eval-when (:compile-toplevel)
   (declaim
-   (ftype (function (class) (values (or cons symbol) &optional))
-          underlying-type))
-  (defun underlying-type (logical-schema)
-    (let* ((slots (closer-mop:class-direct-slots logical-schema))
-           (underlying (find 'schema:underlying slots
-                             :key #'closer-mop:slot-definition-name
-                             :test #'eq))
-           (type (closer-mop:slot-definition-type underlying)))
-      (etypecase type
-        (symbol type)
-        (list
-         (unless (eq (first type) 'eql)
-           (error "Expected eql specifier: ~S" type))
-         `(eql ',(second type))))))
+   (ftype (function (symbol) (values symbol &optional)) find-schema-name))
+  (defun find-schema-name (name)
+    (multiple-value-bind (schema-name status)
+        (find-symbol (string name) 'schema)
+      (unless (eq status :external)
+        (error "~S does not name a schema" name))
+      schema-name))
 
   (declaim
-   (ftype (function ((or cons symbol) (or cons symbol))
-                    (values cons &optional))
-          defassert))
-  (defun defassert (reader writer)
-    `(defmethod assert-match
-         ((reader ,reader) (writer ,writer))
-       (declare (ignore reader writer))
-       (values)))
-
-  (declaim
-   (ftype (function ((or cons symbol)
-                     (or cons symbol)
-                     (or (eql from-underlying) (eql to-underlying)))
-                    (values cons &optional))
-          defresolver))
-  (defun defresolver (reader writer from/to)
-    `(defmethod make-resolver
-         ((reader ,reader) (writer ,writer))
-       (declare (ignore writer))
-       ,(ecase from/to
-          (from-underlying '(lambda (writer-object)
-                             (from-underlying reader writer-object)))
-          (to-underlying '#'to-underlying)))))
+   (ftype (function (schema:primitive-schema) (values symbol &optional))
+          primitive-specializer))
+  (defun primitive-specializer (schema)
+    (ecase schema
+      (schema:null 'null)
+      (schema:boolean 'symbol)
+      ((schema:int schema:long) 'integer)
+      (schema:float 'single-float)
+      (schema:double 'double-float)
+      (schema:bytes 'vector)
+      (schema:string 'string))))
 
 (defmacro defunderlying (schema)
   (declare (symbol schema))
-  (let* ((class (find-class (find-symbol (string schema) 'schema)))
-         (metaclass-name (class-name (class-of class)))
-         (underlying (schema:underlying class))
-         (underlying-type (underlying-type (class-of class))))
-    (unless (subtypep (class-of class) 'schema:logical-schema)
-      (error "~S does not name a logical-schema" schema))
+  (let* ((schema-name (find-schema-name schema))
+         (metaclass-name (class-name (class-of (find-class schema-name))))
+         (underlying (schema:underlying (find-class schema-name)))
+         (underlying-specializer (primitive-specializer underlying)))
+    (check-type underlying schema:primitive-schema)
     `(progn
-       ,(defassert metaclass-name metaclass-name)
+       (defmethod base:coerce
+           ((object ,schema-name) (schema (eql ',underlying)))
+         (declare (ignore schema))
+         (to-underlying object))
 
-       ,(defassert metaclass-name underlying-type)
-       ,(defresolver metaclass-name underlying-type 'from-underlying)
+       (defmethod base:coerce
+           ((object ,underlying-specializer) (schema ,metaclass-name))
+         (from-underlying schema object))
 
-       ,(defassert underlying-type metaclass-name)
-       ,(defresolver underlying-type metaclass-name 'to-underlying)
+       (defmethod base:coerce
+           ((object ,schema-name) schema)
+         (base:coerce (to-underlying object) schema))
 
-       (defmethod assert-match
-           ((reader ,metaclass-name) writer)
-         (declare (ignore reader))
-         (assert-match ',underlying writer))
+       (defmethod base:coerce
+           (object (schema ,metaclass-name))
+         (from-underlying schema (base:coerce object ',underlying))))))
 
-       (defmethod make-resolver
-           ((reader ,metaclass-name) writer)
-         (let ((resolve (make-resolver ',underlying writer)))
-           (lambda (writer-object)
-             (from-underlying reader (funcall resolve writer-object)))))
-
-       (defmethod assert-match
-           (reader (writer ,metaclass-name))
-         (declare (ignore writer))
-         (assert-match reader ',underlying))
-
-       (defmethod make-resolver
-           (reader (writer ,metaclass-name))
-         (declare (ignore writer))
-         (let ((resolve (make-resolver reader ',underlying)))
-           (lambda (writer-object)
-             (funcall resolve (to-underlying writer-object))))))))
-
-(eval-when (:compile-toplevel)
-  (declaim (ftype (function (symbol) (values symbol &optional)) find-metaclass))
-  (defun find-metaclass (symbol)
-    (multiple-value-bind (metaclass status)
-        (find-symbol (format nil "~A-SCHEMA" symbol) 'schema)
-      (unless (eq status :external)
-        (error "~S does not name a metaclass" symbol))
-      metaclass))
-
-  (declaim (ftype (function (symbol) (values symbol &optional)) find-schema))
-  (defun find-schema (symbol)
-    (multiple-value-bind (schema status)
-        (find-symbol (string symbol) 'schema)
-      (unless (eq status :external)
-        (error "~S does not name a schema" symbol))
-      schema)))
-
+;; TODO maybe specialize change-class instead of creating a new instance
 (defmacro deffrom (to (&rest from) &body initargs)
   (declare (symbol to))
-  (let ((reader-class (find-metaclass to))
-        (reader-schema (find-schema to)))
-    (flet ((defresolve (arg writer-class)
-               (declare (symbol arg writer-class))
-             `(defmethod make-resolver
-                  ((reader ,reader-class) (writer ,writer-class))
-                (declare (ignore reader writer))
-                (lambda (,arg)
-                  (make-instance
-                   ',reader-schema
-                   ,@(subst arg '% initargs :test #'eq))))))
+  (let* ((to (find-schema-name to))
+         (metaclass-name (class-name (class-of (find-class to))))
+         (from (mapcar #'find-schema-name from))
+         (initargs (subst 'object '% initargs :test #'eq)))
+    (flet ((defcoerce (writer-class)
+             `(defmethod base:coerce
+                  ((object ,writer-class) (schema ,metaclass-name))
+                (declare (ignore schema))
+                (make-instance ',to ,@initargs))))
       `(progn
-         ,@(loop
-             for writer in from
-             for writer-class = (find-metaclass writer)
-             collect (defassert reader-class writer-class)
-             collect (defresolve writer writer-class))))))
+         ,@(mapcar #'defcoerce from)))))
 
 ;;; uuid schema
 
@@ -269,12 +209,13 @@
 
 ;;; decimal schema
 
-(defmethod assert-match
-    ((reader schema:decimal) (writer schema:decimal))
-  (let ((reader-scale (schema:scale reader))
-        (writer-scale (schema:scale writer))
-        (reader-precision (schema:precision reader))
-        (writer-precision (schema:precision writer)))
+(defmethod base:coerce
+    ((object schema:decimal-object) (schema schema:decimal))
+  (let* ((writer (class-of object))
+         (writer-scale (schema:scale writer))
+         (writer-precision (schema:precision writer))
+         (reader-scale (schema:scale schema))
+         (reader-precision (schema:precision schema)))
     (declare ((integer 0) reader-scale writer-scale)
              ((integer 1) reader-precision writer-precision))
     (unless (= reader-scale writer-scale)
@@ -282,27 +223,11 @@
              reader-scale writer-scale))
     (unless (= reader-precision writer-precision)
       (error "Reader's decimal precision of ~S does not match writer's ~S"
-             reader-precision writer-precision))))
-
-(defmethod make-resolver
-    ((reader schema:decimal) (writer schema:decimal))
-  (declare (ignore writer))
-  (lambda (writer-decimal)
-    (make-instance reader :unscaled (schema:unscaled writer-decimal))))
+             reader-precision writer-precision))
+    (change-class object schema)))
 
 ;;; duration schema
 
-(defmethod assert-match
-    ((reader schema:duration) (writer schema:duration))
-  (declare (ignore reader writer))
-  (values))
-
-(defmethod make-resolver
-    ((reader schema:duration) (writer schema:duration))
-  (declare (ignore writer))
-  (lambda (writer-duration)
-    (make-instance
-     reader
-     :months (schema:months writer-duration)
-     :days (schema:days writer-duration)
-     :milliseconds (schema:milliseconds writer-duration))))
+(defmethod base:coerce
+    ((object schema:duration-object) (schema schema:duration))
+  (change-class object schema))

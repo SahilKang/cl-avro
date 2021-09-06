@@ -148,7 +148,8 @@
                                "schema-of"))))
    (:module "io"
     :depends-on ("schema")
-    :components ((:file "base")
+    :components ((:file "base"
+                  :depends-on ("resolution"))
                  (:file "underlying")
                  (:file "schema"
                   :depends-on ("base"))
@@ -161,15 +162,16 @@
                  (:file "compare"
                   :depends-on ("base"))
                  (:module "resolution"
-                  :depends-on ("base")
-                  :components ((:file "assert-match")
-                               (:file "make-resolver")
-                               (:file "promoted")
-                               (:file "logical")
+                  :depends-on ("underlying")
+                  :components ((:file "base")
+                               (:file "primitive"
+                                :depends-on ("base"))
+                               (:file "complex"
+                                :depends-on ("base"))
+                               (:file "logical"
+                                :depends-on ("base"))
                                (:file "package"
-                                :depends-on ("make-resolver"
-                                             "logical"
-                                             "promoted"))))
+                                :depends-on ("base"))))
                  (:file "package"
                   :depends-on ("schema"
                                "primitive"

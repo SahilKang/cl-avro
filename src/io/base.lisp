@@ -19,7 +19,8 @@
 (defpackage #:cl-avro.io.base
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
+   (#:schema #:cl-avro.schema)
+   (#:resolution #:cl-avro.io.resolution))
   (:export #:serialize
            #:deserialize
            #:serialized-size
@@ -28,9 +29,7 @@
            #:define-serialize-into
            #:deserialize-from-vector
            #:deserialize-from-stream
-           #:define-deserialize-from
-           #:assert-match
-           #:make-resolver))
+           #:define-deserialize-from))
 (in-package #:cl-avro.io.base)
 
 ;;; serialize
@@ -70,45 +69,6 @@ Return (values INTO number-of-serialized-bytes)"
             (serialize-into-vector object into start)))
       (values into size))))
 
-;;; resolution
-
-(defgeneric assert-match (reader writer)
-  (:method (reader writer)
-    (error "Reader schema ~S does not match writer schema ~S" reader writer))
-
-  (:documentation
-   "Asserts that schemas match for schema resolution."))
-
-(defgeneric make-resolver (reader writer)
-  (:method :before (reader writer)
-    (assert-match reader writer))
-
-  (:method :around ((reader symbol) writer)
-    (if (typep reader 'schema:primitive-schema)
-        (call-next-method)
-        (make-resolver (find-class reader) writer)))
-
-  (:method :around ((reader null) writer)
-    (declare (ignore reader writer))
-    #'identity)
-
-  (:method :around (reader writer)
-    (if (eq reader writer)
-        #'identity
-        (call-next-method)))
-
-  (:method (reader writer)
-    (error "Schemas don't resolve."))
-
-  (:documentation
-   "Return a function to resolve READER and WRITER schemas.
-
-The returned function will have a signature like:
-  (function (WRITER) (values READER &optional))
-
-That is, it'll accept an instance of WRITER and return an instance of
-READER."))
-
 ;;; deserialize
 
 (defgeneric deserialize-from-vector (schema vector start)
@@ -132,16 +92,18 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
   (:method (schema (input simple-array) &key reader-schema (start 0))
     (check-type input (simple-array (unsigned-byte 8) (*)))
     (check-type start (and (integer 0) fixnum))
-    (let ((resolve (make-resolver reader-schema schema)))
-      (multiple-value-bind (deserialized bytes-read)
-          (deserialize-from-vector schema input start)
-        (values (funcall resolve deserialized) bytes-read))))
+    (multiple-value-bind (deserialized bytes-read)
+        (deserialize-from-vector schema input start)
+      (values
+       (resolution:coerce deserialized (or reader-schema schema))
+       bytes-read)))
 
   (:method (schema (input stream) &key reader-schema)
-    (let ((resolve (make-resolver reader-schema schema)))
-      (multiple-value-bind (deserialized bytes-read)
-          (deserialize-from-stream schema input)
-        (values (funcall resolve deserialized) bytes-read))))
+    (multiple-value-bind (deserialized bytes-read)
+        (deserialize-from-stream schema input)
+      (values
+       (resolution:coerce deserialized (or reader-schema schema))
+       bytes-read)))
 
   (:documentation
    "Deserialize an instance of SCHEMA from INPUT.

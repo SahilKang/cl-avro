@@ -204,7 +204,7 @@
 
 (defclass union-object ()
   ((wrapped-object
-    :reader wrapped-object
+    :accessor wrapped-object
     :type wrapper-object
     :documentation "Chosen union object."))
   (:metaclass complex-schema)

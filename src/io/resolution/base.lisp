@@ -16,7 +16,29 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:cl-avro.io.resolution
-  (:use #:cl-avro.io.resolution.base)
+(defpackage #:cl-avro.io.resolution.base
+  (:use #:cl)
+  (:local-nicknames
+   (#:schema #:cl-avro.schema))
+  (:shadow #:coerce)
   (:export #:coerce))
+(in-package #:cl-avro.io.resolution.base)
+
+(defgeneric coerce (object schema)
+  (:method (object schema)
+    (error "~S cannot be resolved into ~S" (schema:schema-of object) schema))
+
+  (:method :around (object (schema symbol))
+    (if (typep schema 'schema:primitive-schema)
+        (call-next-method)
+        (coerce object (find-class schema))))
+
+  (:method :around (object schema)
+    (if (eq (schema:schema-of object) schema)
+        object
+        (call-next-method)))
+
+  (:documentation
+   "use Avro Schema Resolution to coerce OBJECT into SCHEMA.
+
+OBJECT may be recursively mutated."))

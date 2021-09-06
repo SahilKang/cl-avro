@@ -123,7 +123,7 @@
 
 (defclass enum-object ()
   ((position
-    :reader position
+    :accessor position
     :type position
     :documentation "Position of chosen enum."))
   (:metaclass complex-schema)
