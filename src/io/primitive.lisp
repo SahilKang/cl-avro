@@ -20,7 +20,8 @@
 (defpackage #:cl-avro.io.primitive
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
+   (#:schema #:cl-avro.schema)
+   (#:little-endian #:cl-avro.little-endian))
   (:import-from #:cl-avro.io.base
                 #:serialized-size
                 #:serialize-into-vector
@@ -33,11 +34,7 @@
            #:serialize-into-stream
            #:serialized-size
            #:deserialize-from-vector
-           #:deserialize-from-stream
-           #:little-endian->uint32
-           #:little-endian->uint64
-           #:uint32->little-endian
-           #:uint64->little-endian))
+           #:deserialize-from-stream))
 (in-package #:cl-avro.io.primitive)
 
 ;;; null schema
@@ -230,158 +227,51 @@
            ,(if vectorp 'vector 'stream) 64 ,@(when vectorp '(start)))
      (values (zig-zag->long zig-zag) bytes-read)))
 
-;;; float and double schemas
-
-;; from little-endian
-
-(defmacro from-little-endian (bits bytes start)
-  (declare ((member 32 64) bits)
-           (symbol bytes start))
-  (let ((value (gensym))
-        (offset (gensym))
-        (index (gensym))
-        (byte (gensym)))
-    `(loop
-       with ,value of-type (unsigned-byte ,bits) = 0
-
-       for ,offset of-type fixnum below ,(truncate bits 8)
-       for ,index of-type fixnum = ,start then (1+ ,index)
-       for ,byte of-type (unsigned-byte 8) = (elt ,bytes ,index)
-
-       do (setf ,value (logior ,value (ash ,byte (* ,offset 8))))
-
-       finally
-          (return ,value))))
-
-(declaim
- (ftype (function ((simple-array (unsigned-byte 8) (*)) &optional fixnum)
-                  (values (unsigned-byte 32) &optional))
-        little-endian->uint32)
- (inline little-endian->uint32))
-(defun little-endian->uint32 (bytes &optional (start 0))
-  (from-little-endian 32 bytes start))
-(declaim (notinline little-endian->uint32))
-
-(declaim
- (ftype (function ((simple-array (unsigned-byte 8) (*)) &optional fixnum)
-                  (values (unsigned-byte 64) &optional))
-        little-endian->uint64)
- (inline little-endian->uint64))
-(defun little-endian->uint64 (bytes &optional (start 0))
-  (from-little-endian 64 bytes start))
-(declaim (notinline little-endian->uint64))
-
-;; to little-endian
-
-(defmacro to-little-endian (bits integer into &optional (start nil startp))
-  (declare ((member 32 64) bits)
-           (symbol integer into start))
-  (let* ((offset (gensym))
-         (byte (gensym))
-         (index (gensym)))
-    `(loop
-       for ,offset of-type fixnum below ,(truncate bits 8)
-       for ,byte of-type (unsigned-byte 8) = (logand #xff (ash ,integer
-                                                               (* ,offset -8)))
-       ,@(when startp
-           `(for ,index of-type fixnum = ,start then (1+ ,index)))
-
-       do ,(if startp
-               `(setf (elt ,into ,index) ,byte)
-               `(write-byte ,byte ,into))
-
-       finally
-          (return (values)))))
-
-(declaim
- (ftype (function ((unsigned-byte 32)
-                   (or stream (simple-array (unsigned-byte 8) (*)))
-                   &optional fixnum)
-                  (values &optional))
-        uint32->little-endian)
- (inline uint32->little-endian))
-(defun uint32->little-endian (integer into &optional (start 0))
-  (etypecase into
-    (stream
-     (to-little-endian 32 integer into))
-    ((simple-array (unsigned-byte 8) (*))
-     (to-little-endian 32 integer into start))))
-(declaim (notinline uint32->little-endian))
-
-(declaim
- (ftype (function ((unsigned-byte 64)
-                   (or stream (simple-array (unsigned-byte 8) (*)))
-                   &optional fixnum)
-                  (values &optional))
-        uint64->little-endian)
- (inline uint64->little-endian))
-(defun uint64->little-endian (integer into &optional (start 0))
-  (etypecase into
-    (stream
-     (to-little-endian 64 integer into))
-    ((simple-array (unsigned-byte 8) (*))
-     (to-little-endian 64 integer into start))))
-(declaim (notinline uint64->little-endian))
-
-;; float schema
+;;; float schema
 
 (defmethod serialized-size ((object single-float))
   4)
 
 (define-serialize-into single-float
   "Write single-precision float."
-  (declare (inline uint32->little-endian ieee-floats:encode-float32))
   (let ((args (if vectorp '(vector start) '(stream))))
     `(prog1 4
        (let ((integer (ieee-floats:encode-float32 object)))
-         (uint32->little-endian integer ,@args)))))
+         (little-endian:from-uint32 integer ,@args)))))
 
 (define-deserialize-from (eql 'schema:float)
   "Read a single-precision float."
-  (declare (ignore schema)
-           (inline little-endian->uint32 ieee-floats:decode-float32))
+  (declare (ignore schema))
   `(values
     (ieee-floats:decode-float32
-     (little-endian->uint32
-      ,(if vectorp
-           'vector
-           `(let ((bytes (make-array 4 :element-type '(unsigned-byte 8))))
-              (unless (= (read-sequence bytes stream) 4)
-                (error 'end-of-file :stream *error-output*))
-              bytes))
+     (little-endian:to-uint32
+      ,(if vectorp 'vector 'stream)
       ,@(when vectorp '(start))))
     4))
 
-;; double schema
+;;; double schema
 
 (defmethod serialized-size ((object double-float))
   8)
 
 (define-serialize-into double-float
   "Write double-precision float."
-  (declare (inline uint64->little-endian ieee-floats:encode-float64))
   (let ((args (if vectorp '(vector start) '(stream))))
     `(prog1 8
        (let ((integer (ieee-floats:encode-float64 object)))
-         (uint64->little-endian integer ,@args)))))
+         (little-endian:from-uint64 integer ,@args)))))
 
 (define-deserialize-from (eql 'schema:double)
   "Read a double-precision float."
-  (declare (ignore schema)
-           (inline little-endian->uint64 ieee-floats:decode-float64))
+  (declare (ignore schema))
   `(values
     (ieee-floats:decode-float64
-     (little-endian->uint64
-      ,(if vectorp
-           'vector
-           `(let ((bytes (make-array 8 :element-type '(unsigned-byte 8))))
-              (unless (= (read-sequence bytes stream) 8)
-                (error 'end-of-file :stream *error-output*))
-              bytes))
+     (little-endian:to-uint64
+      ,(if vectorp 'vector 'stream)
       ,@(when vectorp '(start))))
     8))
 
-;; bytes schema
+;;; bytes schema
 
 (defmethod serialized-size ((object vector))
   (let ((length (length object)))
@@ -420,7 +310,7 @@
                (error 'end-of-file :stream *error-output*)))
        (values bytes (+ bytes-read size)))))
 
-;; string schema
+;;; string schema
 
 (defmethod serialized-size ((object string))
   (let ((length (babel:string-size-in-octets object :encoding :utf-8)))

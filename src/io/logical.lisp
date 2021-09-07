@@ -21,7 +21,7 @@
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:endian #:cl-avro.io.primitive))
+   (#:little-endian #:cl-avro.little-endian))
   (:import-from #:cl-avro.io.base
                 #:serialized-size
                 #:serialize-into-vector
@@ -215,19 +215,17 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
 
 (define-serialize-into schema:duration-object
   "Write duration."
-  (declare (inline endian:uint32->little-endian))
   `(prog1 12
      ,@(if vectorp
-           '((endian:uint32->little-endian (schema:months object) vector start)
-             (endian:uint32->little-endian (schema:days object) vector (+ start 4))
-             (endian:uint32->little-endian (schema:milliseconds object) vector (+ start 8)))
-           '((endian:uint32->little-endian (schema:months object) stream)
-             (endian:uint32->little-endian (schema:days object) stream)
-             (endian:uint32->little-endian (schema:milliseconds object) stream)))))
+           '((little-endian:from-uint32 (schema:months object) vector start)
+             (little-endian:from-uint32 (schema:days object) vector (+ start 4))
+             (little-endian:from-uint32 (schema:milliseconds object) vector (+ start 8)))
+           '((little-endian:from-uint32 (schema:months object) stream)
+             (little-endian:from-uint32 (schema:days object) stream)
+             (little-endian:from-uint32 (schema:milliseconds object) stream)))))
 
 (define-deserialize-from schema:duration
   "Read duration."
-  (declare (inline endian:little-endian->uint32))
   `(let ((bytes ,(if vectorp
                      'vector
                      `(make-array 12 :element-type '(unsigned-byte 8))))
@@ -238,9 +236,9 @@ Serialized as the number of microseconds from 1970-01-01T00:00:00.000000."
      (values
       (make-instance
        schema
-       :months (endian:little-endian->uint32 bytes start)
-       :days (endian:little-endian->uint32 bytes (+ start 4))
-       :milliseconds (endian:little-endian->uint32 bytes (+ start 8)))
+       :months (little-endian:to-uint32 bytes start)
+       :days (little-endian:to-uint32 bytes (+ start 4))
+       :milliseconds (little-endian:to-uint32 bytes (+ start 8)))
       12)))
 
 ;;; decimal schema

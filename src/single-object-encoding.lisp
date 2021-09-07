@@ -21,7 +21,8 @@
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:io #:cl-avro.io))
+   (#:io #:cl-avro.io)
+   (#:little-endian #:cl-avro.little-endian))
   (:export #:single-object
            #:single-object-p
            #:write-single-object
@@ -67,7 +68,7 @@
                  :element-type '(unsigned-byte 8))))
     (declare ((simple-array (unsigned-byte 8) (*)) payload))
     (replace bytes +marker+)
-    (io:uint64->little-endian fingerprint bytes (length +marker+))
+    (little-endian:from-uint64 fingerprint bytes (length +marker+))
     (replace bytes payload :start1 (+ (length +marker+) 8))
     bytes))
 (declaim (notinline write-single-object))
@@ -77,8 +78,7 @@
         single-object->fingerprint)
  (inline single-object->fingerprint))
 (defun single-object->fingerprint (bytes)
-  (declare (inline io:little-endian->uint64))
-  (io:little-endian->uint64 bytes 2))
+  (little-endian:to-uint64 bytes 2))
 (declaim (notinline single-object->fingerprint))
 
 (declaim

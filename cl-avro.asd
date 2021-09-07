@@ -148,8 +148,9 @@
                                "schema-of"))))
    (:file "underlying"
     :depends-on ("schema"))
+   (:file "little-endian")
    (:module "io"
-    :depends-on ("schema" "underlying")
+    :depends-on ("schema" "underlying" "little-endian")
     :components ((:file "base")
                  (:file "schema"
                   :depends-on ("base"))
@@ -179,7 +180,7 @@
                  (:file "package"
                   :depends-on ("base"))))
    (:file "single-object-encoding"
-    :depends-on ("schema" "io"))
+    :depends-on ("schema" "io" "little-endian"))
    (:module "object-container-file"
     :depends-on ("schema" "io")
     :components ((:file "header")
