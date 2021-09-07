@@ -28,7 +28,7 @@
          (schema (avro:schema-of expected))
          (single-object (avro:write-single-object expected)))
     (is (avro:single-object-p single-object))
-    (is (= (avro:fingerprint64 schema)
+    (is (= (avro:fingerprint schema)
            (avro:single-object->fingerprint single-object)))
     (is (eq expected (avro:deserialize-single-object schema single-object)))))
 
@@ -37,7 +37,7 @@
          (schema (avro:schema-of expected))
          (single-object (avro:write-single-object expected)))
     (is (avro:single-object-p single-object))
-    (is (= (avro:fingerprint64 schema)
+    (is (= (avro:fingerprint schema)
            (avro:single-object->fingerprint single-object)))
     (is (= expected (avro:deserialize-single-object schema single-object)))))
 
@@ -51,7 +51,7 @@
          (single-object (avro:write-single-object
                          (make-instance schema :enum expected))))
     (is (avro:single-object-p single-object))
-    (is (= (avro:fingerprint64 schema)
+    (is (= (avro:fingerprint schema)
            (avro:single-object->fingerprint single-object)))
     (is (string= expected
                  (avro:which-one
@@ -79,7 +79,7 @@
                            (map 'list #'avro:name (avro:fields schema))
                            expected)))))
     (is (avro:single-object-p single-object))
-    (is (= (avro:fingerprint64 schema)
+    (is (= (avro:fingerprint schema)
            (avro:single-object->fingerprint single-object)))
     (is (equal expected
                (let* ((record (avro:deserialize-single-object

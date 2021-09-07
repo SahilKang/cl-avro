@@ -59,19 +59,16 @@
  (inline write-single-object))
 (defun write-single-object (object)
   "Serialize OBJECT according to avro single-object encoding."
-  (declare (inline schema:fingerprint))
   (let* ((fingerprint (schema:fingerprint
                        (schema:schema-of object) #'schema:crc-64-avro))
          (payload (io:serialize object))
          (bytes (make-array
-                 (+ (length +marker+) (length fingerprint) (length payload))
+                 (+ (length +marker+) 8 (length payload))
                  :element-type '(unsigned-byte 8))))
-    (declare ((simple-array (unsigned-byte 8) (8)) fingerprint)
-             ((simple-array (unsigned-byte 8) (*)) payload))
+    (declare ((simple-array (unsigned-byte 8) (*)) payload))
     (replace bytes +marker+)
-    (replace bytes fingerprint :start1 (length +marker+))
-    (replace bytes payload
-             :start1 (+ (length +marker+) (length fingerprint)))
+    (io:uint64->little-endian fingerprint bytes (length +marker+))
+    (replace bytes payload :start1 (+ (length +marker+) 8))
     bytes))
 (declaim (notinline write-single-object))
 
@@ -80,8 +77,8 @@
         single-object->fingerprint)
  (inline single-object->fingerprint))
 (defun single-object->fingerprint (bytes)
-  (declare (inline cl-avro.io.primitive::little-endian->uint64))
-  (cl-avro.io.primitive::little-endian->uint64 bytes 2))
+  (declare (inline io:little-endian->uint64))
+  (io:little-endian->uint64 bytes 2))
 (declaim (notinline single-object->fingerprint))
 
 (declaim

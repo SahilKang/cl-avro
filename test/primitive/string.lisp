@@ -32,14 +32,14 @@
         (fingerprint #x8f014872634503c7))
     (is (eq 'avro:string (avro:deserialize 'avro:schema json)))
     (is (string= "\"string\"" (avro:serialize 'avro:string)))
-    (is (= fingerprint (avro:fingerprint64 'avro:string)))))
+    (is (= fingerprint (avro:fingerprint 'avro:string)))))
 
 (test canonical-form
   (let ((json "\"string\"")
         (fingerprint #x8f014872634503c7))
     (is (eq 'avro:string (avro:deserialize 'avro:schema json)))
     (is (string= json (avro:serialize 'avro:string :canonical-form-p t)))
-    (is (= fingerprint (avro:fingerprint64 'avro:string)))))
+    (is (= fingerprint (avro:fingerprint 'avro:string)))))
 
 (define-io-test io
     ()

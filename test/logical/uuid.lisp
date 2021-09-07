@@ -34,7 +34,7 @@
         (expected (find-class 'avro:uuid)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))
-    (is (= fingerprint (avro:fingerprint64 expected)))))
+    (is (= fingerprint (avro:fingerprint expected)))))
 
 (define-io-test io
     ((expected "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))

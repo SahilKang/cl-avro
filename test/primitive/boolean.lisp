@@ -32,14 +32,14 @@
         (fingerprint #x9f42fc78a4d4f764))
     (is (eq 'avro:boolean (avro:deserialize 'avro:schema json)))
     (is (string= "\"boolean\"" (avro:serialize 'avro:boolean)))
-    (is (= fingerprint (avro:fingerprint64 'avro:boolean)))))
+    (is (= fingerprint (avro:fingerprint 'avro:boolean)))))
 
 (test canonical-form
   (let ((json "\"boolean\"")
         (fingerprint #x9f42fc78a4d4f764))
     (is (eq 'avro:boolean (avro:deserialize 'avro:schema json)))
     (is (string= json (avro:serialize 'avro:boolean :canonical-form-p t)))
-    (is (= fingerprint (avro:fingerprint64 'avro:boolean)))))
+    (is (= fingerprint (avro:fingerprint 'avro:boolean)))))
 
 (define-io-test io-true
     ()

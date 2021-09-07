@@ -34,7 +34,7 @@
         (expected (find-class 'avro:time-millis)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))
-    (is (= fingerprint (avro:fingerprint64 expected)))))
+    (is (= fingerprint (avro:fingerprint expected)))))
 
 (define-io-test io
     ((hour 3)

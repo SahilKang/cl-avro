@@ -39,6 +39,6 @@
         (call-next-method)))
 
   (:documentation
-   "use Avro Schema Resolution to coerce OBJECT into SCHEMA.
+   "Use Avro Schema Resolution to coerce OBJECT into SCHEMA.
 
 OBJECT may be recursively mutated."))
