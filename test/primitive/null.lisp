@@ -32,14 +32,14 @@
         (fingerprint #x63dd24e7cc258f8a))
     (is (eq 'avro:null (avro:deserialize 'avro:schema json)))
     (is (string= "\"null\"" (avro:serialize 'avro:null)))
-    (is (= fingerprint (avro:fingerprint64 'avro:null)))))
+    (is (= fingerprint (avro:fingerprint 'avro:null)))))
 
 (test canonical-form
   (let ((json "\"null\"")
         (fingerprint #x63dd24e7cc258f8a))
     (is (eq 'avro:null (avro:deserialize 'avro:schema json)))
     (is (string= json (avro:serialize 'avro:null :canonical-form-p t)))
-    (is (= fingerprint (avro:fingerprint64 'avro:null)))))
+    (is (= fingerprint (avro:fingerprint 'avro:null)))))
 
 (define-io-test io
     ()

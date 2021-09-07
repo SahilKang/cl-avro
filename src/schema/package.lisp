@@ -52,7 +52,6 @@
            #:fingerprint
            #:*default-fingerprint-algorithm*
            #:crc-64-avro
-           #:fingerprint64
 
            #:schema
            #:complex-schema

@@ -32,14 +32,14 @@
         (fingerprint #x7275d51a3f395c8f))
     (is (eq 'avro:int (avro:deserialize 'avro:schema json)))
     (is (string= "\"int\"" (avro:serialize 'avro:int)))
-    (is (= fingerprint (avro:fingerprint64 'avro:int)))))
+    (is (= fingerprint (avro:fingerprint 'avro:int)))))
 
 (test canonical-form
   (let ((json "\"int\"")
         (fingerprint #x7275d51a3f395c8f))
     (is (eq 'avro:int (avro:deserialize 'avro:schema json)))
     (is (string= json (avro:serialize 'avro:int :canonical-form-p t)))
-    (is (= fingerprint (avro:fingerprint64 'avro:int)))))
+    (is (= fingerprint (avro:fingerprint 'avro:int)))))
 
 (macrolet
     ((make-tests (&rest int->serialized)

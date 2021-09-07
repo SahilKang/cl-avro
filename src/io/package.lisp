@@ -28,4 +28,6 @@
   (:export #:serialize
            #:deserialize
            #:compare
-           #:serialized-size))
+           #:serialized-size
+           #:little-endian->uint64
+           #:uint64->little-endian))

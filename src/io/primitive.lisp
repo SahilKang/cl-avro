@@ -35,7 +35,9 @@
            #:deserialize-from-vector
            #:deserialize-from-stream
            #:little-endian->uint32
-           #:uint32->little-endian))
+           #:little-endian->uint64
+           #:uint32->little-endian
+           #:uint64->little-endian))
 (in-package #:cl-avro.io.primitive)
 
 ;;; null schema

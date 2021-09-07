@@ -33,7 +33,6 @@
            #:coerce
 
            #:fingerprint
-           #:fingerprint64
            #:crc-64-avro
            #:*default-fingerprint-algorithm*
 

@@ -32,14 +32,14 @@
         (fingerprint #xd054e14493f41db7))
     (is (eq 'avro:long (avro:deserialize 'avro:schema json)))
     (is (string= "\"long\"" (avro:serialize 'avro:long)))
-    (is (= fingerprint (avro:fingerprint64 'avro:long)))))
+    (is (= fingerprint (avro:fingerprint 'avro:long)))))
 
 (test canonical-form
   (let ((json "\"long\"")
         (fingerprint #xd054e14493f41db7))
     (is (eq 'avro:long (avro:deserialize 'avro:schema json)))
     (is (string= json (avro:serialize 'avro:long :canonical-form-p t)))
-    (is (= fingerprint (avro:fingerprint64 'avro:long)))))
+    (is (= fingerprint (avro:fingerprint 'avro:long)))))
 
 (macrolet
     ((make-tests (&rest long->serialized)

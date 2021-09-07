@@ -114,9 +114,9 @@
        (1am:is (string= canonical-form (avro:serialize
                                         actual-schema :canonical-form-p t)))
 
-       (1am:is (= expected-fingerprint (avro:fingerprint64 defclass-schema)))
-       (1am:is (= expected-fingerprint (avro:fingerprint64 make-instance-schema)))
-       (1am:is (= expected-fingerprint (avro:fingerprint64 actual-schema))))))
+       (1am:is (= expected-fingerprint (avro:fingerprint defclass-schema)))
+       (1am:is (= expected-fingerprint (avro:fingerprint make-instance-schema)))
+       (1am:is (= expected-fingerprint (avro:fingerprint actual-schema))))))
 
 ;;; define-io-test
 
