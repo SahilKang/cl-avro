@@ -16,13 +16,13 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.little-endian
+(defpackage #:cl-avro.io.little-endian
   (:use #:cl)
   (:export #:to-uint32
            #:to-uint64
            #:from-uint32
            #:from-uint64))
-(in-package #:cl-avro.little-endian)
+(in-package #:cl-avro.io.little-endian)
 
 ;;; to-uint
 

@@ -148,18 +148,19 @@
                                "schema-of"))))
    (:file "underlying"
     :depends-on ("schema"))
-   (:file "little-endian")
    (:module "io"
-    :depends-on ("schema" "underlying" "little-endian")
-    :components ((:file "base")
+    :depends-on ("schema" "underlying")
+    :components ((:file "little-endian")
+                 (:file "base"
+                  :depends-on ("little-endian"))
                  (:file "schema"
                   :depends-on ("base"))
                  (:file "primitive"
-                  :depends-on ("base"))
+                  :depends-on ("base" "little-endian"))
                  (:file "complex"
                   :depends-on ("base"))
                  (:file "logical"
-                  :depends-on ("base" "primitive"))
+                  :depends-on ("base" "primitive" "little-endian"))
                  (:file "compare"
                   :depends-on ("base"))
                  (:file "package"
@@ -179,8 +180,6 @@
                   :depends-on ("base"))
                  (:file "package"
                   :depends-on ("base"))))
-   (:file "single-object-encoding"
-    :depends-on ("schema" "io" "little-endian"))
    (:module "object-container-file"
     :depends-on ("schema" "io")
     :components ((:file "header")
@@ -238,7 +237,6 @@
     :depends-on ("schema"
                  "io"
                  "resolution"
-                 "single-object-encoding"
                  "object-container-file"
                  "ipc"))))
 
@@ -255,7 +253,6 @@
   ((:file "common")
    (:file "compare")
    (:file "object-container-file")
-   (:file "single-object-encoding")
    (:module "complex"
     :depends-on ("common")
     :components ((:file "array")

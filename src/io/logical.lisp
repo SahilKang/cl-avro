@@ -21,7 +21,7 @@
   (:use #:cl)
   (:local-nicknames
    (#:schema #:cl-avro.schema)
-   (#:little-endian #:cl-avro.little-endian))
+   (#:little-endian #:cl-avro.io.little-endian))
   (:import-from #:cl-avro.io.base
                 #:serialized-size
                 #:serialize-into-vector
