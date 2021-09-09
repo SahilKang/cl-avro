@@ -126,6 +126,24 @@
     (and (consp schema)
          (not (member (first schema) '(make-instance closer-mop:ensure-class))))))
 
+(declaim
+ (ftype (function (avro:schema)
+                  (values (simple-array (unsigned-byte 8) (8)) &optional))
+        little-endian-fingerprint))
+(defun little-endian-fingerprint (schema)
+  (loop
+    with vector = (make-array 8 :element-type '(unsigned-byte 8))
+    and fingerprint = (avro:fingerprint schema)
+
+    for shift from 0 above -64 by 8
+    for byte = (logand #xff (ash fingerprint shift))
+    for index from 0 below 8
+
+    do (setf (elt vector index) byte)
+
+    finally
+       (return vector)))
+
 (defmacro define-io-test
     (name (&rest context) schema object (&rest serialized) &body check)
   (declare (symbol name))
@@ -209,7 +227,74 @@
                  (avro:deserialize ,schema-symbol stream))
              (1am:is (= (length serialized) size))
              (1am:is (eq schema-to-check (avro:schema-of deserialized)))
-             (check deserialized)))))))
+             (check deserialized))
+
+           (multiple-value-bind (bytes size)
+               (avro:serialize
+                ,object-symbol :single-object-encoding-p ,schema-symbol)
+             (1am:is (= (+ 10 (length serialized)) size))
+             (1am:is (equalp #(#xc3 #x01) (subseq bytes 0 2)))
+             (1am:is (equalp (little-endian-fingerprint ,schema-symbol)
+                             (subseq bytes 2 10)))
+             (1am:is (equalp serialized (subseq bytes 10)))
+             (multiple-value-bind (fingerprint size)
+                 (avro:deserialize 'avro:fingerprint bytes)
+               (1am:is (= 10 size))
+               (1am:is (= (avro:fingerprint ,schema-symbol) fingerprint))
+               (multiple-value-bind (deserialized size)
+                   (avro:deserialize ,schema-symbol bytes :start size)
+                 (1am:is (= (length serialized) size))
+                 (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+                 (check deserialized))))
+
+           (let ((into (make-array (+ 11 (length serialized))
+                                   :element-type '(unsigned-byte 8))))
+             (multiple-value-bind (bytes size)
+                 (avro:serialize
+                  ,object-symbol
+                  :into into :start 1 :single-object-encoding-p ,schema-symbol)
+               (1am:is (eq into bytes))
+               (1am:is (= (+ 10 (length serialized)) size))
+               (1am:is (equalp #(#xc3 #x01) (subseq bytes 1 3)))
+               (1am:is (equalp (little-endian-fingerprint ,schema-symbol)
+                               (subseq bytes 3 11)))
+               (1am:is (equalp serialized (subseq bytes 11)))
+               (multiple-value-bind (fingerprint size)
+                   (avro:deserialize 'avro:fingerprint bytes :start 1)
+                 (1am:is (= 10 size))
+                 (1am:is (= (avro:fingerprint ,schema-symbol) fingerprint))
+                 (multiple-value-bind (deserialized size)
+                     (avro:deserialize ,schema-symbol bytes :start (1+ size))
+                   (1am:is (= (length serialized) size))
+                   (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+                   (check deserialized))))
+             (1am:signals error
+               (avro:serialize
+                ,object-symbol
+                :into into :start 2 :single-object-encoding-p ,schema-symbol)))
+
+           (let ((bytes
+                   (flexi-streams:with-output-to-sequence (stream)
+                     (multiple-value-bind (returned size)
+                         (avro:serialize
+                          ,object-symbol
+                          :into stream :single-object-encoding-p ,schema-symbol)
+                       (1am:is (eq stream returned))
+                       (1am:is (= (+ 10 (length serialized)) size))))))
+             (setf bytes (coerce bytes '(simple-array (unsigned-byte 8) (*))))
+             (1am:is (equalp #(#xc3 #x01) (subseq bytes 0 2)))
+             (1am:is (equalp (little-endian-fingerprint ,schema-symbol)
+                             (subseq bytes 2 10)))
+             (1am:is (equalp serialized (subseq bytes 10)))
+             (multiple-value-bind (fingerprint size)
+                 (avro:deserialize 'avro:fingerprint bytes)
+               (1am:is (= 10 size))
+               (1am:is (= (avro:fingerprint ,schema-symbol) fingerprint))
+               (multiple-value-bind (deserialized size)
+                   (avro:deserialize ,schema-symbol bytes :start size)
+                 (1am:is (= (length serialized) size))
+                 (1am:is (eq schema-to-check (avro:schema-of deserialized)))
+                 (check deserialized)))))))))
 
 ;;; json-syntax
 

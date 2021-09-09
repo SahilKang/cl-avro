@@ -19,7 +19,8 @@
 (defpackage #:cl-avro.io.base
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
+   (#:schema #:cl-avro.schema)
+   (#:little-endian #:cl-avro.io.little-endian))
   (:export #:serialize
            #:deserialize
            #:serialized-size
@@ -45,8 +46,64 @@
   (:documentation
    "Serialize OBJECT into STREAM and return the number of serialized bytes."))
 
+(declaim
+ (ftype (function (schema:object t) (values (unsigned-byte 64) &optional))
+        fingerprint))
+(defun fingerprint (object single-object-encoding-p)
+  (let ((schema (schema:schema-of object)))
+    (if (and (eq schema 'schema:int)
+             (eq single-object-encoding-p 'schema:long))
+        (schema:fingerprint 'schema:long #'schema:crc-64-avro)
+        (schema:fingerprint schema #'schema:crc-64-avro))))
+
+(declaim
+ (ftype (function (schema:object stream t) (values &optional))
+        %serialize-into-stream))
+(defun %serialize-into-stream (object stream single-object-encoding-p)
+  (when single-object-encoding-p
+    (write-byte #xc3 stream)
+    (write-byte #x01 stream)
+    (little-endian:from-uint64
+     (fingerprint object single-object-encoding-p) stream))
+  (serialize-into-stream object stream)
+  (values))
+
+(declaim
+ (ftype (function (schema:object
+                   (simple-array (unsigned-byte 8) (*))
+                   (and (integer 0) fixnum)
+                   t)
+                  (values &optional))
+        %%serialize-into-vector))
+(defun %%serialize-into-vector (object vector start single-object-encoding-p)
+  (when single-object-encoding-p
+    (setf (elt vector start) #xc3
+          (elt vector (1+ start)) #x01)
+    (little-endian:from-uint64
+     (fingerprint object single-object-encoding-p) vector (+ start 2))
+    (incf start 10))
+  (serialize-into-vector object vector start)
+  (values))
+
+(declaim
+ (ftype (function (schema:object
+                   (or null (simple-array (unsigned-byte 8) (*)))
+                   (and (integer 0) fixnum)
+                   (and (integer 0) fixnum)
+                   t)
+                  (values (simple-array (unsigned-byte 8) (*)) &optional))
+        %serialize-into-vector))
+(defun %serialize-into-vector
+    (object vector start size single-object-encoding-p)
+  (if vector
+      (when (> size (- (length vector) start))
+        (error "Not enough room in vector"))
+      (setf vector (make-array size :element-type '(unsigned-byte 8))))
+  (%%serialize-into-vector object vector start single-object-encoding-p)
+  vector)
+
 (defgeneric serialize (object &key &allow-other-keys)
-  (:method (object &key into (start 0))
+  (:method (object &key into (start 0) single-object-encoding-p)
     "Serialize OBJECT into stream or vector supplied by INTO.
 
 If INTO is a vector, then START specifies the vector offset to start
@@ -54,18 +111,20 @@ writing into.
 
 If INTO is nil, then a new vector will be allocated and returned.
 
+SINGLE-OBJECT-ENCODING-P determines whether to serialize OBJECT
+according to Avro Single Object Encoding.  This is treated as a
+generalized boolean with the following addition: if (schema-of OBJECT)
+is int and SINGLE-OBJECT-ENCODING-P is long, then the long schema's
+fingerprint is serialized instead of the int's.
+
 Return (values INTO number-of-serialized-bytes)"
     (let ((size (serialized-size object)))
+      (when single-object-encoding-p
+        (incf size 10))
       (if (streamp into)
-          (serialize-into-stream object into)
-          (progn
-            (if into
-                (check-type into (simple-array (unsigned-byte 8) (*)))
-                (setf into (make-array size :element-type '(unsigned-byte 8))))
-            (check-type start (and (integer 0) fixnum))
-            (when (> size (- (length into) start))
-              (error "Not enough room in vector"))
-            (serialize-into-vector object into start)))
+          (%serialize-into-stream object into single-object-encoding-p)
+          (setf into (%serialize-into-vector
+                      object into start size single-object-encoding-p)))
       (values into size))))
 
 ;;; deserialize
@@ -82,6 +141,17 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
 
 Return (values deserialized-object number-of-bytes-deserialized)"))
 
+(declaim
+ (ftype (function ((simple-array (unsigned-byte 8) (*))
+                   (and (integer 0) fixnum))
+                  (values (unsigned-byte 64) &optional))
+        deserialize-fingerprint))
+(defun deserialize-fingerprint (vector start)
+  (unless (and (= (elt vector start) #xc3)
+               (= (elt vector (1+ start)) #x01))
+    (error "Input does not adhere to Single Object Encoding"))
+  (little-endian:to-uint64 vector (+ start 2)))
+
 (defgeneric deserialize (schema input &key &allow-other-keys)
   (:method ((schema symbol) input &rest keyword-args)
     (if (typep schema 'schema:primitive-schema)
@@ -95,6 +165,17 @@ Return (values deserialized-object number-of-bytes-deserialized)"))
 
   (:method (schema (input stream) &key)
     (deserialize-from-stream schema input))
+
+  (:method ((schema (eql 'schema:fingerprint)) (input simple-array) &key (start 0))
+    "Deserialize fingerprint from single object encoding."
+    (values (deserialize-fingerprint input start) 10))
+
+  (:method ((schema (eql 'schema:fingerprint)) (input stream) &key)
+    "Deserialize fingerprint from single object encoding."
+    (let ((vector (make-array 10 :element-type '(unsigned-byte 8))))
+      (unless (= (read-sequence vector input) 10)
+        (error 'end-of-file :stream *error-output*))
+      (values (deserialize-fingerprint vector 0) 10)))
 
   (:documentation
    "Deserialize an instance of SCHEMA from INPUT."))

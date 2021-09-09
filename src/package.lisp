@@ -23,7 +23,6 @@
   (:use #:cl-avro.schema
         #:cl-avro.io
         #:cl-avro.resolution
-        #:cl-avro.single-object-encoding
         #:cl-avro.object-container-file
         #:cl-avro.ipc)
   (:export #:schema
@@ -39,12 +38,6 @@
            #:serialize
            #:deserialize
            #:compare
-
-           #:single-object
-           #:single-object-p
-           #:write-single-object
-           #:single-object->fingerprint
-           #:deserialize-single-object
 
            #:header
            #:magic
