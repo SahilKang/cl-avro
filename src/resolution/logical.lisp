@@ -36,31 +36,6 @@
         (error "~S does not name a schema" name))
       schema-name)))
 
-(defmacro defunderlying (schema)
-  (declare (symbol schema))
-  (let* ((schema-name (find-schema-name schema))
-         (metaclass-name (class-name (class-of (find-class schema-name))))
-         (underlying (schema:underlying (find-class schema-name)))
-         (underlying-specializer (schema:primitive->class underlying)))
-    (check-type underlying schema:primitive-schema)
-    `(progn
-       (defmethod base:coerce
-           ((object ,schema-name) (schema (eql ',underlying)))
-         (declare (ignore schema))
-         (to-underlying object))
-
-       (defmethod base:coerce
-           ((object ,underlying-specializer) (schema ,metaclass-name))
-         (from-underlying schema object))
-
-       (defmethod base:coerce
-           ((object ,schema-name) schema)
-         (base:coerce (to-underlying object) schema))
-
-       (defmethod base:coerce
-           (object (schema ,metaclass-name))
-         (from-underlying schema (base:coerce object ',underlying))))))
-
 ;; TODO maybe specialize change-class instead of creating a new instance
 (defmacro deffrom (to (&rest from) &body initargs)
   (declare (symbol to))
@@ -76,51 +51,10 @@
       `(progn
          ,@(mapcar #'defcoerce from)))))
 
-;;; uuid schema
-
-(defunderlying uuid)
-
-;;; date schema
-
-(defunderlying date)
-
-(deffrom date
-    (timestamp-millis
-     timestamp-micros
-     local-timestamp-millis
-     local-timestamp-micros)
-  :year (schema:year %)
-  :month (schema:month %)
-  :day (schema:day %))
-
-;;; time-millis schema
-
-(defunderlying time-millis)
-
-(deffrom time-millis
-    (time-micros
-     timestamp-millis
-     timestamp-micros
-     local-timestamp-millis
-     local-timestamp-micros)
-  :hour (schema:hour %)
-  :minute (schema:minute %)
-  :millisecond (multiple-value-bind (second remainder)
-                   (schema:second %)
-                 (truncate
-                  (+ (* 1000 second)
-                     (* 1000 remainder)))))
-
 ;;; time-micros schema
 
-(defunderlying time-micros)
-
 (deffrom time-micros
-    (time-millis
-     timestamp-millis
-     timestamp-micros
-     local-timestamp-millis
-     local-timestamp-micros)
+    (time-millis)
   :hour (schema:hour %)
   :minute (schema:minute %)
   :microsecond (multiple-value-bind (second remainder)
@@ -128,26 +62,7 @@
                  (+ (* 1000 1000 second)
                     (* 1000 1000 remainder))))
 
-;;; timestamp-millis schema
-
-(defunderlying timestamp-millis)
-
-(deffrom timestamp-millis
-    (timestamp-micros)
-  :year (schema:year %)
-  :month (schema:month %)
-  :day (schema:day %)
-  :hour (schema:hour %)
-  :minute (schema:minute %)
-  :millisecond (multiple-value-bind (second remainder)
-                   (schema:second %)
-                 (truncate
-                  (+ (* 1000 second)
-                     (* 1000 remainder)))))
-
 ;;; timestamp-micros schema
-
-(defunderlying timestamp-micros)
 
 (deffrom timestamp-micros
     (timestamp-millis)
@@ -161,26 +76,7 @@
                  (+ (* 1000 1000 second)
                     (* 1000 1000 remainder))))
 
-;;; local-timestamp-millis schema
-
-(defunderlying local-timestamp-millis)
-
-(deffrom local-timestamp-millis
-    (local-timestamp-micros)
-  :year (schema:year %)
-  :month (schema:month %)
-  :day (schema:day %)
-  :hour (schema:hour %)
-  :minute (schema:minute %)
-  :millisecond (multiple-value-bind (second remainder)
-                   (schema:second %)
-                 (truncate
-                  (+ (* 1000 second)
-                     (* 1000 remainder)))))
-
 ;;; local-timestamp-micros schema
-
-(defunderlying local-timestamp-micros)
 
 (deffrom local-timestamp-micros
     (local-timestamp-millis)

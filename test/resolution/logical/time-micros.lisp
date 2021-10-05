@@ -42,52 +42,6 @@
     (is (typep reader 'avro:time-micros))
     (assert= writer reader)))
 
-(test time-micros->long
-  (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:time-micros (avro:serialize writer))
-                  'avro:long)))
-    (is (typep writer 'avro:time-micros))
-    (is (typep reader 'avro:long))
-    (is (= 8732350450 reader))))
-
-(test long->time-micros
-  (let* ((writer 8732350450)
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:long (avro:serialize writer))
-                  'avro:time-micros)))
-    (is (typep writer 'avro:long))
-    (is (typep reader 'avro:time-micros))
-    (is (= 2 (avro:hour reader)))
-    (is (= 25 (avro:minute reader)))
-    (multiple-value-bind (second remainder)
-        (avro:second reader)
-      (is (= 32 second))
-      (is (= (/ 350450 1000 1000) remainder)))))
-
-(test time-micros->float
-  (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:time-micros (avro:serialize writer))
-                  'avro:float)))
-    (is (typep writer 'avro:time-micros))
-    (is (typep reader 'avro:float))
-    (is (= 8732350450.0 reader))))
-
-(test int->time-micros
-  (let* ((writer 8732350)
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:int (avro:serialize writer))
-                  'avro:time-micros)))
-    (is (typep writer 'avro:int))
-    (is (typep reader 'avro:time-micros))
-    (is (= 0 (avro:hour reader)))
-    (is (= 0 (avro:minute reader)))
-    (multiple-value-bind (second remainder)
-        (avro:second reader)
-      (is (= 8 second))
-      (is (= (/ 732350 1000 1000) remainder)))))
-
 (test time-millis->time-micros
   (let* ((writer (make-instance 'avro:time-millis :hour 2 :minute 25 :millisecond 32350))
          (reader (avro:coerce
@@ -96,30 +50,3 @@
     (is (typep writer 'avro:time-millis))
     (is (typep reader 'avro:time-micros))
     (assert= writer reader)))
-
-(defmacro timestamp->time-micros (from)
-  (declare (symbol from))
-  (let ((test-name (intern (format nil "~A->TIME-MICROS" from)))
-        (from (find-schema from))
-        (initarg (initarg-for-millis/micros from)))
-    `(test ,test-name
-       (let* ((writer (make-instance
-                       ',from
-                       :year 2021 :month 8 :day 7
-                       :hour 2 :minute 25 ,initarg ,(ecase initarg
-                                                      (:millisecond 32350)
-                                                      (:microsecond 32350450))))
-              (reader (avro:coerce
-                       (avro:deserialize ',from (avro:serialize writer))
-                       'avro:time-micros)))
-         (is (typep writer ',from))
-         (is (typep reader 'avro:time-micros))
-         (assert= writer reader)))))
-
-(timestamp->time-micros timestamp-millis)
-
-(timestamp->time-micros timestamp-micros)
-
-(timestamp->time-micros local-timestamp-millis)
-
-(timestamp->time-micros local-timestamp-micros)
