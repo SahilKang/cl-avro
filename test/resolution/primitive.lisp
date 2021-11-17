@@ -16,12 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/primitive
+(defpackage #:cl-avro/test/resolution/primitive
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:find-schema
                 #:bytes))
-(in-package #:test/resolution/primitive)
+(in-package #:cl-avro/test/resolution/primitive)
 
 (defmacro deftest (schema function expected)
   (declare (symbol schema function))

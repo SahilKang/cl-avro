@@ -16,12 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/date
+(defpackage #:cl-avro/test/resolution/date
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:find-schema
                 #:initarg-for-millis/micros))
-(in-package #:test/resolution/date)
+(in-package #:cl-avro/test/resolution/date)
 
 (test date->date
   (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
@@ -33,59 +35,3 @@
     (is (= (avro:year writer) (avro:year reader)))
     (is (= (avro:month writer) (avro:month reader)))
     (is (= (avro:day writer) (avro:day reader)))))
-
-(test date->int
-  (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:date (avro:serialize writer))
-                  'avro:int)))
-    (is (typep writer 'avro:date))
-    (is (typep reader 'avro:int))
-    (is (= 18845 reader))))
-
-(test int->date
-  (let* ((writer 18845)
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:int (avro:serialize writer))
-                  'avro:date)))
-    (is (typep writer 'avro:int))
-    (is (typep reader 'avro:date))
-    (is (= 2021 (avro:year reader)))
-    (is (= 8 (avro:month reader)))
-    (is (= 6 (avro:day reader)))))
-
-(test date->float
-  (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:date (avro:serialize writer))
-                  'avro:float)))
-    (is (typep writer 'avro:date))
-    (is (typep reader 'avro:float))
-    (is (= 18845.0 reader))))
-
-(defmacro timestamp->date (from)
-  (declare (symbol from))
-  (let ((test-name (intern (format nil "~A->DATE" from)))
-        (from (find-schema from))
-        (initarg (initarg-for-millis/micros from)))
-    `(test ,test-name
-       (let* ((writer (make-instance
-                       ',from
-                       :year 2021 :month 8 :day 6
-                       :hour 1 :minute 2 ,initarg 3))
-              (reader (avro:coerce
-                       (avro:deserialize ',from (avro:serialize writer))
-                       'avro:date)))
-         (is (typep writer ',from))
-         (is (typep reader 'avro:date))
-         (is (= (avro:year writer) (avro:year reader)))
-         (is (= (avro:month writer) (avro:month reader)))
-         (is (= (avro:day writer) (avro:day reader)))))))
-
-(timestamp->date timestamp-millis)
-
-(timestamp->date timestamp-micros)
-
-(timestamp->date local-timestamp-millis)
-
-(timestamp->date local-timestamp-micros)

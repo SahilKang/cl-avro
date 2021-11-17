@@ -16,36 +16,37 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.ipc.message
+(defpackage #:cl-avro.internal.ipc.message
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
-  (:import-from #:cl-avro.ipc.error
-                #:message)
-  (:export #:message
-           #:request
-           #:response
-           #:errors
-           #:one-way))
-(in-package #:cl-avro.ipc.message)
+   (#:api #:cl-avro)
+   (#:internal #:cl-avro.internal)
+   (#:mop #:cl-avro.internal.mop)))
+(in-package #:cl-avro.internal.ipc.message)
 
-(defclass message (closer-mop:standard-generic-function)
+(deftype errors ()
+  '(simple-array class (*)))
+
+(deftype errors? ()
+  '(or null errors))
+
+(defclass api:message (closer-mop:standard-generic-function)
   ((request
     :initarg :request
-    :reader request
-    :type schema:record
+    :reader api:request
+    :type api:record
     :documentation "Request params.")
    (response
     :initarg :response
-    :reader response
-    :type schema:schema
+    :reader api:response
+    :type api:schema
     :documentation "Response schema.")
    (errors
     :initarg :errors
-    :type (or null (simple-array class (*)))
+    :type errors?
     :documentation "Error condition classes if provided, otherwise nil.")
    (effective-errors
-    :type schema:union
+    :type api:union
     :documentation "Effective error union.")
    (one-way
     :initarg :one-way
@@ -54,90 +55,87 @@
   (:metaclass closer-mop:funcallable-standard-class)
   (:default-initargs
    :request (error "Must supply REQUEST")
-   :response (error "Must supply RESPONSE"))
+   :response (error "Must supply RESPONSE")
+   :errors nil)
   (:documentation
-   "Base class for avro ipc messages."))
+   "Metaclass of avro ipc messages."))
 
 (defmethod closer-mop:validate-superclass
-    ((class message) (superclass closer-mop:standard-generic-function))
+    ((class api:message) (superclass closer-mop:standard-generic-function))
   t)
 
-(defgeneric errors (message)
-  (:method ((instance message))
-    "Return (values errors effective-errors)."
-    (with-slots (errors effective-errors) instance
-      (values errors effective-errors))))
+(defmethod api:errors
+    ((message api:message))
+  "Return (values errors effective-errors)."
+  (with-slots (errors effective-errors) message
+    (values errors effective-errors)))
 
-(defgeneric one-way (message)
-  (:method ((instance message))
-    "Return (values one-way one-way-provided-p)."
-    (if (slot-boundp instance 'one-way)
-        (values (slot-value instance 'one-way) t)
-        (values nil nil))))
+(defmethod api:one-way
+    ((message api:message))
+  "Return (values one-way one-way-provided-p)."
+  (if (slot-boundp message 'one-way)
+      (values (slot-value message 'one-way) t)
+      (values nil nil)))
 
 (declaim
- (ftype (function (schema:record) (values list &optional)) deduce-lambda-list))
+ (ftype (function (api:record) (values list &optional)) deduce-lambda-list))
 (defun deduce-lambda-list (request)
   (flet ((name (field)
-           (nth-value 1 (schema:name field))))
-    (map 'list #'name (schema:fields request))))
+           (nth-value 1 (api:name field))))
+    (map 'list #'name (api:fields request))))
 
 (defmethod initialize-instance :around
-    ((instance message)
-     &rest initargs &key request (errors nil errorsp) (one-way nil one-way-p))
-  (if (not errorsp)
-      (setf (getf initargs :errors) nil)
-      (progn
-        (check-type errors (simple-array class (*)))
-        (when (zerop (length errors))
-          ;; the errors json field represents a union and this
-          ;; implementation doesn't allow empty unions, at least for the
-          ;; time being
-          (error "Errors cannot be an empty array"))))
-  (when one-way-p
-    (check-type one-way boolean))
+    ((instance api:message) &rest initargs &key request)
   (setf (getf initargs :lambda-list) (deduce-lambda-list request))
   (apply #'call-next-method instance initargs))
 
 (declaim
- (ftype (function ((or null (simple-array class (*))))
-                  (values schema:union &optional))
+ (ftype (function (errors?) (values api:union &optional))
         deduce-effective-errors))
 (defun deduce-effective-errors (errors)
-  (make-instance
-   'schema:union
-   :schemas (if errors
-                (apply #'vector 'schema:string (map 'list #'schema:schema errors))
-                (vector 'schema:string))))
+  (flet ((schema (error-class)
+           (closer-mop:ensure-finalized error-class)
+           (internal:schema (closer-mop:class-prototype error-class))))
+    (let ((error-schemas (map 'list #'schema errors)))
+      (make-instance 'api:union :schemas (cons 'api:string error-schemas)))))
 
-(schema:define-initializers message :after
-    (&key)
+(mop:definit ((instance api:message) :after &key)
   (with-slots (errors effective-errors response) instance
-    (when (one-way instance)
-      (unless (eq response 'schema:null)
-        (error "one-way is true but response is not null: ~S" response))
+    ;; the errors json field represents a union and this
+    ;; implementation doesn't allow empty unions, at least for the
+    ;; time being
+    (assert (if errors (plusp (length errors)) t) (errors)
+            "Errors cannot be an empty array")
+    (when (api:one-way instance)
+      (unless (eq response 'api:null)
+        (error "Message is one-way but response is not null: ~S" response))
       (when errors
-        ;; union doesn't allow empty schemas...that would be a problem
-        ;; only if we allow an empty json array for errors
-        (error "one-way is true but there are errors declared: ~S" errors)))
+        ;; union doesn't allow empty schemas so we don't have to check
+        ;; length...that would be a problem only if we allow an empty
+        ;; json array for errors
+        (error "Message is one-way but there are errors declared: ~S" errors)))
     (setf effective-errors (deduce-effective-errors errors))))
 
-(defmethod schema:to-jso
-    ((message message))
-  (let ((initargs
-          (list
-           "request" (map 'vector #'schema:to-jso (schema:fields (request message)))
-           "response" (schema:to-jso (response message))))
-        (documentation (documentation message t))
-        (errors (errors message)))
-    (when errors
-      (let ((errors (map 'simple-vector #'schema:to-jso errors)))
-        (setf initargs (nconc initargs (list "errors" errors)))))
-    (multiple-value-bind (one-way one-way-p) (one-way message)
-      (when one-way-p
-        (let ((one-way (if one-way :true :false)))
-          (setf initargs (nconc initargs (list "one-way" one-way))))))
-    (when documentation
-      (push documentation initargs)
-      (push "doc" initargs))
-    (apply #'st-json:jso initargs)))
+;;; jso
+
+(defmethod internal:write-jso
+    ((message api:message) seen canonical-form-p)
+  (flet ((write-jso (schema)
+           (internal:write-jso schema seen canonical-form-p)))
+    (let ((initargs
+            (list
+             "request" (map 'list #'write-jso (api:fields (api:request message)))
+             "response" (write-jso (api:response message))))
+          (documentation (documentation message t))
+          (errors (api:errors message)))
+      (when errors
+        (let ((errors (map 'list #'write-jso errors)))
+          (setf initargs (nconc initargs (list "errors" errors)))))
+      (multiple-value-bind (one-way one-way-p)
+          (api:one-way message)
+        (when one-way-p
+          (let ((one-way (st-json:as-json-bool one-way)))
+            (setf initargs (nconc initargs (list "one-way" one-way))))))
+      (when documentation
+        (setf initargs (nconc initargs (list "doc" documentation))))
+      (apply #'st-json:jso initargs))))

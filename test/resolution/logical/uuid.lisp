@@ -16,9 +16,11 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/uuid
-  (:use #:cl #:1am))
-(in-package #:test/resolution/uuid)
+(defpackage #:cl-avro/test/resolution/uuid
+  (:use #:cl #:1am)
+  (:local-nicknames
+   (#:avro #:cl-avro)))
+(in-package #:cl-avro/test/resolution/uuid)
 
 (test uuid->uuid
   (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
@@ -27,41 +29,4 @@
                   'avro:uuid)))
     (is (typep writer 'avro:uuid))
     (is (typep reader 'avro:uuid))
-    (is (string= (avro:uuid writer) (avro:uuid reader)))))
-
-(test uuid->string
-  (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:uuid (avro:serialize writer))
-                  'avro:string)))
-    (is (typep writer 'avro:uuid))
-    (is (typep reader 'avro:string))
-    (is (string= (avro:uuid writer) reader))))
-
-(test string->uuid
-  (let* ((writer "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:string (avro:serialize writer))
-                  'avro:uuid)))
-    (is (typep writer 'avro:string))
-    (is (typep reader 'avro:uuid))
-    (is (string= writer (avro:uuid reader)))))
-
-(test uuid->bytes
-  (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:uuid (avro:serialize writer))
-                  'avro:bytes)))
-    (is (typep writer 'avro:uuid))
-    (is (typep reader 'avro:bytes))
-    (is (string= (avro:uuid writer) (babel:octets-to-string reader :encoding :utf-8)))))
-
-(test bytes->uuid
-  (let* ((writer (babel:string-to-octets
-                  "6ba7b810-9dad-11d1-80b4-00c04fd430c8" :encoding :utf-8))
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:bytes (avro:serialize writer))
-                  'avro:uuid)))
-    (is (typep writer 'avro:bytes))
-    (is (typep reader 'avro:uuid))
-    (is (string= (babel:octets-to-string writer :encoding :utf-8) (avro:uuid reader)))))
+    (is (string= (avro:raw writer) (avro:raw reader)))))

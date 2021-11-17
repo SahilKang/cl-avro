@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
             --no-sysinit --no-userinit \
             --load $(find / -name 'quicklisp.lisp' -type f) \
             --non-interactive \
+            --eval '(declaim (optimize (debug 3) (safety 3)))' \
             --eval '(quicklisp-quickstart:install)' \
             --eval '(ql:quickload :cl-avro/test)' \
             --eval '(sb-ext:save-lisp-and-die \

@@ -16,11 +16,12 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/map
+(defpackage #:cl-avro/test/resolution/map
   (:use #:cl #:1am)
   (:local-nicknames
-   (#:base #:test/resolution/base)))
-(in-package #:test/resolution/map)
+   (#:avro #:cl-avro)
+   (#:base #:cl-avro/test/resolution/base)))
+(in-package #:cl-avro/test/resolution/map)
 
 (eval-when (:compile-toplevel)
   (declaim
@@ -43,7 +44,7 @@
            (error "Odd number of key-value pairs: ~S" key-value-pairs))
 
     for (key value) on key-value-pairs by #'cddr
-    do (setf (avro:hashref key map) value)
+    do (setf (avro:gethash key map) value)
 
     finally
        (return map)))
@@ -55,14 +56,14 @@
                   (values (eql t) &optional))
         assert-map=))
 (defun assert-map= (left right compare)
-  (is (= (avro:generic-hash-table-count left)
-         (avro:generic-hash-table-count right)))
+  (is (= (avro:hash-table-count left)
+         (avro:hash-table-count right)))
   (flet ((compare (key left-value)
            (multiple-value-bind (right-value existsp)
-               (avro:hashref key right)
+               (avro:gethash key right)
              (is existsp)
              (is (funcall compare left-value right-value)))))
-    (avro:hashmap #'compare left))
+    (avro:maphash #'compare left))
   t)
 
 (defmacro deftest (from to input compare)

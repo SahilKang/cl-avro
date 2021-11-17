@@ -16,9 +16,11 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/enum
-  (:use #:cl #:1am))
-(in-package #:test/resolution/enum)
+(defpackage #:cl-avro/test/resolution/enum
+  (:use #:cl #:1am)
+  (:local-nicknames
+   (#:avro #:cl-avro)))
+(in-package #:cl-avro/test/resolution/enum)
 
 (test no-reader-default
   (let* ((writer-enum (make-instance

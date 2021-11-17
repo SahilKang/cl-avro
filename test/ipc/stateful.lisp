@@ -16,14 +16,16 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/ipc/stateful/server
+(defpackage #:cl-avro/test/ipc/stateful/server
   (:use #:cl)
-  (:import-from #:test/ipc/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/ipc/common
                 #:flatten)
   (:export #:service-endpoint
            #:client-connected-p
            #:*one-way*))
-(in-package #:test/ipc/stateful/server)
+(in-package #:cl-avro/test/ipc/stateful/server)
 
 (defclass |Greeting| ()
   ((|message| :type avro:string))
@@ -88,7 +90,7 @@
       (t (make-instance '|Greeting| :|message| (format nil "Hello ~A!" message))))))
 
 (declaim
- (ftype (function (fixnum cl-avro.ipc.framing:buffers)
+ (ftype (function (fixnum cl-avro.internal.ipc.framing:buffers)
                   (values (or null (simple-array (unsigned-byte 8) (*))) &optional))
         service-endpoint))
 (defun service-endpoint (client-id request)
@@ -114,19 +116,20 @@
 (defmethod one-way ((string string))
   (setf *one-way* string))
 
-(defpackage #:test/ipc/stateful/client
+(defpackage #:cl-avro/test/ipc/stateful/client
   (:use #:cl)
   (:local-nicknames
-   (#:server #:test/ipc/stateful/server))
+   (#:avro #:cl-avro)
+   (#:server #:cl-avro/test/ipc/stateful/server))
   (:export #:|Greeting|
            #:|Curse|
            #:|message|
            #:|hello|
            #:reset
            #:id
-           #:send-handshake-p
+           #:sent-handshake-p
            #:one-way))
-(in-package #:test/ipc/stateful/client)
+(in-package #:cl-avro/test/ipc/stateful/client)
 
 (defclass |Greeting| ()
   ((|message| :type avro:string))
@@ -156,22 +159,22 @@
     :one-way t)))
 
 (defclass client (avro:stateful-client)
-  ((send-handshake-p
+  ((sent-handshake-p
     :type boolean
-    :accessor %send-handshake-p
-    :initform t)
+    :accessor %sent-handshake-p
+    :initform nil)
    (client-id
     :type fixnum
     :accessor client-id
     :initform (random most-positive-fixnum))))
 
-(defmethod avro:send-handshake-p
+(defmethod avro:sent-handshake-p
     ((client client))
-  (%send-handshake-p client))
+  (%sent-handshake-p client))
 
-(defmethod (setf avro:send-handshake-p)
+(defmethod (setf avro:sent-handshake-p)
     ((boolean symbol) (client client))
-  (setf (%send-handshake-p client) boolean))
+  (setf (%sent-handshake-p client) boolean))
 
 (defmethod avro:send-and-receive
     ((client client) buffers)
@@ -188,7 +191,7 @@
 
 (declaim (ftype (function () (values &optional)) reset))
 (defun reset ()
-  (setf (%send-handshake-p +client+) t
+  (setf (%sent-handshake-p +client+) nil
         (client-id +client+) (random most-positive-fixnum))
   (values))
 
@@ -196,16 +199,17 @@
 (defun id ()
   (client-id +client+))
 
-(declaim (ftype (function () (values boolean &optional)) send-handshake-p))
-(defun send-handshake-p ()
-  (avro:send-handshake-p +client+))
+(declaim (ftype (function () (values boolean &optional)) sent-handshake-p))
+(defun sent-handshake-p ()
+  (avro:sent-handshake-p +client+))
 
-(defpackage #:test/ipc/stateful
+(defpackage #:cl-avro/test/ipc/stateful
   (:use #:cl #:1am)
   (:local-nicknames
-   (#:client #:test/ipc/stateful/client)
-   (#:server #:test/ipc/stateful/server)))
-(in-package #:test/ipc/stateful)
+   (#:avro #:cl-avro)
+   (#:client #:cl-avro/test/ipc/stateful/client)
+   (#:server #:cl-avro/test/ipc/stateful/server)))
+(in-package #:cl-avro/test/ipc/stateful)
 
 (test greeting
   (let* ((request (make-instance 'client:|Greeting| :|message| "foobar"))
@@ -231,10 +235,10 @@
 
 (test connection
   (client:reset)
-  (is (client:send-handshake-p))
+  (is (not (client:sent-handshake-p)))
   (is (not (server:client-connected-p (client:id))))
   (greeting)
-  (is (not (client:send-handshake-p)))
+  (is (client:sent-handshake-p))
   (is (server:client-connected-p (client:id))))
 
 (test one-way

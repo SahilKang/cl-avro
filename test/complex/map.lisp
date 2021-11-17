@@ -16,15 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/map
+(defpackage #:cl-avro/test/map
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/map)
+(in-package #:cl-avro/test/map)
 
 (named-readtables:in-readtable json-syntax)
 
@@ -132,14 +132,14 @@
       (dolist (cons expected)
         (destructuring-bind (key . value) cons
           (let ((enum (make-instance enum-schema :enum value)))
-            (setf (avro:hashref key map) enum))))
+            (setf (avro:gethash key map) enum))))
       map)
-    (6 2 #x61 0 4 #x61 #x61 0 2 #x62 2 0)
+    (5 20 2 #x61 0 4 #x61 #x61 0 2 #x62 2 0)
   (let (sorted-alist)
     (flet ((fill-alist (key value)
              (let ((cons (cons key (avro:which-one value))))
                (push cons sorted-alist))))
-      (avro:hashmap #'fill-alist arg))
+      (avro:maphash #'fill-alist arg))
     (setf sorted-alist (sort sorted-alist #'string< :key #'car))
     (is (equal expected sorted-alist))))
 

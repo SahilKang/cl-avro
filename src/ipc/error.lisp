@@ -16,72 +16,58 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.ipc.error
+(defpackage #:cl-avro.internal.ipc.error
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
-  (:import-from #:cl-avro.schema
-                #:schema)
-  (:import-from #:cl-avro.ipc.handshake
-                #:map<bytes>)
-  (:export #:rpc-error
-           #:metadata
-           #:undeclared-rpc-error
-           #:message
-           #:declared-rpc-error
-           #:declared-rpc-error-class-p
-           #:schema
-           #:make-declared-rpc-error
-           #:to-record
-           #:to-error
-           #:define-error))
-(in-package #:cl-avro.ipc.error)
+   (#:api #:cl-avro)
+   (#:internal #:cl-avro.internal))
+  (:import-from #:cl-avro.internal.recursive-descent.pattern
+                #:define-pattern-method))
+(in-package #:cl-avro.internal.ipc.error)
 
-(define-condition rpc-error (error)
+(define-condition api:rpc-error (error)
   ((metadata
     :initarg :metadata
-    :reader metadata
-    :type map<bytes>
-    :documentation "Metadata from server."))
+    :type internal:map<bytes> ; TODO this needs to be public if I
+                              ; return map<bytes>
+    :reader api:metadata
+    :documentation "Metadata from server"))
   (:default-initargs
-   :metadata (make-instance 'map<bytes> :size 0))
+   :metadata (make-instance 'internal:map<bytes> :size 0))
   (:documentation
    "Base condition for rpc errors."))
 
-(define-condition undeclared-rpc-error (rpc-error)
+(define-condition api:undeclared-rpc-error (api:rpc-error)
   ((message
     :initarg :message
-    :reader message
-    :type schema:string
+    :type api:string
+    :reader api:message
     :documentation "Error message from server."))
   (:report
    (lambda (condition stream)
-     (format stream (message condition))))
+     (format stream (api:message condition))))
   (:default-initargs
    :message (error "Must supply MESSAGE"))
   (:documentation
    "Undeclared error from server."))
 
-(define-condition declared-rpc-error (rpc-error)
-  ()
+(define-condition api:declared-rpc-error (api:rpc-error)
+  ((schema
+    :type api:record
+    :reader internal:schema
+    :allocation :class))
   (:documentation
    "Declared error from server."))
 
-(defgeneric declared-rpc-error-class-p (class)
-  (:method (class)
-    nil)
-  (:documentation
-   "Determines if CLASS is a declared-rpc-error class."))
-
 (declaim
- (ftype (function (symbol schema:record-object &optional map<bytes>)
-                  (values declared-rpc-error &optional))
-        make-declared-rpc-error))
-(defun make-declared-rpc-error
-    (type error &optional (metadata (make-instance 'map<bytes> :size 0)))
+ (ftype (function (symbol api:record-object &optional internal:map<bytes>)
+                  (values api:declared-rpc-error &optional))
+        internal:make-declared-rpc-error))
+(defun internal:make-declared-rpc-error
+    (type error &optional (metadata (make-instance 'internal:map<bytes> :size 0)))
   (loop
-    for field across (schema:fields (class-of error))
-    for (name slot) = (multiple-value-list (schema:name field))
+    for field across (api:fields (class-of error))
+    for (name slot) = (multiple-value-list (api:name field))
 
     collect (intern name 'keyword) into initargs
     collect (slot-value error slot) into initargs
@@ -91,14 +77,15 @@
          (apply #'make-condition type (list* :metadata metadata initargs)))))
 
 (declaim
- (ftype (function (declared-rpc-error) (values schema:record-object &optional))
-        to-record))
-(defun to-record (error)
+ (ftype (function (api:declared-rpc-error)
+                  (values api:record-object &optional))
+        internal:to-record))
+(defun internal:to-record (error)
   (loop
-    with schema = (schema (class-of error))
+    with schema = (internal:schema error)
 
-    for field across (schema:fields schema)
-    for (name slot) = (multiple-value-list (schema:name field))
+    for field across (api:fields schema)
+    for (name slot) = (multiple-value-list (api:name field))
 
     collect (intern name 'keyword) into initargs
     collect (funcall slot error) into initargs
@@ -109,9 +96,9 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (declaim
-   (ftype (function (schema:field) (values cons &optional)) make-condition-slot))
+   (ftype (function (api:field) (values cons &optional)) make-condition-slot))
   (defun make-condition-slot (field)
-    (let ((name (nth-value 1 (schema:name field)))
+    (let ((name (closer-mop:slot-definition-name field))
           (type (closer-mop:slot-definition-type field))
           (documentation (documentation field t))
           (initargs (closer-mop:slot-definition-initargs field))
@@ -132,39 +119,50 @@
                   writers))))
 
   (declaim
-   (ftype (function (schema:record) (values list &optional))
-          make-condition-slots))
+   (ftype (function (api:record) (values list &optional)) make-condition-slots))
   (defun make-condition-slots (record)
-    (mapcar #'make-condition-slot (closer-mop:class-direct-slots record))))
+    (mapcar #'make-condition-slot (closer-mop:class-direct-slots record)))
 
-(defmacro to-error (record-form)
-  (let ((record (gensym))
-        (condition-slots (gensym))
-        (condition-options (gensym))
-        (name (gensym)))
-    `(let* ((,record ,record-form)
-            (,condition-slots (make-condition-slots ,record))
-            (,condition-options (when (documentation ,record t)
-                                  `((:documentation ,(documentation ,record t)))))
-            (,name (make-symbol (schema:name ,record))))
-       (eval
-        `(progn
-           (define-condition ,,name (declared-rpc-error)
-             ,,condition-slots
-             ,@,condition-options)
-           (defmethod schema ((class (eql (find-class ',,name))))
-             ,,record)
-           (defmethod declared-rpc-error-class-p ((class (eql (find-class ',,name))))
-             t)
-           (defmethod schema:to-jso ((class (eql (find-class ',,name))))
-             (declare (ignore class))
-             (let ((jso (schema:to-jso ,,record)))
-               (unless (stringp jso)
-                 (setf (st-json:getjso "type" jso) "error"))
-               jso))
-           (find-class ',,name))))))
+  (declaim
+   (ftype (function (symbol list list api:record) (values cons &optional))
+          expand-define-condition))
+  (defun expand-define-condition (name slots options record)
+    `(progn
+       (define-condition ,name (api:declared-rpc-error)
+         ((schema :allocation :class :initform ,record)
+          ,@slots)
+         ,@options)
 
-(eval-when (:compile-toplevel)
+       (find-class ',name))))
+
+(declaim (ftype (function (api:record) (values class &optional)) to-error))
+(defun to-error (record)
+  (let ((condition-slots (make-condition-slots record))
+        (condition-options (when (documentation record t)
+                             `((:documentation ,(documentation record t)))))
+        (name (make-symbol (api:name record))))
+    (eval
+     (expand-define-condition name condition-slots condition-options record))))
+
+(defmethod internal:write-jso
+    ((error class) seen canonical-form-p)
+  (assert (subtypep error 'api:declared-rpc-error) ())
+  (closer-mop:ensure-finalized error)
+  (let* ((record (internal:schema (closer-mop:class-prototype error)))
+         (jso (internal:write-jso record seen canonical-form-p)))
+    (when (typep jso 'st-json:jso)
+      (setf (st-json:getjso "type" jso) "error"))
+    jso))
+
+(define-pattern-method 'internal:read-jso
+    '(lambda ((jso ("type" "error")) fullname->schema enclosing-namespace)
+      (setf (st-json:getjso "type" jso) "record")
+      (let* ((record (internal:read-jso jso fullname->schema enclosing-namespace))
+             (condition (to-error record)))
+        (setf (gethash (api:fullname record) fullname->schema) condition)
+        condition)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (declaim (ftype (function (list) (values &optional)) assert-valid-options))
   (defun assert-valid-options (options)
     (loop
@@ -172,8 +170,8 @@
       with expected-keys = '(:namespace :enclosing-namespace :aliases
                              :default-initargs :documentation :report)
         initially
-           (unless (every #'consp options)
-             (error "Expected a list of cons cells: ~S" options))
+           (assert (every #'consp options) (options)
+                   "Expected a list of cons cells: ~S" options)
 
       for (key &rest) in options
       unless (member key expected-keys) do
@@ -188,8 +186,8 @@
                 (error "Duplicate keys: ~S" keys))))
     (values))
 
-  (declaim (ftype (function (list) (values list &optional))
-                  options->record-initargs))
+  (declaim
+   (ftype (function (list) (values list &optional)) options->record-initargs))
   (defun options->record-initargs (options)
     (loop
       with keys = '(:namespace :enclosing-namespace :aliases :documentation)
@@ -199,8 +197,8 @@
       when assoc
         nconc (list key (cdr assoc))))
 
-  (declaim (ftype (function (list) (values list &optional))
-                  options->condition-options))
+  (declaim
+   (ftype (function (list) (values list &optional)) options->condition-options))
   (defun options->condition-options (options)
     (loop
       with keys = '(:default-initargs :documentation :report)
@@ -210,10 +208,7 @@
         collect it))
 
   (declaim
-   (ftype (function (list
-                     symbol
-                     symbol
-                     (function (t) (values t &optional)))
+   (ftype (function (list symbol symbol (function (t) (values t &optional)))
                     (values list &optional))
           %gather-into))
   (defun %gather-into (field from to transform)
@@ -228,11 +223,9 @@
          (return field)))
 
   (declaim
-   (ftype (function (list
-                     symbol
-                     symbol
-                     &optional (function (t) (values t &optional)))
-                    (values list &optional))
+   (ftype (function
+           (list symbol symbol &optional (function (t) (values t &optional)))
+           (values list &optional))
           gather-into))
   (defun gather-into (fields from to &optional (transform #'identity))
     (flet ((%gather-into (field)
@@ -265,32 +258,20 @@
             fields (gather-into fields :writer :writers #'writer-transform)
             fields (gather-into fields :initarg :initargs)))))
 
-(defmacro define-error (name (&rest fields) &body options)
+(defmacro api:define-error (name (&rest fields) &body options)
   (declare (symbol name))
   (assert-valid-options options)
-  (let* ((record-initargs (list*
-                           ;; if this is the same symbol as name, then
-                           ;; I can't use the ctor twice
-                           :name (make-symbol (string name))
-                           :direct-slots (to-direct-slots fields)
-                           (options->record-initargs options)))
-         (condition-options (options->condition-options options))
-         (condition-slots (make-condition-slots
-                           (apply #'make-instance 'schema:record record-initargs)))
-         (record (gensym)))
-    `(progn
-       (define-condition ,name (declared-rpc-error)
-         ,condition-slots
-         ,@condition-options)
-       (defmethod declared-rpc-error-class-p ((class (eql (find-class ',name))))
-         t)
-       (let ((,record (apply #'make-instance 'schema:record ',record-initargs)))
-         (defmethod schema ((class (eql (find-class ',name))))
-           ,record)
-         (defmethod schema:to-jso ((class (eql (find-class ',name))))
-           (declare (ignore class))
-           (let ((jso (schema:to-jso ,record)))
-             (unless (stringp jso)
-               (setf (st-json:getjso "type" jso) "error"))
-             jso))
-         (find-class ',name)))))
+  (let ((record-initargs (list*
+                          ;; if this is the same symbol as name, then
+                          ;; I can't use the ctor twice
+                          :name (make-symbol (string name))
+                          :direct-slots (to-direct-slots fields)
+                          (options->record-initargs options)))
+        (condition-options (options->condition-options options))
+        (record (gensym))
+        (condition-slots (gensym)))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (let* ((,record (apply #'make-instance 'api:record ',record-initargs))
+              (,condition-slots (make-condition-slots ,record)))
+         (eval
+          (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))

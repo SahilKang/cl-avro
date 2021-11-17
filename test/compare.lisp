@@ -17,11 +17,11 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/compare
+(defpackage #:cl-avro/test/compare
+  (:local-nicknames
+   (#:avro #:cl-avro))
   (:use #:cl #:1am))
-
-(in-package #:test/compare)
+(in-package #:cl-avro/test/compare)
 
 (defmacro with-compare ((schema &body preprocess) &body body)
   (let ((preprocess-gensym (gensym))
@@ -182,7 +182,7 @@
          :|field_3| (loop
                       with map = (make-instance 'map<string>)
                       for (key value) on (third object) by #'cddr
-                      do (setf (avro:hashref key map) value)
+                      do (setf (avro:gethash key map) value)
                       finally (return map))))
     (is (= 0 (compare '(2 "ABC" ("foo" "bar")) '(2 "ABC" nil))))
     (is (= -1 (compare '(1 "ABC" ("foo" "bar")) '(2 "ABC" ("foo" "bar")))))

@@ -16,17 +16,17 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/common
+(defpackage #:cl-avro/test/common
   (:use #:cl)
+  (:local-nicknames
+   (#:avro #:cl-avro))
   (:export #:field
            #:json=
            #:json-string=
            #:define-schema-test
            #:define-io-test
            #:json-syntax))
-
-(in-package #:test/common)
+(in-package #:cl-avro/test/common)
 
 ;;; field
 

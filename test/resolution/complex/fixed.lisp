@@ -16,9 +16,11 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/fixed
-  (:use #:cl #:1am))
-(in-package #:test/resolution/fixed)
+(defpackage #:cl-avro/test/resolution/fixed
+  (:use #:cl #:1am)
+  (:local-nicknames
+   (#:avro #:cl-avro)))
+(in-package #:cl-avro/test/resolution/fixed)
 
 (test fixed
   (let* ((writer-schema (make-instance

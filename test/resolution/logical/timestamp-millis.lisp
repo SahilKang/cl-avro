@@ -16,11 +16,13 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/timestamp-millis
+(defpackage #:cl-avro/test/resolution/timestamp-millis
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:millisecond))
-(in-package #:test/resolution/timestamp-millis)
+(in-package #:cl-avro/test/resolution/timestamp-millis)
 
 (declaim
  (ftype (function (local-time:timestamp local-time:timestamp) (values &optional))
@@ -48,94 +50,5 @@
                    'avro:timestamp-millis (avro:serialize writer))
                   'avro:timestamp-millis)))
     (is (typep writer 'avro:timestamp-millis))
-    (is (typep reader 'avro:timestamp-millis))
-    (assert= writer reader)))
-
-(test timestamp-millis->long
-  (let* ((writer (make-instance
-                  'avro:timestamp-millis
-                  :year 2021
-                  :month 8
-                  :day 7
-                  :hour 9
-                  :minute 25
-                  :millisecond 32350
-                  :timezone local-time:+utc-zone+))
-         (reader (avro:coerce
-                  (avro:deserialize
-                   'avro:timestamp-millis (avro:serialize writer))
-                  'avro:long)))
-    (is (typep writer 'avro:timestamp-millis))
-    (is (typep reader 'avro:long))
-    (is (= 1628328332350 reader))))
-
-(test long->timestamp-millis
-  (let* ((writer 1628328332350)
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:long (avro:serialize writer))
-                  'avro:timestamp-millis))
-         (local-time:*default-timezone* local-time:+utc-zone+))
-    (is (typep writer 'avro:long))
-    (is (typep reader 'avro:timestamp-millis))
-    (is (= 2021 (avro:year reader)))
-    (is (= 8 (avro:month reader)))
-    (is (= 7 (avro:day reader)))
-    (is (= 9 (avro:hour reader)))
-    (is (= 25 (avro:minute reader)))
-    (multiple-value-bind (second remainder)
-        (avro:second reader)
-      (is (= 32 second))
-      (is (= (/ 350 1000) remainder)))))
-
-(test timestamp-millis->float
-  (let* ((writer (make-instance
-                  'avro:timestamp-millis
-                  :year 2021
-                  :month 8
-                  :day 7
-                  :hour 9
-                  :minute 25
-                  :millisecond 32350
-                  :timezone local-time:+utc-zone+))
-         (reader (avro:coerce
-                  (avro:deserialize
-                   'avro:timestamp-millis (avro:serialize writer))
-                  'avro:float)))
-    (is (typep writer 'avro:timestamp-millis))
-    (is (typep reader 'avro:float))
-    (is (= 1628328332350.0 reader))))
-
-(test int->timestamp-millis
-  (let* ((writer 8732350)
-         (reader (avro:coerce
-                  (avro:deserialize 'avro:int (avro:serialize writer))
-                  'avro:timestamp-millis))
-         (local-time:*default-timezone* local-time:+utc-zone+))
-    (is (typep writer 'avro:int))
-    (is (typep reader 'avro:timestamp-millis))
-    (is (= 1970 (avro:year reader)))
-    (is (= 1 (avro:month reader)))
-    (is (= 1 (avro:day reader)))
-    (is (= 2 (avro:hour reader)))
-    (is (= 25 (avro:minute reader)))
-    (multiple-value-bind (second remainder)
-        (avro:second reader)
-      (is (= 32 second))
-      (is (= (/ 350 1000) remainder)))))
-
-(test timestamp-micros->timestamp-millis
-  (let* ((writer (make-instance
-                  'avro:timestamp-micros
-                  :year 2021
-                  :month 8
-                  :day 7
-                  :hour 2
-                  :minute 25
-                  :microsecond 32350450))
-         (reader (avro:coerce
-                  (avro:deserialize
-                   'avro:timestamp-micros (avro:serialize writer))
-                  'avro:timestamp-millis)))
-    (is (typep writer 'avro:timestamp-micros))
     (is (typep reader 'avro:timestamp-millis))
     (assert= writer reader)))

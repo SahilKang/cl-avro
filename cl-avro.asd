@@ -16,302 +16,197 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(asdf:defsystem #:cl-avro
+(in-package #:asdf-user)
+
+(defsystem #:cl-avro
   :description "Implementation of the Apache Avro data serialization system."
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
-  :depends-on (#:uiop
-               #:flexi-streams
-               #:babel
-               #:local-time
-               #:local-time-duration
-               #:time-interval
-               #:ieee-floats
-               #:st-json
-               #:chipz
-               #:salza2
-               #:closer-mop
-               #:trivial-extensible-sequences
-               #:genhash
-               #:md5
-               #:trivial-gray-streams)
-  :in-order-to ((test-op (test-op #:cl-avro/test)))
   :build-pathname "cl-avro"
   :pathname "src"
+  :in-order-to ((test-op (test-op #:cl-avro/test)))
+  :depends-on (#:alexandria
+               #:babel
+               #:chipz
+               #:closer-mop
+               #:ieee-floats
+               #:flexi-streams
+               #:local-time
+               #:local-time-duration
+               #:md5
+               #:salza2
+               #:st-json
+               #:time-interval
+               #:trivial-extensible-sequences)
   :components
-  ((:module "schema"
-    :components ((:file "primitive")
-                 (:file "ascii")
-                 (:module "complex"
-                  :depends-on ("primitive" "ascii")
-                  :components ((:file "common")
-                               (:file "base")
-                               (:file "scalarize"
-                                :depends-on ("common" "base"))
-                               (:file "late-type-check"
-                                :depends-on ("common" "base" "scalarize"))
-                               (:module "named"
-                                :depends-on ("common" "base" "scalarize")
-                                :serial t
-                                :components ((:file "type")
-                                             (:file "class")
-                                             (:file "schema")
-                                             (:file "package")))
-                               (:file "array"
-                                :depends-on ("base" "late-type-check"))
-                               (:file "enum"
-                                :depends-on ("common" "base" "named"))
-                               (:file "fixed"
-                                :depends-on ("base" "named"))
-                               (:file "map"
-                                :depends-on ("base" "late-type-check"))
-                               (:file "union"
-                                :depends-on ("common" "base" "named"))
-                               (:module "record"
-                                :depends-on ("common"
-                                             "base"
-                                             "named"
-                                             "array"
-                                             "enum"
-                                             "fixed"
-                                             "map"
-                                             "union")
-                                :serial t
-                                :components ((:file "notation")
-                                             (:file "field")
-                                             (:file "effective-field")
-                                             (:file "schema")
-                                             (:file "package")))
-                               (:file "package"
-                                :depends-on ("base"
-                                             "scalarize"
-                                             "late-type-check"
-                                             "named"
-                                             "array"
-                                             "enum"
-                                             "fixed"
-                                             "map"
-                                             "union"
-                                             "record"))))
-                 (:module "logical"
-                  :depends-on ("primitive" "ascii" "complex")
-                  :components ((:file "base")
-                               (:file "uuid"
-                                :depends-on ("base"))
-                               (:file "decimal"
-                                :depends-on ("base"))
-                               (:file "duration"
-                                :depends-on ("base"))
-                               (:file "timezone")
-                               (:file "date"
-                                :depends-on ("base"))
-                               (:file "time"
-                                :depends-on ("base" "timezone"))
-                               (:file "timestamp"
-                                :depends-on ("date" "time"))
-                               (:file "local-timestamp"
-                                :depends-on ("date" "time"))
-                               (:file "package"
-                                :depends-on ("base"
-                                             "uuid"
-                                             "decimal"
-                                             "duration"
-                                             "timezone"
-                                             "date"
-                                             "time"
-                                             "timestamp"
-                                             "local-timestamp"))))
-                 (:module "io"
-                  :depends-on ("primitive" "complex" "logical")
-                  :components ((:file "common")
-                               (:file "st-json")
-                               (:file "read"
-                                :depends-on ("common" "st-json"))
-                               (:module "write"
-                                :depends-on ("common" "st-json")
-                                :serial t
-                                :components ((:file "canonicalize")
-                                             (:file "write")))
-                               (:file "package"
-                                :depends-on ("read" "write"))))
-                 (:file "fingerprint"
-                  :depends-on ("complex" "io"))
-                 (:file "schema-of"
-                  :depends-on ("primitive" "complex"))
+  ((:file "type")
+   (:file "mop")
+   (:file "ascii")
+   (:file "little-endian" :depends-on ("type"))
+   (:file "crc-64-avro" :depends-on ("type"))
+   (:module "api"
+    :components ((:file "package")
+                 (:file "io" :depends-on ("package"))
+                 (:file "schema" :depends-on ("package"))
+                 (:file "name" :depends-on ("package"))
+                 (:file "coerce" :depends-on ("package"))
+                 (:file "compare" :depends-on ("package"))
+                 (:file "file" :depends-on ("package"))
+                 (:file "ipc" :depends-on ("package"))))
+   (:module "recursive-descent"
+    :depends-on ("api" "mop" "type")
+    :components ((:file "pattern")
+                 (:file "jso" :depends-on ("pattern"))))
+   (:module "primitive"
+    :depends-on ("type" "little-endian" "crc-64-avro" "api" "recursive-descent")
+    :components ((:file "defprimitive")
+                 (:file "compare")
+                 (:file "ieee-754" :depends-on ("compare"))
+                 (:file "zigzag" :depends-on ("compare"))
+                 (:file "null" :depends-on ("defprimitive"))
+                 (:file "boolean" :depends-on ("defprimitive"))
+                 (:file "int" :depends-on ("zigzag" "defprimitive"))
+                 (:file "long" :depends-on ("zigzag" "defprimitive"))
+                 (:file "float" :depends-on ("ieee-754" "defprimitive"))
+                 (:file "double" :depends-on ("ieee-754" "defprimitive"))
+                 (:file "bytes" :depends-on ("long" "defprimitive" "compare"))
+                 (:file "string" :depends-on ("bytes" "long" "defprimitive"))))
+   (:file "schema"
+    :depends-on ("primitive"
+                 "api"
+                 "little-endian"
+                 "type"
+                 "crc-64-avro"
+                 "recursive-descent"))
+   (:module "name"
+    :depends-on ("api" "mop" "recursive-descent" "schema" "type" "ascii")
+    :components ((:file "type")
+                 (:file "deduce" :depends-on ("type"))
+                 (:file "class" :depends-on ("type" "deduce"))
+                 (:file "schema" :depends-on ("type" "deduce" "class"))
+                 (:file "coerce" :depends-on ("deduce" "schema"))
                  (:file "package"
-                  :depends-on ("primitive"
-                               "complex"
-                               "logical"
-                               "io"
-                               "fingerprint"
-                               "schema-of"))))
-   (:file "underlying"
-    :depends-on ("schema"))
-   (:module "io"
-    :depends-on ("schema" "underlying")
-    :components ((:file "little-endian")
-                 (:file "base"
-                  :depends-on ("little-endian"))
-                 (:file "schema"
-                  :depends-on ("base"))
-                 (:file "primitive"
-                  :depends-on ("base" "little-endian"))
-                 (:file "complex"
-                  :depends-on ("base"))
-                 (:file "logical"
-                  :depends-on ("base" "primitive" "little-endian"))
-                 (:file "compare"
-                  :depends-on ("base"))
-                 (:file "package"
-                  :depends-on ("schema"
-                               "primitive"
-                               "complex"
-                               "logical"
-                               "compare"))))
-   (:module "resolution"
-    :depends-on ("schema" "underlying")
-    :components ((:file "base")
-                 (:file "primitive"
-                  :depends-on ("base"))
-                 (:file "complex"
-                  :depends-on ("base"))
-                 (:file "logical"
-                  :depends-on ("base"))
-                 (:file "package"
-                  :depends-on ("base"))))
-   (:module "object-container-file"
-    :depends-on ("schema" "io")
-    :components ((:file "header")
-                 (:file "file-block"
-                  :depends-on ("header"))
-                 (:file "file-input-stream"
-                  :depends-on ("header" "file-block"))
-                 (:file "file-output-stream"
-                  :depends-on ("header" "file-block"))
-                 (:file "package"
-                  :depends-on ("header"
-                               "file-block"
-                               "file-input-stream"
-                               "file-output-stream"))))
+                  :depends-on ("type" "deduce" "class" "schema" "coerce"))))
+   (:module "complex"
+    :depends-on ("type" "api" "mop" "recursive-descent" "schema" "name")
+    :components ((:file "count-and-size")
+                 (:file "array" :depends-on ("count-and-size"))
+                 (:file "map" :depends-on ("count-and-size"))
+                 (:file "union")
+                 (:file "fixed")
+                 (:file "enum")
+                 (:file "record")))
+   (:module "logical"
+    :depends-on ("type"
+                 "mop"
+                 "ascii"
+                 "api"
+                 "recursive-descent"
+                 "primitive"
+                 "schema"
+                 "complex")
+    :components ((:file "uuid")
+                 (:file "datetime")
+                 (:file "date" :depends-on ("datetime"))
+                 (:file "time-millis" :depends-on ("datetime"))
+                 (:file "time-micros" :depends-on ("datetime"))
+                 (:file "timestamp-millis" :depends-on ("datetime"))
+                 (:file "timestamp-micros" :depends-on ("datetime"))
+                 (:file "local-timestamp-millis" :depends-on ("datetime"))
+                 (:file "local-timestamp-micros" :depends-on ("datetime"))
+                 (:file "big-endian")
+                 (:file "decimal" :depends-on ("big-endian"))
+                 (:file "duration")))
+   (:module "file"
+    :depends-on ("primitive" "complex" "logical")
+    :components ((:file "file-header")
+                 (:file "file-block" :depends-on ("file-header"))
+                 (:file "file-reader" :depends-on ("file-block"))
+                 (:file "file-writer" :depends-on ("file-block"))))
    (:module "ipc"
-    :depends-on ("schema" "io" "resolution")
+    :depends-on ("primitive" "complex" "logical")
     :components ((:file "handshake")
-                 (:file "error"
-                  :depends-on ("handshake"))
-                 (:file "message"
-                  :depends-on ("error"))
-                 (:file "framing"
-                  :depends-on ("handshake"))
-                 (:module "protocol"
-                  :depends-on ("handshake" "error" "message" "framing")
-                  :components ((:module "class"
-                                :components ((:file "protocol")
-                                             (:file "io"
-                                              :depends-on ("protocol"))
-                                             (:file "package"
-                                              :depends-on ("protocol"))))
-                               (:module "object"
-                                :depends-on ("class")
-                                :components ((:file "transceiver")
-                                             (:module "client"
-                                              :depends-on ("transceiver")
-                                              :components ((:file "common")
-                                                           (:file "stateful"
-                                                            :depends-on ("common"))
-                                                           (:file "stateless"
-                                                            :depends-on ("common"))
-                                                           (:file "package"
-                                                            :depends-on ("common"))))
-                                             (:file "protocol-object"
-                                              :depends-on ("client" "transceiver"))
-                                             (:file "server"
-                                              :depends-on ("protocol-object" "transceiver"))
-                                             (:file "package"
-                                              :depends-on ("protocol-object" "transceiver" "server"))))
-                               (:file "package"
-                                :depends-on ("class" "object"))))
-                 (:file "package"
-                  :depends-on ("error" "message" "protocol"))))
-   (:file "package"
-    :depends-on ("schema"
-                 "io"
-                 "resolution"
-                 "object-container-file"
-                 "ipc"))))
+                 (:file "error" :depends-on ("handshake"))
+                 (:file "message" :depends-on ("error"))
+                 (:file "framing" :depends-on ("handshake"))
+                 (:file "parse" :depends-on ("error" "message"))
+                 (:file "protocol" :depends-on ("parse" "handshake"))
+                 (:file "client" :depends-on ("framing" "protocol"))
+                 (:file "protocol-object" :depends-on ("client"))
+                 (:file "server"
+                  :depends-on ("framing" "protocol" "protocol-object"))))))
 
-
-(asdf:defsystem #:cl-avro/test
+(defsystem #:cl-avro/test
   :description "Tests for cl-avro."
   :version (:read-file-form "version.lisp")
   :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
   :license "GPLv3"
-  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables #:babel)
-  :perform (test-op (op sys) (uiop:symbol-call :1am :run))
   :pathname "test"
-  :components
-  ((:file "common")
-   (:file "compare")
-   (:file "object-container-file")
-   (:module "complex"
-    :depends-on ("common")
-    :components ((:file "array")
-                 (:file "enum")
-                 (:file "fixed")
-                 (:file "map")
-                 (:file "record")
-                 (:file "union")))
-   (:module "logical"
-    :depends-on ("common")
-    :components ((:file "date")
-                 (:file "decimal")
-                 (:file "duration")
-                 (:file "local-timestamp-micros")
-                 (:file "local-timestamp-millis")
-                 (:file "time-micros")
-                 (:file "time-millis")
-                 (:file "timestamp-micros")
-                 (:file "timestamp-millis")
-                 (:file "uuid")))
-   (:module "primitive"
-    :depends-on ("common")
-    :components ((:file "boolean")
-                 (:file "bytes")
-                 (:file "double")
-                 (:file "float")
-                 (:file "int")
-                 (:file "long")
-                 (:file "null")
-                 (:file "string")))
-   (:module "resolution"
-    :components ((:file "base")
-                 (:file "primitive"
-                  :depends-on ("base"))
-                 (:file "promote"
-                  :depends-on ("base"))
-                 (:module "complex"
-                  :depends-on ("base")
-                  :components ((:file "array")
-                               (:file "enum")
-                               (:file "fixed")
-                               (:file "map")
-                               (:file "record")
-                               (:file "union")))
-                 (:module "logical"
-                  :depends-on ("base")
-                  :components ((:file "date")
-                               (:file "decimal")
-                               (:file "duration")
-                               (:file "local-timestamp-micros")
-                               (:file "local-timestamp-millis")
-                               (:file "time-micros")
-                               (:file "time-millis")
-                               (:file "timestamp-micros")
-                               (:file "timestamp-millis")
-                               (:file "uuid")))))
-   (:module "ipc"
-    :components ((:file "common")
-                 (:file "stateless"
-                  :depends-on ("common"))
-                 (:file "stateful"
-                  :depends-on ("common"))))))
+  :perform (test-op (op sys) (uiop:symbol-call :1am :run))
+  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables #:babel)
+  :components ((:file "common")
+               (:file "compare")
+               (:file "file")
+               (:module "complex"
+                :depends-on ("common")
+                :components ((:file "array")
+                             (:file "enum")
+                             (:file "fixed")
+                             (:file "map")
+                             (:file "record")
+                             (:file "union")))
+               (:module "logical"
+                :depends-on ("common")
+                :components ((:file "date")
+                             (:file "decimal")
+                             (:file "duration")
+                             (:file "local-timestamp-micros")
+                             (:file "local-timestamp-millis")
+                             (:file "time-micros")
+                             (:file "time-millis")
+                             (:file "timestamp-micros")
+                             (:file "timestamp-millis")
+                             (:file "uuid")))
+               (:module "primitive"
+                :depends-on ("common")
+                :components ((:file "boolean")
+                             (:file "bytes")
+                             (:file "double")
+                             (:file "float")
+                             (:file "int")
+                             (:file "long")
+                             (:file "null")
+                             (:file "string")))
+               (:module "resolution"
+                :components ((:file "base")
+                             (:file "primitive"
+                              :depends-on ("base"))
+                             (:file "promote"
+                              :depends-on ("base"))
+                             (:module "complex"
+                              :depends-on ("base")
+                              :components ((:file "array")
+                                           (:file "enum")
+                                           (:file "fixed")
+                                           (:file "map")
+                                           (:file "record")
+                                           (:file "union")))
+                             (:module "logical"
+                              :depends-on ("base")
+                              :components ((:file "date")
+                                           (:file "decimal")
+                                           (:file "duration")
+                                           (:file "local-timestamp-micros")
+                                           (:file "local-timestamp-millis")
+                                           (:file "time-micros")
+                                           (:file "time-millis")
+                                           (:file "timestamp-micros")
+                                           (:file "timestamp-millis")
+                                           (:file "uuid")))))
+               (:module "ipc"
+                :components ((:file "common")
+                             (:file "stateless"
+                              :depends-on ("common"))
+                             (:file "stateful"
+                              :depends-on ("common"))))))
