@@ -16,9 +16,11 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/uuid
-  (:use #:cl #:1am))
-(in-package #:test/resolution/uuid)
+(defpackage #:cl-avro/test/resolution/uuid
+  (:use #:cl #:1am)
+  (:local-nicknames
+   (#:avro #:cl-avro)))
+(in-package #:cl-avro/test/resolution/uuid)
 
 (test uuid->uuid
   (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
@@ -27,4 +29,4 @@
                   'avro:uuid)))
     (is (typep writer 'avro:uuid))
     (is (typep reader 'avro:uuid))
-    (is (string= (avro:uuid writer) (avro:uuid reader)))))
+    (is (string= (avro:raw writer) (avro:raw reader)))))

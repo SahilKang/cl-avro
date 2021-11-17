@@ -16,13 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/ipc/stateless/server
+(defpackage #:cl-avro/test/ipc/stateless/server
   (:use #:cl)
-  (:import-from #:test/ipc/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/ipc/common
                 #:flatten)
   (:export #:service-endpoint
            #:*one-way*))
-(in-package #:test/ipc/stateless/server)
+(in-package #:cl-avro/test/ipc/stateless/server)
 
 (defclass |Greeting| ()
   ((|message| :type avro:string))
@@ -89,7 +91,7 @@
   (setf *one-way* string))
 
 (declaim
- (ftype (function (cl-avro.ipc.framing:buffers)
+ (ftype (function (cl-avro.internal.ipc.framing:buffers)
                   (values (simple-array (unsigned-byte 8) (*)) &optional))
         service-endpoint))
 (defun service-endpoint (request)
@@ -97,16 +99,17 @@
          (response (avro:receive-from-unconnected-client +service+ request)))
     (flatten response)))
 
-(defpackage #:test/ipc/stateless/client
+(defpackage #:cl-avro/test/ipc/stateless/client
   (:use #:cl)
   (:local-nicknames
-   (#:server #:test/ipc/stateless/server))
+   (#:avro #:cl-avro)
+   (#:server #:cl-avro/test/ipc/stateless/server))
   (:export #:|Greeting|
            #:|Curse|
            #:|message|
            #:|hello|
            #:one-way))
-(in-package #:test/ipc/stateless/client)
+(in-package #:cl-avro/test/ipc/stateless/client)
 
 (defclass |Greeting| ()
   ((|message| :type avro:string))
@@ -147,12 +150,13 @@
 (defparameter +service+
   (make-instance '|HelloWorld| :transceiver +client+))
 
-(defpackage #:test/ipc/stateless
+(defpackage #:cl-avro/test/ipc/stateless
   (:use #:cl #:1am)
   (:local-nicknames
-   (#:client #:test/ipc/stateless/client)
-   (#:server #:test/ipc/stateless/server)))
-(in-package #:test/ipc/stateless)
+   (#:avro #:cl-avro)
+   (#:client #:cl-avro/test/ipc/stateless/client)
+   (#:server #:cl-avro/test/ipc/stateless/server)))
+(in-package #:cl-avro/test/ipc/stateless)
 
 (test greeting
   (let* ((request (make-instance 'client:|Greeting| :|message| "foobar"))

@@ -16,15 +16,16 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/decimal
+(defpackage #:cl-avro/test/decimal
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro)
+   (#:internal #:cl-avro.internal))
+  (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/decimal)
+(in-package #:cl-avro/test/decimal)
 
 (named-readtables:in-readtable json-syntax)
 
@@ -39,6 +40,7 @@
        (schema (avro:deserialize 'avro:schema json)))
   (is (eq 'avro:bytes schema)))
 
+;; TODO canonical form isn't specified for logical schemas
 (define-schema-test schema-bytes
   {
     "type": "bytes",
@@ -47,12 +49,12 @@
     "scale": 2
   }
   {
-    "precision": 4,
-    "scale": 2,
     "type": "bytes",
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 4,
+    "scale": 2
   }
-  #x5452f11fed1af467
+  #xeeb4ee37786d146e
   (make-instance
    'avro:decimal
    :underlying 'avro:bytes
@@ -88,12 +90,12 @@
     "scale": 4
   }
   {
-    "precision": 4,
-    "scale": 4,
     "type": "bytes",
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 4,
+    "scale": 4
   }
-  #x7a2017da52b0b0d
+  #xf07f87a02e62b644
   (make-instance
    'avro:decimal
    :underlying 'avro:bytes
@@ -128,11 +130,11 @@
     "precision": 3,
   }
   {
-    "precision": 3,
     "type": "bytes",
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 3
   }
-  #x6d0f5de0928faf67
+  #x69151c93bbffa7b8
   (make-instance
    'avro:decimal
    :underlying 'avro:bytes
@@ -187,16 +189,16 @@
     "scale": 2
   }
   {
-    "precision": 4,
-    "scale": 2,
     "type": {
       "name": "foo",
       "type": "fixed",
       "size": 2
     },
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 4,
+    "scale": 2
   }
-  #xdbaa0878f079e119
+  #x38262a1302a1557f
   (make-instance
    'avro:decimal
    :underlying (make-instance
@@ -243,16 +245,16 @@
     "scale": 4
   }
   {
-    "precision": 4,
-    "scale": 4,
     "type": {
       "name": "foo",
       "type": "fixed",
       "size": 4
     },
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 4,
+    "scale": 4
   }
-  #x318a6202499b604b
+  #x6cc413011b16903f
   (make-instance
    'avro:decimal
    :underlying (make-instance
@@ -298,15 +300,15 @@
     "precision": 4,
   }
   {
-    "precision": 4,
     "type": {
       "name": "foo",
       "type": "fixed",
       "size": 4
     },
-    "logicalType": "decimal"
+    "logicalType": "decimal",
+    "precision": 4
   }
-  #xfd7421f66a728ed0
+  #xa67f01d3bbb18067
   (make-instance
    'avro:decimal
    :underlying (make-instance
@@ -352,7 +354,8 @@
   (signals error
     (avro:scale (find-class 'late_decimal)))
   (signals error
-    (avro:underlying (find-class 'late_decimal)))
+    ;; TODO maybe expose this publicly
+    (internal:underlying (find-class 'late_decimal)))
 
   (defclass late_fixed ()
     ()
@@ -361,7 +364,7 @@
 
   (is (= 4 (avro:precision (find-class 'late_decimal))))
   (is (zerop (avro:scale (find-class 'late_decimal))))
-  (is (eq (find-class 'late_fixed) (avro:underlying (find-class 'late_decimal)))))
+  (is (eq (find-class 'late_fixed) (internal:underlying (find-class 'late_decimal)))))
 
 (test scale-greater-than-precision
   (signals error

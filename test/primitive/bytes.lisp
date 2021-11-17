@@ -16,14 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/bytes
+(defpackage #:cl-avro/test/bytes
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/bytes)
+(in-package #:cl-avro/test/bytes)
 
 (named-readtables:in-readtable json-syntax)
 

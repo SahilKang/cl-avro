@@ -16,21 +16,21 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/local-timestamp-micros
+(defpackage #:cl-avro/test/local-timestamp-micros
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:json-syntax
                 #:json-string=
                 #:define-io-test))
-
-(in-package #:test/local-timestamp-micros)
+(in-package #:cl-avro/test/local-timestamp-micros)
 
 (named-readtables:in-readtable json-syntax)
 
 (test schema
   (let ((json {"type": "long", "logicalType": "local-timestamp-micros"})
-        (fingerprint #xd054e14493f41db7)
+        (fingerprint #x10d2958f23b25beb)
         (expected (find-class 'avro:local-timestamp-micros)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))

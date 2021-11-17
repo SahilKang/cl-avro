@@ -16,12 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/date
+(defpackage #:cl-avro/test/resolution/date
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:find-schema
                 #:initarg-for-millis/micros))
-(in-package #:test/resolution/date)
+(in-package #:cl-avro/test/resolution/date)
 
 (test date->date
   (let* ((writer (make-instance 'avro:date :year 2021 :month 8 :day 6))

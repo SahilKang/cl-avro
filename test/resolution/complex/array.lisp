@@ -16,11 +16,12 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/array
+(defpackage #:cl-avro/test/resolution/array
   (:use #:cl #:1am)
   (:local-nicknames
-   (#:base #:test/resolution/base)))
-(in-package #:test/resolution/array)
+   (#:avro #:cl-avro)
+   (#:base #:cl-avro/test/resolution/base)))
+(in-package #:cl-avro/test/resolution/array)
 
 (eval-when (:compile-toplevel)
   (declaim

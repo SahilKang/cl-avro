@@ -16,21 +16,21 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/time-millis
+(defpackage #:cl-avro/test/time-millis
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:json-syntax
                 #:json-string=
                 #:define-io-test))
-
-(in-package #:test/time-millis)
+(in-package #:cl-avro/test/time-millis)
 
 (named-readtables:in-readtable json-syntax)
 
 (test schema
   (let ((json {"type": "int", "logicalType": "time-millis"})
-        (fingerprint #x7275d51a3f395c8f)
+        (fingerprint #xbf34ac33708d105e)
         (expected (find-class 'avro:time-millis)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))

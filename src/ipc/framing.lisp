@@ -16,38 +16,48 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.ipc.framing
+(defpackage #:cl-avro.internal.ipc.framing
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema)
-   (#:io #:cl-avro.io)
-   (#:handshake #:cl-avro.ipc.handshake))
+   (#:api #:cl-avro)
+   (#:internal #:cl-avro.internal))
+  (:import-from #:cl-avro.internal.type
+                #:uint8
+                #:uint32
+                #:ufixnum
+                #:array<uint8>
+                #:vector<uint8>)
   (:export #:frame
            #:to-input-stream
            #:input-stream
+           #:buffer-object
            #:buffers
            #:buffer))
-(in-package #:cl-avro.ipc.framing)
+(in-package #:cl-avro.internal.ipc.framing)
 
-(declaim ((unsigned-byte 32) +buffer-size+))
+;;; buffer
+
+(declaim (uint32 +buffer-size+))
 (defconstant +buffer-size+ (* 8 1024))
 
-(declaim ((unsigned-byte 32) +max-object-size+))
+(declaim (uint32 +max-object-size+))
 (defconstant +max-object-size+ (- +buffer-size+ 4))
 
+(deftype buffer-size ()
+  `(integer 0 ,+max-object-size+))
+
 (deftype buffer ()
-  '(simple-array (unsigned-byte 8) (*)))
+  'array<uint8>)
 
 (deftype buffers ()
   '(simple-array buffer (*)))
 
 ;;; frame
 
-(declaim
- (ftype (function ((unsigned-byte 32)) (values buffer &optional)) make-buffer))
+(declaim (ftype (function (buffer-size) (values buffer &optional)) make-buffer))
 (defun make-buffer (size)
   (loop
-    with buffer = (make-array (+ 4 size) :element-type '(unsigned-byte 8))
+    with buffer = (make-array (+ 4 size) :element-type 'uint8)
 
     for i below 4
     for shift = 24 then (- shift 8)
@@ -56,18 +66,20 @@
     do (setf (elt buffer i) byte)
 
     finally
-       (return buffer)))
+       (return
+         buffer)))
 
-(declaim
- (ftype (function (schema:object) (values buffer &optional)) buffer))
-(defun buffer (object)
-  (let ((buffer (make-buffer (io:serialized-size object))))
-    (io:serialize object :into buffer :start 4)
+(declaim (ftype (function (api:object) (values buffer &optional)) buffer-object))
+(defun buffer-object (object)
+  (let ((buffer (make-buffer (api:serialized-size object))))
+    (api:serialize object :into buffer :start 4)
     buffer))
 
+(deftype object-sizes ()
+  '(simple-array fixnum (*)))
+
 (declaim
- (ftype (function ((simple-array fixnum (*)) &optional fixnum)
-                  (values buffers &optional))
+ (ftype (function (object-sizes &optional ufixnum) (values buffers &optional))
         allocate-buffers))
 (defun allocate-buffers (object-sizes &optional (prefix-pad 0))
   (loop
@@ -89,9 +101,8 @@
     do (setf (elt buffers i) (make-buffer +max-object-size+))
 
     finally
-       (return buffers)))
-
-;; output-stream
+       (return
+         buffers)))
 
 (defclass output-stream (trivial-gray-streams:fundamental-binary-output-stream
                          trivial-gray-streams:trivial-gray-stream-mixin)
@@ -100,39 +111,46 @@
     :reader buffers
     :type buffers)
    (buffers-index
-    :accessor buffers-index
-    :type (and (integer 0) fixnum))
+    :accessor outer-index
+    :type ufixnum)
    (buffer-index
-    :accessor buffer-index
-    :type (and (integer 0) fixnum)))
+    :accessor inner-index
+    :type ufixnum))
   (:default-initargs
    :buffers (error "Must supply BUFFERS")))
 
 (defmethod initialize-instance :after
     ((instance output-stream) &key (start 0))
-  (with-slots (buffers-index buffer-index) instance
-    (setf buffers-index start
-          buffer-index 4)))
+  (with-accessors
+        ((outer-index outer-index)
+         (inner-index inner-index))
+      instance
+    (setf outer-index start
+          inner-index 4)))
 
 (defmethod stream-element-type
     ((instance output-stream))
-  '(unsigned-byte 8))
+  'uint8)
 
 (defmethod trivial-gray-streams:stream-write-byte
     ((instance output-stream) (byte fixnum))
-  (declare ((unsigned-byte 8) byte))
-  (with-slots (buffers buffers-index buffer-index) instance
+  (declare (uint8 byte))
+  (with-accessors
+        ((buffers buffers)
+         (outer-index outer-index)
+         (inner-index inner-index))
+      instance
     (tagbody
      begin
-       (if (= buffers-index (length buffers))
+       (if (= outer-index (length buffers))
            (error 'end-of-file :stream *error-output*)
-           (let ((buffer (elt buffers buffers-index)))
-             (when (= buffer-index (length buffer))
-               (incf buffers-index)
-               (setf buffer-index 4)
+           (let ((buffer (elt buffers outer-index)))
+             (when (= inner-index (length buffer))
+               (incf outer-index)
+               (setf inner-index 4)
                (go begin))
-             (setf (elt buffer buffer-index) byte)
-             (incf buffer-index)))))
+             (setf (elt buffer inner-index) byte)
+             (incf inner-index)))))
   byte)
 
 (defmethod trivial-gray-streams:stream-write-sequence
@@ -141,54 +159,57 @@
      (start fixnum)
      (end fixnum)
      &key)
-  (declare (buffer vector))
-  (with-slots (buffers buffers-index buffer-index) stream
+  (declare (buffer vector)
+           (ufixnum start end))
+  (with-accessors
+        ((buffers buffers)
+         (outer-index outer-index)
+         (inner-index inner-index))
+      stream
     (loop
       until (or (>= start end)
-                (= buffers-index (length buffers)))
-      for buffer = (elt buffers buffers-index)
+                (= outer-index (length buffers)))
+      for buffer = (elt buffers outer-index)
 
-      if (= buffer-index (length buffer)) do
-        (incf buffers-index)
-        (setf buffer-index 4)
+      if (= inner-index (length buffer)) do
+        (incf outer-index)
+        (setf inner-index 4)
       else do
         (let* ((needed (- end start))
-               (remaining (- (length buffer) buffer-index))
+               (remaining (- (length buffer) inner-index))
                (count (min needed remaining)))
-          (replace buffer vector :start1 buffer-index :start2 start :end2 end)
-          (incf buffer-index count)
+          (replace buffer vector :start1 inner-index :start2 start :end2 end)
+          (incf inner-index count)
           (incf start count))
 
       finally
-         (return vector))))
+         (return
+           vector))))
 
 (declaim (ftype (function (list output-stream) (values &optional)) frame-into))
 (defun frame-into (objects output-stream)
   (flet ((serialize (object)
-           (io:serialize object :into output-stream)))
+           (api:serialize object :into output-stream)))
     (map nil #'serialize objects))
   (values))
 
-(declaim
- (ftype (function (list) (values (simple-array fixnum (*)) &optional))
-        object-sizes))
+(declaim (ftype (function (list) (values object-sizes &optional)) object-sizes))
 (defun object-sizes (objects)
-  (map '(simple-array fixnum (*)) #'io:serialized-size objects))
+  (map 'object-sizes #'api:serialized-size objects))
 
 (declaim
- (ftype (function (handshake:request list) (values buffers &optional))
+ (ftype (function (internal:request list) (values buffers &optional))
         frame-with-handshake))
 (defun frame-with-handshake (handshake objects)
   (let* ((object-sizes (object-sizes objects))
          (buffers (allocate-buffers object-sizes 1)))
     (frame-into objects (make-instance 'output-stream :buffers buffers :start 1))
-    (setf (elt buffers 0) (buffer handshake))
+    (setf (elt buffers 0) (buffer-object handshake))
     buffers))
 
-(declaim
- (ftype (function (&rest schema:object) (values buffers &optional)) frame))
+(declaim (ftype (function (&rest api:object) (values buffers &optional)) frame))
 (defun frame (&rest objects)
-  (if (typep (first objects) 'handshake:request)
+  (if (typep (first objects) 'internal:request)
       (frame-with-handshake (first objects) (rest objects))
       (let* ((object-sizes (object-sizes objects))
              (buffers (allocate-buffers object-sizes)))
@@ -197,47 +218,52 @@
 
 ;;; to-input-stream
 
-;; input-stream
-
 (defclass input-stream (trivial-gray-streams:fundamental-binary-input-stream
                         trivial-gray-streams:trivial-gray-stream-mixin)
   ((buffers
     :initarg :buffers
     :reader buffers
-    :type (vector (vector (unsigned-byte 8))))
+    :type (vector vector<uint8>))
    (buffers-index
-    :accessor buffers-index
-    :type (and (integer 0) fixnum))
+    :accessor outer-index
+    :type ufixnum)
    (buffer-index
-    :accessor buffer-index
-    :type (and (integer 0) fixnum)))
+    :accessor inner-index
+    :type ufixnum))
   (:default-initargs
    :buffers (error "Must supply BUFFERS")))
 
 (defmethod initialize-instance :after
     ((instance input-stream) &key)
-  (with-slots (buffers-index buffer-index) instance
-    (setf buffers-index 0
-          buffer-index 0)))
+  (with-accessors
+        ((outer-index outer-index)
+         (inner-index inner-index))
+      instance
+    (setf outer-index 0
+          inner-index 0)))
 
 (defmethod stream-element-type
     ((instance input-stream))
-  '(unsigned-byte 8))
+  'uint8)
 
 (defmethod trivial-gray-streams:stream-read-byte
     ((instance input-stream))
-  (with-slots (buffers buffers-index buffer-index) instance
+  (with-accessors
+        ((buffers buffers)
+         (outer-index outer-index)
+         (inner-index inner-index))
+      instance
     (tagbody
      begin
-       (if (= buffers-index (length buffers))
+       (if (= outer-index (length buffers))
            (return-from trivial-gray-streams:stream-read-byte :eof)
-           (let ((buffer (elt buffers buffers-index)))
-             (when (= buffer-index (length buffer))
-               (incf buffers-index)
-               (setf buffer-index 0)
+           (let ((buffer (elt buffers outer-index)))
+             (when (= inner-index (length buffer))
+               (incf outer-index)
+               (setf inner-index 0)
                (go begin))
-             (let ((byte (elt buffer buffer-index)))
-               (incf buffer-index)
+             (let ((byte (elt buffer inner-index)))
+               (incf inner-index)
                (return-from trivial-gray-streams:stream-read-byte byte)))))))
 
 (defmethod trivial-gray-streams:stream-read-sequence
@@ -246,32 +272,35 @@
      (start fixnum)
      (end fixnum)
      &key)
-  (declare (buffer vector))
-  (with-slots (buffers buffers-index buffer-index) stream
+  (declare (buffer vector)
+           (ufixnum start end))
+  (with-accessors
+        ((buffers buffers)
+         (outer-index outer-index)
+         (inner-index inner-index))
+      stream
     (loop
       until (or (>= start end)
-                (= buffers-index (length buffers)))
-      for buffer = (elt buffers buffers-index)
+                (= outer-index (length buffers)))
+      for buffer = (elt buffers outer-index)
 
-      if (= buffer-index (length buffer)) do
-        (incf buffers-index)
-        (setf buffer-index 0)
+      if (= inner-index (length buffer)) do
+        (incf outer-index)
+        (setf inner-index 0)
       else do
         (let* ((needed (- end start))
-               (remaining (- (length buffer) buffer-index))
+               (remaining (- (length buffer) inner-index))
                (count (min needed remaining)))
-          (replace vector buffer :start1 start :start2 buffer-index :end1 end)
-          (incf buffer-index count)
+          (replace vector buffer :start1 start :start2 inner-index :end1 end)
+          (incf inner-index count)
           (incf start count))
 
       finally
-         (return start))))
-
-;; to-input-stream
+         (return
+           start))))
 
 (declaim
- (ftype (function (buffer &optional fixnum)
-                  (values (unsigned-byte 32) &optional))
+ (ftype (function (buffer &optional ufixnum) (values uint32 &optional))
         parse-big-endian))
 (defun parse-big-endian (buffer &optional (start 0))
   (loop
@@ -285,11 +314,11 @@
     do (setf integer (logior integer (ash byte shift)))
 
     finally
-       (return integer)))
+       (return
+         integer)))
 
 (declaim
- (ftype (function (stream (simple-array (unsigned-byte 8) (4)))
-                  (values (unsigned-byte 32) &optional))
+ (ftype (function (stream (array<uint8> 4)) (values uint32 &optional))
         read-size))
 (defun read-size (stream buffer)
   (unless (= (read-sequence buffer stream) 4)
@@ -301,15 +330,13 @@
         stream->input-stream))
 (defun stream->input-stream (stream)
   (loop
-    with size-buffer = (make-array 4 :element-type '(unsigned-byte 8))
-    and buffers
-          = (make-array 0 :element-type '(simple-array (unsigned-byte 8) (*))
-                          :adjustable t :fill-pointer t)
+    with size-buffer = (make-array 4 :element-type 'uint8)
+    and buffers = (make-array 0 :element-type 'buffer :adjustable t :fill-pointer t)
 
     for size = (read-size stream size-buffer)
     until (zerop size)
 
-    for buffer = (make-array size :element-type '(unsigned-byte 8))
+    for buffer = (make-array size :element-type 'uint8)
 
     if (= (read-sequence buffer stream) size) do
       (vector-push-extend buffer buffers)
@@ -317,15 +344,16 @@
       (error 'end-of-file :stream *error-output*)
 
     finally
-       (return (make-instance 'input-stream :buffers buffers))))
+       (return
+         (make-instance 'input-stream :buffers buffers))))
 
 (declaim
- (ftype (function ((vector (unsigned-byte 8))) (values input-stream &optional))
+ (ftype (function (vector<uint8>) (values input-stream &optional))
         bytes->input-stream))
 (defun bytes->input-stream (bytes)
   (loop
     with index = 0
-    and buffers = (make-array 0 :element-type '(vector (unsigned-byte 8))
+    and buffers = (make-array 0 :element-type 'vector<uint8>
                                 :adjustable t :fill-pointer t)
 
     for size = (prog1 (parse-big-endian bytes index)
@@ -333,7 +361,7 @@
     until (zerop size)
 
     for slice = (prog1 (make-array size
-                                   :element-type '(unsigned-byte 8)
+                                   :element-type 'uint8
                                    :displaced-to bytes
                                    :displaced-index-offset index)
                   (incf index size))
@@ -341,11 +369,11 @@
     do (vector-push-extend slice buffers)
 
     finally
-       (return (make-instance 'input-stream :buffers buffers))))
+       (return
+         (make-instance 'input-stream :buffers buffers))))
 
 (declaim
- (ftype (function ((or (vector (unsigned-byte 8)) stream))
-                  (values input-stream &optional))
+ (ftype (function ((or stream vector<uint8>)) (values input-stream &optional))
         to-input-stream))
 (defun to-input-stream (input)
   (if (streamp input)

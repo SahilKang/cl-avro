@@ -16,15 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/array
+(defpackage #:cl-avro/test/array
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/array)
+(in-package #:cl-avro/test/array)
 
 (named-readtables:in-readtable json-syntax)
 
@@ -145,7 +145,7 @@
                         (lambda (enum)
                           (make-instance enum-schema :enum enum))
                         expected))
-    (6 0 0 2 0)
+    (5 6 0 0 2 0)
   (is (equal expected (map 'list #'avro:which-one arg))))
 
 (test late-type-check

@@ -16,15 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/record
+(defpackage #:cl-avro/test/record
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/record)
+(in-package #:cl-avro/test/record)
 
 (named-readtables:in-readtable json-syntax)
 
@@ -758,7 +758,7 @@
                  :type ,(closer-mop:ensure-class
                          'array<node>
                          :metaclass 'avro:array
-                         :items 'Node)))
+                         :items '|Node|)))
               :enclosing-namespace "org.apache.avro"))))
   (defclass array<double> ()
     ()
@@ -1127,8 +1127,8 @@
      :map-field (let ((map (make-instance map<foo>))
                       (abc (make-instance foo :label "ABC"))
                       (def (make-instance foo :label "DEF")))
-                  (setf (avro:hashref "abc" map) abc
-                        (avro:hashref "def" map) def)
+                  (setf (avro:gethash "abc" map) abc
+                        (avro:gethash "def" map) def)
                   map)
      :union-field (make-instance
                    union<boolean-double-array<bytes>>
@@ -1164,11 +1164,13 @@
      #xa4 #x70 #x3d #x0a #xd7 #x63 #x4c #x40 ; 56.78d0
      6 2 4 6                                 ; #(2 4 6)
      ;; nil is not serialized
-     4                                       ; two elements in array:
+     3                                       ; two elements in array:
+     32                                      ; 16 bytes in array block
      #x33 #x33 #x33 #x33 #x33 #xb3 #x37 #x40 ; 23.7d0
      #x77 #xbe #x9f #x1a #x2f #xdd #x5e #x40 ; 123.456d0
      0                                       ; end array
-     4                                  ; two key-value pairs in map
+     3                                  ; two key-value pairs in map
+     32                                 ; 16 bytes in map block
      6 #x61 #x62 #x63                   ; "abc"
      6 #x41 #x42 #x43                   ; "ABC"
      6 #x64 #x65 #x66                   ; "def"
@@ -1178,7 +1180,8 @@
      0                                  ; "A" under enum
      2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32 ; md5
      12 #x70 #x61 #x72 #x65 #x6e #x74            ; "parent"
-     4                                     ; two elements in array
+     3                                     ; two elements in array
+     36                                    ; 18 bytes in array block
      14 #x63 #x68 #x69 #x6c #x64 #x2d #x31 ; "child-1"
      0                                     ; empty array
      14 #x63 #x68 #x69 #x6c #x64 #x2d #x32 ; "child-2"
@@ -1193,16 +1196,16 @@
   (is (= 56.78d0 (double-field arg)))
   (is (equalp #(2 4 6) (bytes-field arg)))
   (is (null (null-field arg)))
-  (is (equalp #(23.7d0 123.456d0) (avro:raw-buffer (array-field arg))))
+  (is (equalp #(23.7d0 123.456d0) (avro:raw (array-field arg))))
   (let ((map (map-field arg)))
-    (is (= 2 (avro:generic-hash-table-count map)))
-    (is (string= "ABC" (label (avro:hashref "abc" map))))
-    (is (string= "DEF" (label (avro:hashref "def" map)))))
+    (is (= 2 (avro:hash-table-count map)))
+    (is (string= "ABC" (label (avro:gethash "abc" map))))
+    (is (string= "DEF" (label (avro:gethash "def" map)))))
   (is (eq 'avro:false (avro:object (union-field arg))))
   (is (string= "A" (avro:which-one (enum-field arg))))
   (is (equalp
        #(2 4 6 8 10 12 14 16 18 20 22 24 26 28 30 32)
-       (avro:raw-buffer (fixed-field arg))))
+       (avro:raw (fixed-field arg))))
   (let* ((parent (record-field arg))
          (children (children parent))
          (child-1 (elt children 0))

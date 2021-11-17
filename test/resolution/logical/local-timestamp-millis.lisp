@@ -16,11 +16,13 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/local-timestamp-millis
+(defpackage #:cl-avro/test/resolution/local-timestamp-millis
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:millisecond))
-(in-package #:test/resolution/local-timestamp-millis)
+(in-package #:cl-avro/test/resolution/local-timestamp-millis)
 
 (declaim
  (ftype (function (local-time:timestamp local-time:timestamp) (values &optional))

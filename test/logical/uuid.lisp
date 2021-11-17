@@ -16,21 +16,21 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/uuid
+(defpackage #:cl-avro/test/uuid
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:json-syntax
                 #:json-string=
                 #:define-io-test))
-
-(in-package #:test/uuid)
+(in-package #:cl-avro/test/uuid)
 
 (named-readtables:in-readtable json-syntax)
 
 (test schema
   (let ((json {"type": "string", "logicalType": "uuid"})
-        (fingerprint #x8f014872634503c7)
+        (fingerprint #x33ec648d41dc37c9)
         (expected (find-class 'avro:uuid)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))
@@ -44,10 +44,10 @@
      #x36 #x62 #x61 #x37 #x62 #x38 #x31 #x30 #x2d #x39 #x64 #x61 #x64
      #x2d #x31 #x31 #x64 #x31 #x2d #x38 #x30 #x62 #x34 #x2d #x30 #x30
      #x63 #x30 #x34 #x66 #x64 #x34 #x33 #x30 #x63 #x38)
-  (is (string= expected (avro:uuid arg)))
-  (signals error
+  (is (string= expected (avro:raw arg)))
+  (signals (or error warning)
     (make-instance 'avro:uuid :uuid "abc"))
-  (signals error
+  (signals (or error warning)
     (make-instance 'avro:uuid :uuid "")))
 
 ;; TODO move this into some generic logical fall-through

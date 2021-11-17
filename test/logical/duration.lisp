@@ -16,15 +16,16 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/duration
+(defpackage #:cl-avro/test/duration
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro)
+   (#:internal #:cl-avro.internal))
+  (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
                 #:define-io-test))
-
-(in-package #:test/duration)
+(in-package #:cl-avro/test/duration)
 
 (named-readtables:in-readtable json-syntax)
 
@@ -98,14 +99,14 @@
     (:underlying late_fixed))
 
   (signals error
-    (avro:underlying (find-class 'late_duration)))
+    (internal:underlying (find-class 'late_duration)))
 
   (defclass late_fixed ()
     ()
     (:metaclass avro:fixed)
     (:size 12))
 
-  (is (eq (find-class 'late_fixed) (avro:underlying (find-class 'late_duration)))))
+  (is (eq (find-class 'late_fixed) (internal:underlying (find-class 'late_duration)))))
 
 (test bad-fixed-size
   (let ((schema (make-instance
@@ -115,4 +116,4 @@
                               :name "foo"
                               :size 13))))
     (signals error
-      (avro:underlying schema))))
+      (internal:underlying schema))))

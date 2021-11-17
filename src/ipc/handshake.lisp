@@ -16,101 +16,95 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:cl-avro.ipc.handshake
+(defpackage #:cl-avro.internal.ipc.handshake
   (:use #:cl)
   (:local-nicknames
-   (#:schema #:cl-avro.schema))
-  (:export #:request
-           #:response
-           #:MD5
-           #:union<null-string>
-           #:union<null-MD5>
-           #:map<bytes>
-           #:match
-           #:client-hash
-           #:client-protocol
-           #:server-hash
-           #:server-protocol))
-(in-package #:cl-avro.ipc.handshake)
+   (#:api #:cl-avro)
+   (#:internal #:cl-avro.internal)))
+(in-package #:cl-avro.internal.ipc.handshake)
 
-;; TODO maybe create and switch into org.apache.avro.ipc package
-;; do this for header, etc. then too
-
-(defclass MD5 ()
+(defclass internal:md5 ()
   ()
-  (:metaclass schema:fixed)
-  (:enclosing-namespace "org.apache.avro.ipc")
-  (:size 16))
+  (:metaclass api:fixed)
+  (:size 16)
+  (:enclosing-namespace "org.apache.avro.ipc"))
 
-(defclass union<null-MD5> ()
+(defclass internal:union<null-md5> ()
   ()
-  (:metaclass schema:union)
-  (:schemas schema:null MD5))
+  (:metaclass api:union)
+  (:schemas api:null internal:md5))
 
-(defclass union<null-string> ()
+(defclass internal:union<null-string> ()
   ()
-  (:metaclass schema:union)
-  (:schemas schema:null schema:string))
+  (:metaclass api:union)
+  (:schemas api:null api:string))
 
-(defclass map<bytes> ()
+(defclass internal:map<bytes> ()
   ()
-  (:metaclass schema:map)
-  (:values schema:bytes))
+  (:metaclass api:map)
+  (:values api:bytes))
 
-(defclass union<null-map<bytes>> ()
+(defclass internal:union<null-map<bytes>> ()
   ()
-  (:metaclass schema:union)
-  (:schemas schema:null map<bytes>))
+  (:metaclass api:union)
+  (:schemas api:null internal:map<bytes>))
 
-(defclass match ()
+(defclass internal:match ()
   ()
-  (:metaclass schema:enum)
+  (:metaclass api:enum)
   (:symbols "BOTH" "CLIENT" "NONE")
   (:name "HandshakeMatch")
   (:enclosing-namespace "org.apache.avro.ipc"))
 
 ;;; request
 
-(defclass request ()
+(defclass internal:request ()
   ((|clientHash|
-    :type MD5
     :initarg :client-hash
-    :reader client-hash)
+    :type internal:md5
+    :reader internal:client-hash)
    (|clientProtocol|
-    :type union<null-string>
     :initarg :client-protocol
-    :reader client-protocol)
+    :type internal:union<null-string>
+    :reader internal:client-protocol)
    (|serverHash|
-    :type MD5
     :initarg :server-hash
-    :reader server-hash)
+    :type internal:md5
+    :reader internal:server-hash)
    (|meta|
-    :type union<null-map<bytes>>
     :initarg :meta
-    :reader meta))
-  (:metaclass schema:record)
+    :type internal:union<null-map<bytes>>
+    :reader internal:meta))
+  (:metaclass api:record)
   (:name "HandshakeRequest")
-  (:namespace "org.apache.avro.ipc"))
+  (:namespace "org.apache.avro.ipc")
+  (:default-initargs
+   :client-protocol (make-instance 'internal:union<null-string> :object nil)
+   :meta (make-instance 'internal:union<null-map<bytes>> :object nil)))
 
 ;;; response
 
-(defclass response ()
+(defclass internal:response ()
   ((|match|
-    :type match
     :initarg :match
-    :reader match)
+    :type internal:match
+    :reader internal:match)
    (|serverProtocol|
-    :type union<null-string>
     :initarg :server-protocol
-    :reader server-protocol)
+    :type internal:union<null-string>
+    :reader internal:server-protocol)
    (|serverHash|
-    :type union<null-MD5>
     :initarg :server-hash
-    :reader server-hash)
+    :type internal:union<null-md5>
+    :reader internal:server-hash)
    (|meta|
-    :type union<null-map<bytes>>
     :initarg :meta
-    :reader meta))
-  (:metaclass schema:record)
+    :type internal:union<null-map<bytes>>
+    :reader internal:meta))
+  (:metaclass api:record)
   (:name "HandshakeResponse")
-  (:namespace "org.apache.avro.ipc"))
+  (:namespace "org.apache.avro.ipc")
+  (:default-initargs
+   :server-protocol (make-instance 'internal:union<null-string> :object nil)
+   :server-hash (make-instance 'internal:union<null-md5> :object nil)
+   :meta (make-instance 'internal:union<null-map<bytes>> :object nil)))

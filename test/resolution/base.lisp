@@ -16,14 +16,16 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/base
+(defpackage #:cl-avro/test/resolution/base
   (:use #:cl)
+  (:local-nicknames
+   (#:avro #:cl-avro))
   (:export #:find-schema
            #:bytes
            #:initarg-for-millis/micros
            #:millisecond
            #:microsecond))
-(in-package #:test/resolution/base)
+(in-package #:cl-avro/test/resolution/base)
 
 (eval-when (:compile-toplevel)
   (declaim
@@ -33,7 +35,7 @@
         (find-symbol (string name) 'avro)
       (unless (eq status :external)
         (error "~S does not name a schema" name))
-      (unless (typep schema 'cl-avro.schema:primitive-schema)
+      (unless (typep schema 'avro:primitive-schema)
         (check-type (find-class schema) avro:schema))
       schema))
 

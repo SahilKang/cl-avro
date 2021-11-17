@@ -16,12 +16,14 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/resolution/promote
+(defpackage #:cl-avro/test/resolution/promote
   (:use #:cl #:1am)
-  (:import-from #:test/resolution/base
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/resolution/base
                 #:find-schema
                 #:bytes))
-(in-package #:test/resolution/promote)
+(in-package #:cl-avro/test/resolution/promote)
 
 (defmacro deftest (from to input function &optional postprocess)
   (declare (symbol from to function postprocess))

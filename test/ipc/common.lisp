@@ -16,13 +16,15 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-(defpackage #:test/ipc/common
+(defpackage #:cl-avro/test/ipc/common
   (:use #:cl)
+  (:local-nicknames
+   (#:avro #:cl-avro))
   (:export #:flatten))
-(in-package #:test/ipc/common)
+(in-package #:cl-avro/test/ipc/common)
 
 (declaim
- (ftype (function (cl-avro.ipc.framing:buffers)
+ (ftype (function (cl-avro.internal.ipc.framing:buffers)
                   (values (simple-array (unsigned-byte 8) (*)) &optional))
         flatten))
 (defun flatten (buffers)

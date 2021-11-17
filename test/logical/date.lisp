@@ -16,21 +16,21 @@
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package #:cl-user)
-
-(defpackage #:test/date
+(defpackage #:cl-avro/test/date
   (:use #:cl #:1am)
-  (:import-from #:test/common
+  (:local-nicknames
+   (#:avro #:cl-avro))
+  (:import-from #:cl-avro/test/common
                 #:json-syntax
                 #:json-string=
                 #:define-io-test))
-
-(in-package #:test/date)
+(in-package #:cl-avro/test/date)
 
 (named-readtables:in-readtable json-syntax)
 
 (test schema
   (let ((json {"type": "int", "logicalType": "date"})
-        (fingerprint #x7275d51a3f395c8f)
+        (fingerprint #xf9171af064bdedf2)
         (expected (find-class 'avro:date)))
     (is (eq expected (avro:deserialize 'avro:schema json)))
     (is (json-string= json (avro:serialize expected)))
