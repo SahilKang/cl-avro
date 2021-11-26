@@ -19,7 +19,8 @@
 (defpackage #:cl-avro/test/record
   (:use #:cl #:1am)
   (:local-nicknames
-   (#:avro #:cl-avro))
+   (#:avro #:cl-avro)
+   (#:internal #:cl-avro.internal))
   (:import-from #:cl-avro/test/common
                 #:define-schema-test
                 #:json-syntax
@@ -1223,3 +1224,19 @@
 
   (signals error
     (setf (string-field arg) 3)))
+
+(test non-fixed-size
+  (let ((schema (make-instance
+                 'avro:record
+                 :name '#:foo
+                 :direct-slots '((:name #:foo :type avro:boolean)
+                                 (:name #:bar :type avro:string)))))
+    (is (null (internal:fixed-size schema)))))
+
+(test fixed-size
+  (let ((schema (make-instance
+                 'avro:record
+                 :name '#:foo
+                 :direct-slots '((:name #:foo :type avro:boolean)
+                                 (:name #:bar :type avro:boolean)))))
+    (is (= 2 (internal:fixed-size schema)))))

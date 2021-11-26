@@ -340,15 +340,17 @@
 
 ;;; serialized-size
 
+(deftype ufixnum? ()
+  '(or null ufixnum))
+
 (defmethod internal:fixed-size
     ((schema api:record))
   (let* ((fields (api:fields schema))
          (types (map '(simple-array api:schema (*)) #'api:type fields))
-         (sizes (map 'list #'internal:fixed-size types)))
+         (sizes (map '(simple-array ufixnum? (*)) #'internal:fixed-size types)))
     (declare (fields fields))
-    (when (and (every #'identity sizes)
-               (apply #'= sizes))
-      (first sizes))))
+    (when (every #'identity sizes)
+      (reduce #'+ sizes :initial-value 0))))
 
 (defmethod api:serialized-size
     ((object api:record-object))
