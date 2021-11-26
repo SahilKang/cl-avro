@@ -275,6 +275,8 @@
           (name namespace aliases (doc :documentation) symbols default) jso
         (push enclosing-namespace initargs)
         (push :enclosing-namespace initargs)
+        (push (make-symbol (st-json:getjso "name" jso)) initargs)
+        (push :name initargs)
         (let* ((schema (apply #'make-instance 'api:enum initargs))
                (fullname (api:fullname schema)))
           (assert (not (gethash fullname fullname->schema)) ()
