@@ -27,12 +27,12 @@
 (in-package #:cl-avro/test/ipc/stateless/server)
 
 (defclass |Greeting| ()
-  ((|message| :type avro:string))
+  ((|message| :type avro:string :initarg :message))
   (:metaclass avro:record)
   (:enclosing-namespace "com.acme"))
 
 (avro:define-error |Curse|
-    ((|message| :type avro:string)))
+    ((|message| :type avro:string :initarg :message)))
 
 (defclass |HelloWorld| ()
   ()
@@ -81,9 +81,9 @@
   (let ((message (slot-value greeting '|message|)))
     (cond
       ((string= message "foo")
-       (error '|Curse| :|message| "throw foo"))
+       (error '|Curse| :message "throw foo"))
       ((string= message "bar") (error "meow"))
-      (t (make-instance '|Greeting| :|message| (format nil "Hello ~A!" message))))))
+      (t (make-instance '|Greeting| :message (format nil "Hello ~A!" message))))))
 
 (defparameter *one-way* nil)
 
@@ -112,12 +112,12 @@
 (in-package #:cl-avro/test/ipc/stateless/client)
 
 (defclass |Greeting| ()
-  ((|message| :type avro:string))
+  ((|message| :type avro:string :initarg :message))
   (:metaclass avro:record)
   (:enclosing-namespace "com.acme"))
 
 (avro:define-error |Curse|
-    ((|message| :type avro:string)))
+    ((|message| :type avro:string :reader |message|)))
 
 (defclass |HelloWorld| ()
   ()
@@ -159,14 +159,14 @@
 (in-package #:cl-avro/test/ipc/stateless)
 
 (test greeting
-  (let* ((request (make-instance 'client:|Greeting| :|message| "foobar"))
+  (let* ((request (make-instance 'client:|Greeting| :message "foobar"))
          (response (client:|hello| request)))
     (is (typep response 'client:|Greeting|))
     (is (string= "Hello foobar!" (slot-value response 'client:|message|)))))
 
 (test declared-error
   (handler-case
-      (let ((request (make-instance 'client:|Greeting| :|message| "foo")))
+      (let ((request (make-instance 'client:|Greeting| :message "foo")))
         (client:|hello| request))
     (client:|Curse| (curse)
       (is (typep curse 'client:|Curse|))
@@ -174,7 +174,7 @@
 
 (test undeclared-error
   (handler-case
-      (let ((request (make-instance 'client:|Greeting| :|message| "bar")))
+      (let ((request (make-instance 'client:|Greeting| :message "bar")))
         (client:|hello| request))
     (avro:undeclared-rpc-error (condition)
       (is (typep condition 'avro:undeclared-rpc-error))

@@ -40,18 +40,23 @@
 (defclass writer_schema ()
   ((nums
     :type array<int>
+    :initarg :nums
     :reader nums)
    (num
     :type avro:int
+    :initarg :num
     :reader num)
    (str
     :type avro:string
+    :initarg :str
     :reader str)
    (record
     :type writer_schema?
+    :initarg :record
     :reader record)
    (extra
     :type avro:boolean
+    :initarg :extra
     :reader extra))
   (:metaclass avro:record)
   (:default-initargs

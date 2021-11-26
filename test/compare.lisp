@@ -162,28 +162,30 @@
         'avro:record
         :name "foo"
         :direct-slots
-        `((:name #:|field_1| :type avro:int)
+        `((:name #:|field_1| :type avro:int :initargs (:field-1))
           (:name #:|field_2|
                  :order avro:descending
+                 :initargs (:field-2)
                  :type ,(closer-mop:ensure-class
                          'enum_name
                          :metaclass 'avro:enum
                          :symbols '("ABC" "AB")))
           (:name #:|field_3|
                  :order avro:ignore
+                 :initargs (:field-3)
                  :type ,(closer-mop:ensure-class
                          'map<string>
                          :metaclass 'avro:map
                          :values 'avro:string))))
         (make-instance
          schema
-         :|field_1| (first object)
-         :|field_2| (make-instance 'enum_name :enum (second object))
-         :|field_3| (loop
-                      with map = (make-instance 'map<string>)
-                      for (key value) on (third object) by #'cddr
-                      do (setf (avro:gethash key map) value)
-                      finally (return map))))
+         :field-1 (first object)
+         :field-2 (make-instance 'enum_name :enum (second object))
+         :field-3 (loop
+                    with map = (make-instance 'map<string>)
+                    for (key value) on (third object) by #'cddr
+                    do (setf (avro:gethash key map) value)
+                    finally (return map))))
     (is (= 0 (compare '(2 "ABC" ("foo" "bar")) '(2 "ABC" nil))))
     (is (= -1 (compare '(1 "ABC" ("foo" "bar")) '(2 "ABC" ("foo" "bar")))))
     (is (= -1 (compare '(2 "AB" ("foo" "bar")) '(2 "ABC" ("foo" "bar")))))

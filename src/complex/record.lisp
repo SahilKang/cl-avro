@@ -30,7 +30,11 @@
                 #:comparison)
   (:import-from #:cl-avro.internal.recursive-descent.pattern
                 #:define-pattern-method)
-  (:export #:read-field))
+  (:export #:read-field
+           #:fields
+           #:objects
+           #:booleans
+           #:make-object))
 (in-package #:cl-avro.internal.record)
 
 ;;; field
@@ -152,7 +156,16 @@
 
 (defclass effective-field
     (api:field closer-mop:standard-effective-slot-definition)
-  ((default :type api:object)))
+  ((default
+    :type api:object)
+   (readers
+    :type list
+    :accessor readers
+    :reader internal:readers)
+   (writers
+    :type list
+    :accessor writers
+    :reader internal:writers)))
 
 (defmethod initialize-instance :around
     ((instance effective-field)
@@ -224,8 +237,10 @@
 
 (defmethod closer-mop:compute-effective-slot-definition
     ((class api:record) name slots)
-  (let ((effective-slot (call-next-method)))
-    (dolist (slot slots effective-slot)
+  (let ((effective-slot (call-next-method))
+        readers
+        writers)
+    (dolist (slot slots)
       (multiple-value-bind (default defaultp)
           (api:default slot)
         (when defaultp
@@ -236,7 +251,16 @@
           (set-order-once effective-slot order)))
       (let ((aliases (api:aliases slot)))
         (when aliases
-          (set-aliases-once effective-slot aliases))))))
+          (set-aliases-once effective-slot aliases)))
+      (dolist (reader (closer-mop:slot-definition-readers slot))
+        (push reader readers))
+      (dolist (writer (closer-mop:slot-definition-writers slot))
+        (push writer writers)))
+    ;; delete-duplicates will discard the earlier duplicate, which
+    ;; works fine because we're reversing afterwards
+    (setf (readers effective-slot) (nreverse (delete-duplicates readers :test #'eq))
+          (writers effective-slot) (nreverse (delete-duplicates writers :test #'equal)))
+    effective-slot))
 
 (defmethod (setf closer-mop:slot-value-using-class)
     (new-value (class api:record) object (slot api:field))
@@ -251,56 +275,6 @@
     ((instance api:record))
   (closer-mop:ensure-finalized instance)
   (slot-value instance 'fields))
-
-(declaim (ftype (function (list) (values list &optional)) add-initargs))
-(defun add-initargs (slots)
-  (flet ((add-initarg (slot)
-           (let* ((name (string (getf slot :name)))
-                  (initarg (intern name 'keyword)))
-             (pushnew initarg (getf slot :initargs)))
-           (flet ((add-initarg (alias)
-                    (pushnew (intern alias 'keyword)
-                             (getf slot :initargs))))
-             (map nil #'add-initarg (getf slot :aliases)))
-           slot))
-    (mapcar #'add-initarg slots)))
-
-(declaim (ftype (function (cons) (values keyword &optional)) lispiest-initarg))
-(defun lispiest-initarg (slot)
-  (flet ((initarg< (initarg1 initarg2)
-           (declare (keyword initarg1 initarg2))
-           (let ((initarg1 (string initarg1))
-                 (initarg2 (string initarg2)))
-             (and (string/= initarg1 initarg2)
-                  (string= (remove #\- initarg1 :test #'char=)
-                           (remove #\_ (string-upcase initarg2) :test #'char=))))))
-    (first (sort (copy-list (getf slot :initargs)) #'initarg<))))
-
-(declaim
- (ftype (function (list list) (values list &optional)) add-default-initargs))
-(defun add-default-initargs (slots default-initargs)
-  (labels
-      ((preexisting (slot)
-         (loop
-           for initarg in (getf slot :initargs)
-           when (find initarg default-initargs :test #'eq :key #'first)
-             return it))
-       (preexisting-or-new (slot)
-         (let* ((name (string (getf slot :name)))
-                (initarg (lispiest-initarg slot))
-                (error-form `(error ,(format nil "Must supply ~A" name)))
-                (lambda-form `(lambda () ,error-form)))
-           (or (preexisting slot)
-               `(,initarg ,error-form ,(compile nil lambda-form))))))
-    (mapcar #'preexisting-or-new slots)))
-
-(mop:definit ((instance api:record) :around
-              &rest initargs &key direct-slots direct-default-initargs)
-  (setf (getf initargs :direct-slots) (add-initargs direct-slots)
-        (getf initargs :direct-default-initargs) (add-default-initargs
-                                                  (getf initargs :direct-slots)
-                                                  direct-default-initargs))
-  (apply #'call-next-method instance initargs))
 
 (deftype slot-names ()
   '(simple-array symbol (*)))
@@ -410,67 +384,102 @@
 
 ;;; deserialize
 
+(deftype objects ()
+  '(simple-array api:object (*)))
+
+(deftype booleans ()
+  '(simple-array boolean (*)))
+
+(declaim
+ (ftype (function (api:record fields objects list booleans)
+                  (values api:record-object &optional))
+        %make-object))
+(defun %make-object (schema fields values initargs initargp-vector)
+  (loop
+    with object = (apply #'make-instance schema initargs)
+
+    for field across fields
+    for value across values
+    for initargp across initargp-vector
+
+    when initargp do
+      (setf (slot-value object (nth-value 1 (api:name field))) value)
+
+    finally
+       (return
+         object)))
+
+(declaim
+ (ftype (function (api:record fields objects)
+                  (values api:record-object &optional))
+        make-object))
+(defun make-object (schema fields values)
+  (loop
+    with initargs of-type list = nil
+    and initargp-vector = (make-array (length fields)
+                                      :element-type 'boolean
+                                      :initial-element nil)
+
+    for index below (length fields)
+    for field = (elt fields index)
+    for value = (elt values index)
+    for initarg of-type (or null keyword)
+      = (first (closer-mop:slot-definition-initargs field))
+
+    if initarg do
+      (push value initargs)
+      (push initarg initargs)
+    else do
+      (setf (elt initargp-vector index) t)
+
+    finally
+       (return
+         (%make-object schema fields values initargs initargp-vector))))
+
 (defmethod api:deserialize
     ((schema api:record) (input vector) &key (start 0))
   (declare (vector<uint8> input)
            (ufixnum start))
   (loop
     with fields of-type fields = (api:fields schema)
-    and initargs of-type list = nil
+    with values = (make-array (length fields) :element-type 'api:object)
     and total-bytes-read of-type ufixnum = 0
 
-    for field across fields
+    for index below (length fields)
+    for field = (elt fields index)
     for new-start of-type ufixnum = (+ start total-bytes-read)
-    for value of-type api:object
-      = (multiple-value-bind (value bytes-read)
-            (api:deserialize (api:type field) input :start new-start)
-          (declare (ufixnum bytes-read))
-          (incf total-bytes-read bytes-read)
-          value)
-
     do
-       (push value initargs)
-       ;; TODO do the thing below
-       (push (lispiest-initarg
-              (list :initargs (closer-mop:slot-definition-initargs field)))
-             initargs)
+       (multiple-value-bind (value bytes-read)
+           (api:deserialize (api:type field) input :start new-start)
+         (declare (api:object value)
+                  (ufixnum bytes-read))
+         (incf total-bytes-read bytes-read)
+         (setf (elt values index) value))
 
     finally
        (return
-         (values (apply #'make-instance schema initargs) total-bytes-read))))
+         (values (make-object schema fields values) total-bytes-read))))
 
 (defmethod api:deserialize
     ((schema api:record) (input stream) &key)
   (loop
     with fields of-type fields = (api:fields schema)
-    and initargs of-type list = nil
+    with values = (make-array (length fields) :element-type 'api:object)
     and total-bytes-read of-type ufixnum = 0
 
-    for field across fields
-    for value of-type api:object
-      = (multiple-value-bind (value bytes-read)
-            (api:deserialize (api:type field) input)
-          (declare (ufixnum bytes-read))
-          (incf total-bytes-read bytes-read)
-          value)
-
+    for index below (length fields)
+    for field = (elt fields index)
     do
-       (push value initargs)
-       ;; TODO do the thing below
-       (push (lispiest-initarg
-              (list :initargs (closer-mop:slot-definition-initargs field)))
-             initargs)
+       (multiple-value-bind (value bytes-read)
+           (api:deserialize (api:type field) input)
+         (declare (api:object value)
+                  (ufixnum bytes-read))
+         (incf total-bytes-read bytes-read)
+         (setf (elt values index) value))
 
     finally
        (return
-         ;; TODO need to coalesce upper/lower keyword initargs with
-         ;; an around method on initialize-instance, or use the
-         ;; lispiest initarg when building initargs.  is add-initarg
-         ;; really a good thing then?
-         ;; or just remove the default-initargs stuff and have a restart
-         ;; catch unset slots
-         ;; or do none of that and just have slot-value assert the value
-         (values (apply #'make-instance schema initargs) total-bytes-read))))
+         (values (make-object schema fields values) total-bytes-read))))
 
 ;;; compare
 
@@ -620,13 +629,13 @@
         with writer of-type api:schema = (class-of object)
         with writer-fields of-type fields = (api:fields writer)
         and reader-fields of-type fields = (api:fields schema)
-        and initargs of-type list = nil
+        with values = (make-array (length reader-fields) :element-type 'api:object)
 
-              initially
-                 (name:assert-matching-names schema writer)
+          initially
+             (name:assert-matching-names schema writer)
 
-        for reader-field across reader-fields
-        for initarg of-type keyword = (intern (api:name reader-field) 'keyword)
+        for index below (length reader-fields)
+        for reader-field = (elt reader-fields index)
         for writer-field of-type (or null api:field)
           = (find-field reader-field writer-fields)
 
@@ -637,8 +646,7 @@
             (declare (symbol writer-slot-name)
                      (api:object writer-value)
                      (api:schema reader-type))
-            (push (api:coerce writer-value reader-type) initargs)
-            (push initarg initargs))
+            (setf (elt values index) (api:coerce writer-value reader-type)))
         else do
           (multiple-value-bind (default defaultp)
               (api:default reader-field)
@@ -647,12 +655,24 @@
             (unless defaultp
               (error "Writer field ~S does not exist and reader has no default"
                      (api:name reader-field)))
-            (push default initargs)
-            (push initarg initargs))
+            (setf (elt values index) default))
 
         finally
            (return
-             (apply #'change-class object schema initargs)))))
+             (loop
+               ;; TODO maybe specialize change-class to do this field
+               ;; level coercing
+               with object = (change-class object schema)
+
+               for field across reader-fields
+               for value across values
+               for name = (nth-value 1 (api:name field))
+               do
+                  (setf (slot-value object name) value)
+
+               finally
+                  (return
+                    object))))))
 
 ;;; field default
 
@@ -668,52 +688,67 @@
       (map nil #'fill-jso (api:fields (class-of default))))
     jso))
 
-(declaim
- (ftype (function (api:record) (values hash-table &optional)) name->type))
-(defun name->type (schema)
+(declaim (ftype (function (fields) (values hash-table &optional)) name->index))
+(defun name->index (fields)
   (loop
-    with fields of-type fields = (api:fields schema)
-    with name->type = (make-hash-table :test #'equal :size (length fields))
+    with name->index = (make-hash-table :test #'equal :size (length fields))
 
-    for field across fields
+    for index below (length fields)
+    for field = (elt fields index)
     for name of-type name:name = (api:name field)
-    for type of-type api:schema = (api:type field)
-
-    do (setf (gethash name name->type) type)
+    do
+       (setf (gethash name name->index) index)
 
     finally
        (return
-         name->type)))
+         name->index)))
+
+(declaim
+ (ftype (function ((or symbol string) t fields hash-table objects)
+                  (values &optional))
+        set-values))
+(defun set-values (key value fields name->index values)
+  (let* ((index (gethash (string key) name->index))
+         (type (api:type (elt fields index)))
+         (value (internal:deserialize-field-default type value)))
+    (setf (elt values index) value))
+  (values))
 
 (defmethod internal:deserialize-field-default
     ((schema api:record) (default st-json:jso))
-  (let ((name->type (name->type schema))
-        initargs)
-    (flet ((fill-initargs (key value)
-             (let* ((type (gethash key name->type))
-                    (value (internal:deserialize-field-default type value))
-                    (key (intern key 'keyword)))
-               (push value initargs)
-               (push key initargs))))
-      (st-json:mapjso #'fill-initargs default))
-    (apply #'make-instance schema initargs)))
+  (let* ((fields (api:fields schema))
+         (name->index (name->index fields))
+         (values (make-array (length fields) :element-type 'api:object)))
+    (declare (fields fields))
+    (flet ((set-values (key value)
+             (set-values key value fields name->index values)))
+      (st-json:mapjso #'set-values default))
+    (make-object schema fields values)))
 
 (defmethod internal:deserialize-field-default
     ((schema api:record) (default list))
-  (let ((initargs (if (consp (first default))
-                      (alist->initargs default)
-                      (plist->initargs default))))
-    (apply #'make-instance schema initargs)))
+  (let* ((fields (api:fields schema))
+         (name->index (name->index fields))
+         (values (make-array (length fields) :element-type 'api:object)))
+    (declare (fields fields))
+    (if (consp (first default))
+        (set-values-from-alist fields name->index values default)
+        (set-values-from-plist fields name->index values default))
+    (make-object schema fields values)))
 
-(declaim (ftype (function (cons) (values cons &optional)) alist->initargs))
-(defun alist->initargs (alist)
+(declaim
+ (ftype (function (fields hash-table objects cons) (values &optional))
+        set-values-from-alist))
+(defun set-values-from-alist (fields name->index values alist)
   (loop
     for (key . value) in alist
-    collect (intern (string key) 'keyword)
-    collect value))
+    do (set-values key value fields name->index values))
+  (values))
 
-(declaim (ftype (function (list) (values list &optional)) plist->initargs))
-(defun plist->initargs (plist)
+(declaim
+ (ftype (function (fields hash-table objects list) (values &optional))
+        set-values-from-plist))
+(defun set-values-from-plist (fields name->index values plist)
   (loop
     for remaining = plist then (cddr remaining)
     while remaining
@@ -725,8 +760,8 @@
     unless rest do
       (error "Odd number of key-value pairs: ~S" plist)
 
-    collect (intern (string key) 'keyword)
-    collect value))
+    do (set-values key value fields name->index values))
+  (values))
 
 ;;; jso
 
