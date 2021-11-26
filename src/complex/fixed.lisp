@@ -325,6 +325,8 @@
       (internal:with-initargs (name namespace aliases size) jso
         (push enclosing-namespace initargs)
         (push :enclosing-namespace initargs)
+        (push (make-symbol (st-json:getjso "name" jso)) initargs)
+        (push :name initargs)
         (let* ((schema (apply #'make-instance 'api:fixed initargs))
                (fullname (api:fullname schema)))
           (assert (not (gethash fullname fullname->schema)) ()

@@ -202,3 +202,9 @@
 
 (export 'underlying)
 (defgeneric underlying (schema))
+
+(export 'readers)
+(defgeneric readers (effective-field))
+
+(export 'writers)
+(defgeneric writers (effective-field))

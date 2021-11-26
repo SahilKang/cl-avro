@@ -20,9 +20,14 @@
   (:use #:cl)
   (:local-nicknames
    (#:api #:cl-avro)
-   (#:internal #:cl-avro.internal))
+   (#:internal #:cl-avro.internal)
+   (#:record #:cl-avro.internal.record))
   (:import-from #:cl-avro.internal.recursive-descent.pattern
-                #:define-pattern-method))
+                #:define-pattern-method)
+  (:import-from #:cl-avro.internal.record
+                #:fields
+                #:objects
+                #:booleans))
 (in-package #:cl-avro.internal.ipc.error)
 
 (define-condition api:rpc-error (error)
@@ -60,21 +65,73 @@
    "Declared error from server."))
 
 (declaim
+ (ftype (function (symbol fields objects list booleans)
+                  (values api:declared-rpc-error &optional))
+        %make-error))
+(defun %make-error (type fields values initargs initargp-vector)
+  (loop
+    with error = (apply #'make-condition type initargs)
+
+    for field across fields
+    for value across values
+    for initargp across initargp-vector
+    for writers = (internal:writers field)
+
+    when initargp do
+      (let ((writer (fdefinition (first writers))))
+        (funcall writer value error))
+
+    finally
+       (return
+         error)))
+
+(declaim
+ (ftype (function (symbol fields objects internal:map<bytes>)
+                  (values api:declared-rpc-error &optional))
+        make-error))
+(defun make-error (type fields values metadata)
+  (loop
+    with initargs of-type list = (list :metadata metadata)
+    and initargp-vector = (make-array (length fields)
+                                      :element-type 'boolean
+                                      :initial-element nil)
+
+    for index below (length fields)
+    for field = (elt fields index)
+    for value = (elt values index)
+    for initarg of-type (or null keyword)
+      = (first (closer-mop:slot-definition-initargs field))
+
+    if initarg do
+      (push value initargs)
+      (push initarg initargs)
+    else do
+      (setf (elt initargp-vector index) t)
+
+    finally
+       (return
+         (%make-error type fields values initargs initargp-vector))))
+
+(declaim
  (ftype (function (symbol api:record-object &optional internal:map<bytes>)
                   (values api:declared-rpc-error &optional))
         internal:make-declared-rpc-error))
 (defun internal:make-declared-rpc-error
     (type error &optional (metadata (make-instance 'internal:map<bytes> :size 0)))
   (loop
-    for field across (api:fields (class-of error))
-    for (name slot) = (multiple-value-list (api:name field))
+    with fields of-type fields = (api:fields (class-of error))
+    with values = (make-array (length fields) :element-type 'api:object)
 
-    collect (intern name 'keyword) into initargs
-    collect (slot-value error slot) into initargs
+    for index below (length fields)
+    for field = (elt fields index)
+    for name of-type symbol = (nth-value 1 (api:name field))
+    for value of-type api:object = (slot-value error name)
+    do
+       (setf (elt values index) value)
 
     finally
        (return
-         (apply #'make-condition type (list* :metadata metadata initargs)))))
+         (make-error type fields values metadata))))
 
 (declaim
  (ftype (function (api:declared-rpc-error)
@@ -82,65 +139,143 @@
         internal:to-record))
 (defun internal:to-record (error)
   (loop
-    with schema = (internal:schema error)
+    with schema of-type api:record = (internal:schema error)
+    with fields of-type fields = (api:fields schema)
+    with values = (make-array (length fields) :element-type 'api:object)
 
-    for field across (api:fields schema)
-    for (name slot) = (multiple-value-list (api:name field))
-
-    collect (intern name 'keyword) into initargs
-    collect (funcall slot error) into initargs
+    for index below (length fields)
+    for field = (elt fields index)
+    for reader = (fdefinition (first (internal:readers field)))
+    for value = (funcall reader error)
+    do
+       (setf (elt values index) value)
 
     finally
        (return
-         (apply #'make-instance schema initargs))))
+         (record:make-object schema fields values))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim
-   (ftype (function (api:field) (values cons &optional)) make-condition-slot))
-  (defun make-condition-slot (field)
-    (let ((name (closer-mop:slot-definition-name field))
-          (type (closer-mop:slot-definition-type field))
-          (documentation (documentation field t))
-          (initargs (closer-mop:slot-definition-initargs field))
-          (readers (closer-mop:slot-definition-readers field))
-          (writers (closer-mop:slot-definition-writers field)))
-      `(,name
-        :type ,type
-        ,@(when documentation
-            `(:documentation ,documentation))
-        ,@(mapcan (lambda (initarg)
-                    `(:initarg ,initarg))
-                  initargs)
-        ,@(mapcan (lambda (reader)
-                    `(:reader ,reader))
-                  (list* name readers))
-        ,@(mapcan (lambda (writer)
-                    `(:writer ,writer))
-                  writers))))
+(declaim
+ (ftype (function (api:field) (values cons &optional))
+        %%add-accessors-and-initargs))
+(defun %%add-accessors-and-initargs (field)
+  (let ((initargs (list
+                   :name (nth-value 1 (api:name field))
+                   :type (api:type field)
+                   :allocation (closer-mop:slot-definition-allocation field)
+                   :initargs (closer-mop:slot-definition-initargs field)
+                   :documentation (documentation field t))))
+    (let ((initfunction (closer-mop:slot-definition-initfunction field)))
+      (when initfunction
+        (push initfunction initargs)
+        (push :initfunction initargs)
+        (push (closer-mop:slot-definition-initform field) initargs)
+        (push :initform initargs)))
+    (multiple-value-bind (default defaultp)
+        (api:default field)
+      (when defaultp
+        (push default initargs)
+        (push :default initargs)))
+    (multiple-value-bind (order orderp)
+        (api:order field)
+      (when orderp
+        (push order initargs)
+        (push :order initargs)))
+    (let ((aliases (api:aliases field)))
+      (when aliases
+        (push aliases initargs)
+        (push :aliases initargs)))
+    (let ((readers (internal:readers field))
+          (writers (internal:writers field))
+          (symbol (gensym)))
+      (unless readers
+        (push symbol readers))
+      (unless (closer-mop:slot-definition-initargs field)
+        (push `(setf ,symbol) writers))
+      (push readers initargs)
+      (push :readers initargs)
+      (push writers initargs)
+      (push :writers initargs))
+    initargs))
 
-  (declaim
-   (ftype (function (api:record) (values list &optional)) make-condition-slots))
-  (defun make-condition-slots (record)
-    (mapcar #'make-condition-slot (closer-mop:class-direct-slots record)))
+(declaim
+ (ftype (function (fields) (values list &optional)) %add-accessors-and-initargs))
+(defun %add-accessors-and-initargs (fields)
+  (map 'list #'%%add-accessors-and-initargs fields))
 
-  (declaim
-   (ftype (function (symbol list list api:record) (values cons &optional))
-          expand-define-condition))
-  (defun expand-define-condition (name slots options record)
-    `(progn
-       (define-condition ,name (api:declared-rpc-error)
-         ((schema :allocation :class :initform ,record)
-          ,@slots)
-         ,@options)
+(declaim
+ (ftype (function (api:record) (values api:record &optional))
+        add-accessors-and-initargs))
+(defun add-accessors-and-initargs (record)
+  (let ((initargs
+          (list
+           :direct-default-initargs (closer-mop:class-direct-default-initargs record)
+           :documentation (documentation record t)
+           :direct-superclasses (closer-mop:class-direct-superclasses record))))
+    (multiple-value-bind (deduced-namespace provided-namespace namespace-provided-p)
+        (api:namespace record)
+      (when namespace-provided-p
+        (push provided-namespace initargs)
+        (push :namespace initargs))
+      (when (and deduced-namespace
+                 (or (null provided-namespace)
+                     (string/= deduced-namespace provided-namespace)))
+        (push deduced-namespace initargs)
+        (push :enclosing-namespace initargs)))
+    (let ((aliases (api:aliases record)))
+      (when aliases
+        (push aliases initargs)
+        (push :aliases initargs)))
+    (push (%add-accessors-and-initargs (api:fields record)) initargs)
+    (push :direct-slots initargs)
+    (apply #'reinitialize-instance record initargs)))
 
-       (find-class ',name))))
+(declaim
+ (ftype (function (api:field) (values cons &optional)) make-condition-slot))
+(defun make-condition-slot (field)
+  (let ((name (nth-value 1 (api:name field)))
+        (type (api:type field))
+        (documentation (documentation field t))
+        (initargs (closer-mop:slot-definition-initargs field))
+        (readers (internal:readers field))
+        (writers (internal:writers field)))
+    `(,name
+      :type ,type
+      ,@(when documentation
+          `(:documentation ,documentation))
+      ,@(mapcan (lambda (initarg)
+                  `(:initarg ,initarg))
+                initargs)
+      ,@(mapcan (lambda (reader)
+                  `(:reader ,reader))
+                (list* name readers))
+      ,@(mapcan (lambda (writer)
+                  `(:writer ,writer))
+                writers))))
+
+(declaim
+ (ftype (function (api:record) (values list &optional)) make-condition-slots))
+(defun make-condition-slots (record)
+  (map 'list #'make-condition-slot (api:fields record)))
+
+(declaim
+ (ftype (function (symbol list list api:record) (values cons &optional))
+        expand-define-condition))
+(defun expand-define-condition (name slots options record)
+  `(progn
+     (define-condition ,name (api:declared-rpc-error)
+       ((schema :allocation :class :initform ,record)
+        ,@slots)
+       ,@options)
+
+     (find-class ',name)))
 
 (declaim (ftype (function (api:record) (values class &optional)) to-error))
 (defun to-error (record)
-  (let ((condition-slots (make-condition-slots record))
-        (condition-options (when (documentation record t)
-                             `((:documentation ,(documentation record t)))))
-        (name (make-symbol (api:name record))))
+  (let* ((record (add-accessors-and-initargs record))
+         (condition-slots (make-condition-slots record))
+         (condition-options (when (documentation record t)
+                              `((:documentation ,(documentation record t)))))
+         (name (make-symbol (api:name record))))
     (eval
      (expand-define-condition name condition-slots condition-options record))))
 
@@ -271,7 +406,8 @@
         (record (gensym))
         (condition-slots (gensym)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (let* ((,record (apply #'make-instance 'api:record ',record-initargs))
+       (let* ((,record (add-accessors-and-initargs
+                        (apply #'make-instance 'api:record ',record-initargs)))
               (,condition-slots (make-condition-slots ,record)))
          (eval
           (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))

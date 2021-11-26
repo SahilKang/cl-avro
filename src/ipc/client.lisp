@@ -21,7 +21,8 @@
   (:local-nicknames
    (#:api #:cl-avro)
    (#:internal #:cl-avro.internal)
-   (#:framing #:cl-avro.internal.ipc.framing)))
+   (#:framing #:cl-avro.internal.ipc.framing)
+   (#:record #:cl-avro.internal.record)))
 (in-package #:cl-avro.internal.ipc.client)
 
 ;;; client
@@ -248,19 +249,11 @@ perform one successfully."))
  (ftype (function (api:record list) (values api:record-object &optional))
         parse-parameters))
 (defun parse-parameters (request lambda-list)
-  (loop
-    for field across (api:fields request)
-    for arg in lambda-list
-
-    for name = (api:name field)
-    for keyword = (intern name 'keyword)
-
-    collect keyword into initargs
-    collect arg into initargs
-
-    finally
-       (return
-         (apply #'make-instance request initargs))))
+  (record:make-object
+   request
+   (api:fields request)
+   (make-array (length lambda-list)
+               :element-type 'api:object :initial-contents lambda-list)))
 
 ;;; find-server-message
 
