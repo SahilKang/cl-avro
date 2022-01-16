@@ -15,7 +15,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-avro)
+(in-package #:cl-user)
 (defpackage #:cl-avro.internal.recursive-descent.pattern
   (:use #:cl)
   (:local-nicknames

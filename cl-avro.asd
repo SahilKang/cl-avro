@@ -1,5 +1,5 @@
 ;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -46,14 +46,8 @@
    (:file "little-endian" :depends-on ("type"))
    (:file "crc-64-avro" :depends-on ("type"))
    (:module "api"
-    :components ((:file "package")
-                 (:file "io" :depends-on ("package"))
-                 (:file "schema" :depends-on ("package"))
-                 (:file "name" :depends-on ("package"))
-                 (:file "coerce" :depends-on ("package"))
-                 (:file "compare" :depends-on ("package"))
-                 (:file "file" :depends-on ("package"))
-                 (:file "ipc" :depends-on ("package"))))
+    :components ((:file "public")
+                 (:file "internal")))
    (:module "recursive-descent"
     :depends-on ("api" "mop" "type")
     :components ((:file "pattern")
