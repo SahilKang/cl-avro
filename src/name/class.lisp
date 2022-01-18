@@ -113,29 +113,28 @@ The returned values conform to NAMESPACE-RETURN-TYPE."
 
 ;;; initialization
 
-(declaim (ftype (function (symbol list) (values t &optional)) %parse-name))
-(defun %parse-name (name initargs)
-  (let* ((initargs (cddr (member :name initargs)))
-         (other-name (getf initargs :name name)))
-    (if (eq name other-name)
-        (string name)
-        other-name)))
+(declaim (ftype (function (list) (values type:fullname &optional)) %parse-name))
+(defun %parse-name (initargs)
+  (let* ((first (member :name initargs))
+         (second (member :name (cddr first))))
+    (assert first () "Must supply NAME")
+    (if second
+        (second second)
+        (string (second first)))))
 
 (declaim
- (ftype (function (t list) (values type:fullname &optional)) parse-name))
-(defun parse-name (name initargs)
-  (if (symbolp name)
-      (%parse-name name initargs)
-      name))
+ (ftype (function (named-class list) (values type:fullname &optional))
+        parse-name))
+(defun parse-name (instance initargs)
+  (if (slot-boundp instance 'provided-name)
+      (provided-name instance)
+      (%parse-name initargs)))
 
-(mop:definit ((instance named-class) :after
-              &rest initargs
-              &key
-              (name (or (class-name instance) (error "Must supply NAME"))))
+(mop:definit ((instance named-class) :after &rest initargs)
   (let ((provided-namespace (provided-namespace instance)))
     (with-slots
           (provided-name deduced-name deduced-namespace fullname) instance
-      (setf provided-name (parse-name name initargs)
+      (setf provided-name (parse-name instance initargs)
             deduced-name (deduce:fullname->name provided-name)
             deduced-namespace (deduce:deduce-namespace
                                provided-name provided-namespace nil)
