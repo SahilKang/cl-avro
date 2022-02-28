@@ -113,8 +113,8 @@ The returned values conform to NAMESPACE-RETURN-TYPE."
 
 ;;; initialization
 
-(declaim (ftype (function (list) (values type:fullname &optional)) %parse-name))
-(defun %parse-name (initargs)
+(declaim (ftype (function (list) (values type:fullname &optional)) parse-name))
+(defun parse-name (initargs)
   (let* ((first (member :name initargs))
          (second (member :name (cddr first))))
     (assert first () "Must supply NAME")
@@ -122,21 +122,21 @@ The returned values conform to NAMESPACE-RETURN-TYPE."
         (second second)
         (string (second first)))))
 
-(declaim
- (ftype (function (named-class list) (values type:fullname &optional))
-        parse-name))
-(defun parse-name (instance initargs)
-  (if (slot-boundp instance 'provided-name)
-      (provided-name instance)
-      (%parse-name initargs)))
-
-(mop:definit ((instance named-class) :after &rest initargs)
+(defmethod initialize-instance :after
+    ((instance named-class) &rest initargs)
   (let ((provided-namespace (provided-namespace instance)))
     (with-slots
           (provided-name deduced-name deduced-namespace fullname) instance
-      (setf provided-name (parse-name instance initargs)
+      (setf provided-name (parse-name initargs)
             deduced-name (deduce:fullname->name provided-name)
             deduced-namespace (deduce:deduce-namespace
                                provided-name provided-namespace nil)
             fullname (deduce:deduce-fullname
                       provided-name provided-namespace nil)))))
+
+(defmethod reinitialize-instance :around
+    ((instance named-class) &rest initargs)
+  (when (typep (getf initargs :name) '(or null (not symbol)))
+    (push (class-name instance) initargs)
+    (push :name initargs))
+  (apply #'call-next-method instance initargs))
