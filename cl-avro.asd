@@ -69,6 +69,7 @@
    (:file "schema"
     :depends-on ("primitive"
                  "api"
+                 "mop"
                  "little-endian"
                  "type"
                  "crc-64-avro"
@@ -142,6 +143,8 @@
   :components ((:file "common")
                (:file "compare")
                (:file "file")
+               (:file "name")
+               (:file "reinitialization")
                (:module "complex"
                 :depends-on ("common")
                 :components ((:file "array")

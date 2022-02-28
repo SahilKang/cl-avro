@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -30,7 +30,8 @@
 (deftype errors? ()
   '(or null errors))
 
-(defclass api:message (closer-mop:standard-generic-function)
+(defclass api:message
+    (mop:all-or-nothing-reinitialization closer-mop:standard-generic-function)
   ((request
     :initarg :request
     :reader api:request
@@ -61,6 +62,10 @@
    "Metaclass of avro ipc messages."))
 
 (defmethod closer-mop:validate-superclass
+    ((class api:message) (superclass mop:all-or-nothing-reinitialization))
+  t)
+
+(defmethod closer-mop:validate-superclass
     ((class api:message) (superclass closer-mop:standard-generic-function))
   t)
 
@@ -88,6 +93,12 @@
     ((instance api:message) &rest initargs &key request)
   (setf (getf initargs :lambda-list) (deduce-lambda-list request))
   (apply #'call-next-method instance initargs))
+
+(defmethod reinitialize-instance :around
+    ((instance api:message) &rest initargs)
+  (if initargs
+      (call-next-method)
+      instance))
 
 (declaim
  (ftype (function (errors?) (values api:union &optional))

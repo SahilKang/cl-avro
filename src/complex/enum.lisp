@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -86,13 +86,20 @@
   (cl:position default symbols :test #'string=))
 
 (declaim
- (ftype (function (array<name> t) (values position? &optional)) parse-default))
+ (ftype (function (array<name> (or null name:name position))
+                  (values position? &optional))
+        parse-default))
 (defun parse-default (symbols default)
   (when default
-    (check-type default name:name)
-    (assert (default-position symbols default) (default)
-            "Default ~S not found in symbols ~S" default symbols)
-    (default-position symbols default)))
+    (etypecase default
+      (name:name
+       (assert (default-position symbols default) (default)
+               "Default ~S not found in symbols ~S" default symbols)
+       (default-position symbols default))
+      (position
+       (assert (< default (length symbols)) (default)
+               "Default position ~S overindexes ~S" default symbols)
+       default))))
 
 (mop:definit ((instance api:enum) :around &rest initargs &key symbols default)
   (let* ((symbols (parse-symbols symbols))

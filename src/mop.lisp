@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -23,7 +23,8 @@
            #:scalarize
            #:late-class
            #:early->late
-           #:schema-class))
+           #:schema-class
+           #:all-or-nothing-reinitialization))
 (in-package #:cl-avro.internal.mop)
 
 ;;; definit
@@ -54,6 +55,33 @@
   (let ((class (if (symbolp class) (find-class class) class)))
     (pushnew class (getf initargs :direct-superclasses) :test #'superclassp))
   initargs)
+
+;;; all-or-nothing-reinitialization
+
+(defclass all-or-nothing-reinitialization ()
+  ())
+
+(defmethod reinitialize-instance :around
+    ((instance all-or-nothing-reinitialization) &rest initargs &key &allow-other-keys)
+  (let ((new (apply #'make-instance (class-of instance) initargs))
+        (instance (call-next-method)))
+    (loop
+      with terminals = (mapcar #'find-class '(standard-class standard-object))
+      and classes = (list (class-of instance))
+
+      while classes
+      for class = (pop classes)
+      unless (member class terminals) do
+        (setf classes (append classes (closer-mop:class-direct-superclasses class)))
+        (loop
+          for slot in (closer-mop:class-direct-slots class)
+          for name = (closer-mop:slot-definition-name slot)
+          if (slot-boundp new name) do
+            (setf (slot-value instance name) (slot-value new name))
+          else do
+            (slot-makunbound instance name)))
+    (closer-mop:finalize-inheritance instance)
+    instance))
 
 ;;; scalar-class
 
@@ -117,8 +145,8 @@
   (loop
     with initargs-to-scalarize = (initargs-to-scalarize (class-of instance))
 
-      initially
-         (assert (evenp (length initargs)))
+    initially
+       (assert (evenp (length initargs)))
 
     for (initarg value) on initargs by #'cddr
 

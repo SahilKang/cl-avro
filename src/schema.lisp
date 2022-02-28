@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -21,6 +21,7 @@
   (:local-nicknames
    (#:api #:cl-avro)
    (#:internal #:cl-avro.internal)
+   (#:mop #:cl-avro.internal.mop)
    (#:little-endian #:cl-avro.internal.little-endian))
   (:import-from #:cl-avro.internal.defprimitive
                 #:*primitives*)
@@ -119,7 +120,8 @@
           '(member ,@*primitives*))))
   (defschema))
 
-(defclass api:complex-schema (crc-64-avro-little-endian standard-class)
+(defclass api:complex-schema
+    (crc-64-avro-little-endian mop:all-or-nothing-reinitialization standard-class)
   ()
   (:documentation
    "Base metaclass of avro complex schemas."))
@@ -129,16 +131,25 @@
   t)
 
 (defmethod closer-mop:validate-superclass
+    ((class api:complex-schema) (superclass mop:all-or-nothing-reinitialization))
+  t)
+
+(defmethod closer-mop:validate-superclass
     ((class api:complex-schema) (superclass standard-class))
   t)
 
-(defclass api:logical-schema (crc-64-avro-little-endian standard-class)
+(defclass api:logical-schema
+    (crc-64-avro-little-endian mop:all-or-nothing-reinitialization standard-class)
   ()
   (:documentation
    "Base metaclass of avro logical schemas."))
 
 (defmethod closer-mop:validate-superclass
     ((class api:logical-schema) (superclass crc-64-avro-little-endian))
+  t)
+
+(defmethod closer-mop:validate-superclass
+    ((class api:logical-schema) (superclass mop:all-or-nothing-reinitialization))
   t)
 
 (defmethod closer-mop:validate-superclass
