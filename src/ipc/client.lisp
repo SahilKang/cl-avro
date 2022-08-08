@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -234,14 +234,14 @@ perform one successfully."))
 ;;; parse-metadata
 
 (declaim
- (ftype (function (list) (values internal:map<bytes> &optional))
+ (ftype (function (list) (values api:map<bytes> &optional))
         parse-metadata))
 (defun parse-metadata (lambda-list)
   ;; TODO change lambda-list to allow passing in request/response
   ;; metadata as either a single keyword arg or as a rest plist of
   ;; strings and bytes...symbols should be fine too
   (declare (ignore lambda-list))
-  (make-instance 'internal:map<bytes>))
+  (make-instance 'api:map<bytes>))
 
 ;;; parse-parameters
 
@@ -276,11 +276,11 @@ perform one successfully."))
 (declaim
  (ftype (function
          (framing:input-stream api:message api:schema classes? api:union)
-         (values api:object internal:map<bytes> &optional))
+         (values api:object api:map<bytes> &optional))
         process-response))
 (defun process-response
     (response-stream server-message response-schema conditions errors-union)
-  (let ((metadata (api:deserialize 'internal:map<bytes> response-stream))
+  (let ((metadata (api:deserialize 'api:map<bytes> response-stream))
         (errorp (eq 'api:true (api:deserialize 'api:boolean response-stream))))
     (if errorp
         (error (make-error
@@ -296,7 +296,7 @@ perform one successfully."))
                 metadata))))
 
 (declaim
- (ftype (function (classes? api:union-object internal:map<bytes>)
+ (ftype (function (classes? api:union-object api:map<bytes>)
                   (values api:rpc-error &optional))
         make-error))
 (defun make-error (conditions error metadata)
@@ -345,7 +345,7 @@ perform one successfully."))
 
 (declaim
  (ftype (function
-         (api:protocol internal:client string api:record-object internal:map<bytes>)
+         (api:protocol internal:client string api:record-object api:map<bytes>)
          (values framing:input-stream &optional))
         perform-handshake))
 (defun perform-handshake (protocol client message-name parameters metadata)

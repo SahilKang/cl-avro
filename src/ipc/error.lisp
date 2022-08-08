@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -33,12 +33,11 @@
 (define-condition api:rpc-error (error)
   ((metadata
     :initarg :metadata
-    :type internal:map<bytes> ; TODO this needs to be public if I
-                              ; return map<bytes>
+    :type api:map<bytes>
     :reader api:metadata
     :documentation "Metadata from server"))
   (:default-initargs
-   :metadata (make-instance 'internal:map<bytes> :size 0))
+   :metadata (make-instance 'api:map<bytes> :size 0))
   (:documentation
    "Base condition for rpc errors."))
 
@@ -86,7 +85,7 @@
          error)))
 
 (declaim
- (ftype (function (symbol fields objects internal:map<bytes>)
+ (ftype (function (symbol fields objects api:map<bytes>)
                   (values api:declared-rpc-error &optional))
         make-error))
 (defun make-error (type fields values metadata)
@@ -113,11 +112,11 @@
          (%make-error type fields values initargs initargp-vector))))
 
 (declaim
- (ftype (function (symbol api:record-object &optional internal:map<bytes>)
+ (ftype (function (symbol api:record-object &optional api:map<bytes>)
                   (values api:declared-rpc-error &optional))
         internal:make-declared-rpc-error))
 (defun internal:make-declared-rpc-error
-    (type error &optional (metadata (make-instance 'internal:map<bytes> :size 0)))
+    (type error &optional (metadata (make-instance 'api:map<bytes> :size 0)))
   (loop
     with fields of-type fields = (api:fields (class-of error))
     with values = (make-array (length fields) :element-type 'api:object)
