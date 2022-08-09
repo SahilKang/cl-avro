@@ -87,7 +87,8 @@
 (defun deduce-lambda-list (request)
   (flet ((name (field)
            (nth-value 1 (api:name field))))
-    (map 'list #'name (api:fields request))))
+    (nconc (map 'list #'name (api:fields request))
+           (list '&optional 'api:metadata))))
 
 (defmethod initialize-instance :around
     ((instance api:message) &rest initargs &key request)
