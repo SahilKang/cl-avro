@@ -29,7 +29,6 @@
            #:md5
            #:union<null-md5>
            #:union<null-string>
-           #:map<bytes>
            #:union<null-map<bytes>>
            #:match
            #:request

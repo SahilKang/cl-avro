@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -42,10 +42,11 @@
 ;;; call-function
 
 (declaim
- (ftype (function (api:record api:message framing:input-stream)
-                  (values api:object internal:map<bytes> api:boolean &optional))
+ (ftype (function (api:record api:map<bytes> api:message framing:input-stream)
+                  (values api:object api:map<bytes> api:boolean &optional))
         call-function))
-(defun call-function (client-request server-message request-stream)
+(defun call-function
+    (client-request request-metadata server-message request-stream)
   (let* ((parameters (api:coerce (api:deserialize client-request request-stream)
                                  (api:request server-message)))
          (lambda-list (map
@@ -56,9 +57,9 @@
          (errors-union (nth-value 1 (api:errors server-message))))
     (handler-case
         (multiple-value-bind (response response-metadata)
-            (apply server-message lambda-list)
+            (apply server-message (nconc lambda-list (list request-metadata)))
           (values response
-                  (or response-metadata (make-instance 'internal:map<bytes>))
+                  (or response-metadata (make-instance 'api:map<bytes>))
                   'api:false))
       (api:declared-rpc-error (error)
         ;; TODO this can also signal if error is not part of union. In
@@ -70,7 +71,7 @@
                 'api:true))
       (condition ()
         (values (make-instance errors-union :object "oh no, an error occurred")
-                (make-instance 'internal:map<bytes>)
+                (make-instance 'api:map<bytes>)
                 'api:true)))))
 
 ;;; receive-from-unconnected-client
@@ -86,14 +87,8 @@ If the handshake is complete, then the second return value will be the
 client-protocol. Otherwise, it will be nil."
   (let* ((request-stream (framing:to-input-stream input))
          (request-handshake (api:deserialize 'internal:request request-stream))
-         ;; TODO pass this in to the message as keyword args then the
-         ;; lambda-list will be something like:
-         ;; ((arg1 foo) (arg2 bar) &rest metadata &key &allow-other-keys)
-         ;; make sure metadata is interned so as not to conflict with
-         ;; required args
-         (request-metadata (api:deserialize 'internal:map<bytes> request-stream))
+         (request-metadata (api:deserialize 'api:map<bytes> request-stream))
          (message-name (api:deserialize 'api:string request-stream)))
-    (declare (ignore request-metadata))
     (multiple-value-bind (response-handshake client-protocol)
         (handshake-response protocol-object request-handshake)
       (if (or (zerop (length message-name))
@@ -110,7 +105,8 @@ client-protocol. Otherwise, it will be nil."
                                       :test #'string=
                                       :key #'closer-mop:generic-function-name)))
             (multiple-value-bind (response response-metadata errorp)
-                (call-function client-request server-message request-stream)
+                (call-function
+                 client-request request-metadata server-message request-stream)
               (values (framing:frame
                        response-handshake response-metadata errorp response)
                       client-protocol)))))))
@@ -207,9 +203,8 @@ client-protocol. Otherwise, it will be nil."
 A return value of nil indicates no response should be sent to the
 client."
   (let* ((request-stream (framing:to-input-stream input))
-         (request-metadata (api:deserialize 'internal:map<bytes> request-stream))
+         (request-metadata (api:deserialize 'api:map<bytes> request-stream))
          (message-name (api:deserialize 'api:string request-stream)))
-    (declare (ignore request-metadata))
     (if (zerop (length message-name))
         (framing:frame)
         (let ((client-request (api:request
@@ -222,6 +217,7 @@ client."
                                     :test #'string=
                                     :key #'closer-mop:generic-function-name)))
           (multiple-value-bind (response response-metadata errorp)
-              (call-function client-request server-message request-stream)
+              (call-function
+               client-request request-metadata server-message request-stream)
             (unless (api:one-way server-message)
               (framing:frame response-metadata errorp response)))))))

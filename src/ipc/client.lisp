@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -109,10 +109,19 @@ perform one successfully."))
         (response (api:response message)))
     (multiple-value-bind (conditions errors-union)
         (api:errors message)
-      (let* ((body
-               `(lambda ,lambda-list
-                  (let* ((metadata (parse-metadata (list ,@lambda-list)))
-                         (parameters (parse-parameters ,request (list ,@lambda-list)))
+      (let* ((lambda-list-with-default
+               (nconc (butlast lambda-list)
+                      (list '(api:metadata
+                              (make-instance 'api:map<bytes>)))))
+             (lambda-list-without-optional
+               (nbutlast (butlast lambda-list)))
+             (body
+               `(lambda ,lambda-list-with-default
+                  (declare (api:map<bytes> api:metadata))
+                  (let* ((metadata api:metadata)
+                         (parameters (parse-parameters
+                                      ,request
+                                      (list ,@lambda-list-without-optional)))
                          (response-stream
                            (perform-handshake
                             ,protocol ,client ,message-name parameters metadata)))
@@ -141,7 +150,7 @@ perform one successfully."))
              (method
                (make-instance
                 'standard-method
-                :lambda-list lambda-list
+                :lambda-list lambda-list-with-default
                 :specializers specializers
                 :function (compile nil method-lambda)
                 :documentation documentation)))
@@ -161,10 +170,19 @@ perform one successfully."))
         (response (api:response message)))
     (multiple-value-bind (conditions errors-union)
         (api:errors message)
-      (let* ((body
-               `(lambda ,lambda-list
-                  (let* ((metadata (parse-metadata (list ,@lambda-list)))
-                         (parameters (parse-parameters ,request (list ,@lambda-list)))
+      (let* ((lambda-list-with-default
+               (nconc (butlast lambda-list)
+                      (list '(api:metadata
+                              (make-instance 'api:map<bytes>)))))
+             (lambda-list-without-optional
+               (nbutlast (butlast lambda-list)))
+             (body
+               `(lambda ,lambda-list-with-default
+                  (declare (api:map<bytes> api:metadata))
+                  (let* ((metadata api:metadata)
+                         (parameters (parse-parameters
+                                      ,request
+                                      (list ,@lambda-list-without-optional)))
                          ,@(unless (api:one-way message)
                              `((response-stream
                                 (if (api:sent-handshake-p ,client)
@@ -210,7 +228,7 @@ perform one successfully."))
              (method
                (make-instance
                 'standard-method
-                :lambda-list lambda-list
+                :lambda-list lambda-list-with-default
                 :specializers specializers
                 :function (compile nil method-lambda)
                 :documentation documentation)))
@@ -230,18 +248,6 @@ perform one successfully."))
      (api:double 'double-float)
      (api:bytes 'vector)
      (api:string 'string))))
-
-;;; parse-metadata
-
-(declaim
- (ftype (function (list) (values internal:map<bytes> &optional))
-        parse-metadata))
-(defun parse-metadata (lambda-list)
-  ;; TODO change lambda-list to allow passing in request/response
-  ;; metadata as either a single keyword arg or as a rest plist of
-  ;; strings and bytes...symbols should be fine too
-  (declare (ignore lambda-list))
-  (make-instance 'internal:map<bytes>))
 
 ;;; parse-parameters
 
@@ -276,11 +282,11 @@ perform one successfully."))
 (declaim
  (ftype (function
          (framing:input-stream api:message api:schema classes? api:union)
-         (values api:object internal:map<bytes> &optional))
+         (values api:object api:map<bytes> &optional))
         process-response))
 (defun process-response
     (response-stream server-message response-schema conditions errors-union)
-  (let ((metadata (api:deserialize 'internal:map<bytes> response-stream))
+  (let ((metadata (api:deserialize 'api:map<bytes> response-stream))
         (errorp (eq 'api:true (api:deserialize 'api:boolean response-stream))))
     (if errorp
         (error (make-error
@@ -296,7 +302,7 @@ perform one successfully."))
                 metadata))))
 
 (declaim
- (ftype (function (classes? api:union-object internal:map<bytes>)
+ (ftype (function (classes? api:union-object api:map<bytes>)
                   (values api:rpc-error &optional))
         make-error))
 (defun make-error (conditions error metadata)
@@ -345,7 +351,7 @@ perform one successfully."))
 
 (declaim
  (ftype (function
-         (api:protocol internal:client string api:record-object internal:map<bytes>)
+         (api:protocol internal:client string api:record-object api:map<bytes>)
          (values framing:input-stream &optional))
         perform-handshake))
 (defun perform-handshake (protocol client message-name parameters metadata)

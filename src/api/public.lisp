@@ -156,7 +156,8 @@
            #:file-writer
            #:write-block
            #:compare
-           #:coerce))
+           #:coerce
+           #:map<bytes>))
 
 (in-package #:cl-avro)
 

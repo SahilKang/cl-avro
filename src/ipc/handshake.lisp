@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021-2022 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -39,7 +39,7 @@
   (:metaclass api:union)
   (:schemas api:null api:string))
 
-(defclass internal:map<bytes> ()
+(defclass api:map<bytes> ()
   ()
   (:metaclass api:map)
   (:values api:bytes))
@@ -47,7 +47,7 @@
 (defclass internal:union<null-map<bytes>> ()
   ()
   (:metaclass api:union)
-  (:schemas api:null internal:map<bytes>))
+  (:schemas api:null api:map<bytes>))
 
 (defclass internal:match ()
   ()
