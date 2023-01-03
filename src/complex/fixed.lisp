@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -24,7 +24,8 @@
    (#:mop #:cl-avro.internal.mop)
    (#:name #:cl-avro.internal.name)
    (#:bytes #:cl-avro.internal.bytes)
-   (#:sequences #:org.shirakumo.trivial-extensible-sequences))
+   (#:sequences #:org.shirakumo.trivial-extensible-sequences)
+   (#:intern #:cl-avro.internal.intern))
   (:import-from #:cl-avro.internal.type
                 #:uint8
                 #:ufixnum
@@ -337,3 +338,8 @@
     ((schema api:fixed) seen canonical-form-p)
   (declare (ignore seen canonical-form-p))
   (list "size" (api:size schema)))
+
+;;; intern
+
+(defmethod api:intern ((instance api:fixed) &key null-namespace)
+  (declare (ignore instance null-namespace)))

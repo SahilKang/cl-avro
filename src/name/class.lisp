@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -22,7 +22,8 @@
    (#:api #:cl-avro)
    (#:mop #:cl-avro.internal.mop)
    (#:type #:cl-avro.internal.name.type)
-   (#:deduce #:cl-avro.internal.name.deduce))
+   (#:deduce #:cl-avro.internal.name.deduce)
+   (#:intern #:cl-avro.internal.intern))
   (:export #:named-class
            #:provided-name
            #:deduced-name
@@ -140,3 +141,20 @@ The returned values conform to NAMESPACE-RETURN-TYPE."
     (push (class-name instance) initargs)
     (push :name initargs))
   (apply #'call-next-method instance initargs))
+
+;;; intern
+
+(defmethod api:intern :around
+    ((instance named-class) &key (null-namespace api:*null-namespace*))
+  (let ((name (api:name instance))
+        (namespace (api:namespace instance)))
+    (when (deduce:null-namespace-p namespace)
+      (setf namespace null-namespace))
+    (let* ((intern:*intern-package* (or (find-package namespace)
+                                        (make-package namespace)))
+           (class-name (intern name intern:*intern-package*)))
+      (assert (not (find-class class-name nil)) (class-name) "Class already exists")
+      (export class-name intern:*intern-package*)
+      (setf (find-class class-name) instance)
+      (call-next-method instance :null-namespace null-namespace)
+      class-name)))
