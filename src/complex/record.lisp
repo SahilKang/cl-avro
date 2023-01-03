@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -22,7 +22,8 @@
    (#:api #:cl-avro)
    (#:internal #:cl-avro.internal)
    (#:mop #:cl-avro.internal.mop)
-   (#:name #:cl-avro.internal.name))
+   (#:name #:cl-avro.internal.name)
+   (#:intern #:cl-avro.internal.intern))
   (:import-from #:cl-avro.internal.type
                 #:uint8
                 #:ufixnum
@@ -855,3 +856,35 @@
         (push documentation initargs)
         (push "doc" initargs)))
     initargs))
+
+;;; intern
+
+(defmethod api:intern ((instance api:record) &key null-namespace)
+  (declare (ignore null-namespace))
+  (loop
+    for field across (api:fields instance)
+    do
+       (loop
+         for reader in (internal:readers field)
+         for symbol = (intern (symbol-name reader) intern:*intern-package*)
+         for function = (fdefinition reader)
+         do
+            ;; TODO use add-method instead
+            (assert (not (fboundp symbol)) (symbol) "Function already exists")
+            (export symbol intern:*intern-package*)
+            (setf (fdefinition symbol) function))
+       (loop
+         for writer in (internal:writers field)
+         for symbol = (intern (symbol-name (second writer)) intern:*intern-package*)
+         for function = (fdefinition writer)
+         do
+            ;; TODO use add-method instead
+            (assert (not
+                     (handler-case
+                         (fdefinition `(setf ,symbol))
+                       (undefined-function ()
+                         nil)))
+                    (symbol)
+                    "Function already exists")
+            (export symbol intern:*intern-package*)
+            (setf (fdefinition `(setf ,symbol)) function))))

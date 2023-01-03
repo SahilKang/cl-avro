@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -23,7 +23,8 @@
    (#:api #:cl-avro)
    (#:internal #:cl-avro.internal)
    (#:mop #:cl-avro.internal.mop)
-   (#:name #:cl-avro.internal.name))
+   (#:name #:cl-avro.internal.name)
+   (#:intern #:cl-avro.internal.intern))
   (:import-from #:cl-avro.internal.type
                 #:uint8
                 #:ufixnum
@@ -304,3 +305,21 @@
         (push default initargs)
         (push "default" initargs)))
     initargs))
+
+;;; intern
+
+(defmethod api:intern ((instance api:enum) &key null-namespace)
+  (declare (ignore null-namespace))
+  (let* ((namespace (concatenate
+                     'string
+                     (package-name intern:*intern-package*)
+                     "." (api:name instance)))
+         (package (or (find-package namespace) (make-package namespace))))
+    (loop
+      for symbol-name across (api:symbols instance)
+      for symbol = (intern symbol-name package)
+      for object = (make-instance instance :enum symbol-name)
+      do
+         (assert (not (boundp symbol)) (symbol) "Symbol ~S already exists" symbol)
+         (export symbol package)
+         (setf (symbol-value symbol) object))))

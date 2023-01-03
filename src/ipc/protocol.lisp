@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -23,7 +23,8 @@
    (#:internal #:cl-avro.internal)
    (#:mop #:cl-avro.internal.mop)
    (#:name #:cl-avro.internal.name)
-   (#:parse #:cl-avro.internal.ipc.parse))
+   (#:parse #:cl-avro.internal.ipc.parse)
+   (#:intern #:cl-avro.internal.intern))
   (:import-from #:cl-avro.internal.record
                 #:read-field))
 (in-package #:cl-avro.internal.ipc.protocol)
@@ -236,3 +237,17 @@
   (flet ((read-jso (error)
            (internal:read-jso error fullname->schema enclosing-namespace)))
     (map 'list #'read-jso errors)))
+
+;;; intern
+
+(defmethod api:intern ((instance api:protocol) &key null-namespace)
+  (flet ((intern-type (type)
+           (api:intern type :null-namespace null-namespace)))
+    (map nil #'intern-type (api:types instance)))
+  (flet ((intern-message (message)
+           (let* ((name (symbol-name (closer-mop:generic-function-name message)))
+                  (symbol (intern name intern:*intern-package*)))
+             (assert (not (fboundp symbol)) (symbol) "Function already exists")
+             (export symbol intern:*intern-package*)
+             (setf (fdefinition symbol) message))))
+    (map nil #'intern-message (api:messages instance))))

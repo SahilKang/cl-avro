@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -21,7 +21,8 @@
   (:local-nicknames
    (#:api #:cl-avro)
    (#:internal #:cl-avro.internal)
-   (#:record #:cl-avro.internal.record))
+   (#:record #:cl-avro.internal.record)
+   (#:intern #:cl-avro.internal.intern))
   (:import-from #:cl-avro.internal.recursive-descent.pattern
                 #:define-pattern-method)
   (:import-from #:cl-avro.internal.record
@@ -410,3 +411,12 @@
               (,condition-slots (make-condition-slots ,record)))
          (eval
           (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))
+
+;;; intern
+
+(defmethod api:intern ((instance class) &key null-namespace)
+  (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
+  (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
+         (class-name (api:intern schema :null-namespace null-namespace)))
+    (setf (find-class class-name) instance)
+    class-name))

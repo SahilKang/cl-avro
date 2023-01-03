@@ -1,4 +1,4 @@
-;;; Copyright 2022 Google LLC
+;;; Copyright 2022-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -20,6 +20,8 @@
 (defpackage #:cl-avro
   (:export #:schema
            #:object
+           #:intern
+           #:*null-namespace*
            #:schema-of
            #:fingerprint
            #:*default-fingerprint-algorithm*
@@ -178,6 +180,8 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 (cl:defgeneric codec (instance))
 
 (cl:defgeneric schema (instance))
+
+(cl:defgeneric intern (instance cl:&key null-namespace))
 
 (cl:defgeneric serialized-size (object))
 

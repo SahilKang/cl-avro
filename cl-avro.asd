@@ -1,5 +1,5 @@
 ;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -48,6 +48,7 @@
    (:module "api"
     :components ((:file "public")
                  (:file "internal")))
+   (:file "intern" :depends-on ("api"))
    (:module "recursive-descent"
     :depends-on ("api" "mop" "type")
     :components ((:file "pattern")
@@ -75,7 +76,7 @@
                  "crc-64-avro"
                  "recursive-descent"))
    (:module "name"
-    :depends-on ("api" "mop" "recursive-descent" "schema" "type" "ascii")
+    :depends-on ("api" "mop" "recursive-descent" "schema" "type" "ascii" "intern")
     :components ((:file "type")
                  (:file "deduce" :depends-on ("type"))
                  (:file "class" :depends-on ("type" "deduce"))
@@ -84,7 +85,7 @@
                  (:file "package"
                   :depends-on ("type" "deduce" "class" "schema" "coerce"))))
    (:module "complex"
-    :depends-on ("type" "api" "mop" "recursive-descent" "schema" "name")
+    :depends-on ("type" "api" "mop" "recursive-descent" "schema" "name" "intern")
     :components ((:file "count-and-size")
                  (:file "array" :depends-on ("count-and-size"))
                  (:file "map" :depends-on ("count-and-size"))
@@ -120,7 +121,7 @@
                  (:file "file-reader" :depends-on ("file-block"))
                  (:file "file-writer" :depends-on ("file-block"))))
    (:module "ipc"
-    :depends-on ("primitive" "complex" "logical")
+    :depends-on ("primitive" "complex" "logical" "intern")
     :components ((:file "handshake")
                  (:file "error" :depends-on ("handshake"))
                  (:file "message" :depends-on ("error"))
@@ -145,6 +146,7 @@
                (:file "file")
                (:file "name")
                (:file "reinitialization")
+               (:file "intern")
                (:module "complex"
                 :depends-on ("common")
                 :components ((:file "array")

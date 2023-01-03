@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -24,7 +24,8 @@
                 #:ufixnum)
   (:export #:fullname->name
            #:deduce-namespace
-           #:deduce-fullname))
+           #:deduce-fullname
+           #:null-namespace-p))
 (in-package #:cl-avro.internal.name.deduce)
 
 (declaim
