@@ -89,6 +89,69 @@
         (is (eq :external status))
         (is (eq writer (fdefinition `(setf ,symbol))))))))
 
+(test record-add-methods
+  (when (find-package "namespace")
+    (delete-package "namespace"))
+  (let* ((schema-1 (make-instance 'avro:record :namespace "namespace"
+                                               :name '#:record_name_1
+                                               :direct-slots
+                                               '((:name #:foo
+                                                  :type avro:int
+                                                  :readers (#:read-foo)
+                                                  :writers ((setf #:write-foo))))))
+         (schema-2 (make-instance 'avro:record :namespace "namespace"
+                                               :name '#:record_name_2
+                                               :direct-slots
+                                               '((:name #:foo
+                                                  :type avro:int
+                                                  :readers (#:read-foo)
+                                                  :writers ((setf #:write-foo))))))
+         (interned-1 (avro:intern schema-1))
+         (interned-2 (avro:intern schema-2)))
+    (multiple-value-bind (symbol status)
+        (find-symbol "RECORD_NAME_1" (find-package "namespace"))
+      (is (eq :external status))
+      (is (eq symbol interned-1)))
+    (multiple-value-bind (symbol status)
+        (find-symbol "RECORD_NAME_2" (find-package "namespace"))
+      (is (eq :external status))
+      (is (eq symbol interned-2)))
+    (is (eq schema-1 (find-class interned-1)))
+    (is (eq schema-2 (find-class interned-2)))
+    (let* ((package (find-package "namespace"))
+           (slot-1 (first (closer-mop:class-direct-slots schema-1)))
+           (slot-2 (first (closer-mop:class-direct-slots schema-2)))
+           (reader-1 (fdefinition (first (closer-mop:slot-definition-readers slot-1))))
+           (reader-2 (fdefinition (first (closer-mop:slot-definition-readers slot-2))))
+           (writer-1 (fdefinition (first (closer-mop:slot-definition-writers slot-1))))
+           (writer-2 (fdefinition (first (closer-mop:slot-definition-writers slot-2)))))
+      (multiple-value-bind (symbol status)
+          (find-symbol "READ-FOO" package)
+        (let* ((gf (fdefinition symbol))
+               (method (find-if
+                        (lambda (method)
+                          (find schema-2 (closer-mop:method-specializers method)))
+                        (closer-mop:generic-function-methods gf))))
+          (is (eq :external status))
+          (is (eq reader-1 gf))
+          (is method)
+          (is (eq (closer-mop:method-function
+                   (first (closer-mop:generic-function-methods reader-2)))
+                  (closer-mop:method-function method)))))
+      (multiple-value-bind (symbol status)
+          (find-symbol "WRITE-FOO" package)
+        (let* ((gf (fdefinition `(setf ,symbol)))
+               (method (find-if
+                        (lambda (method)
+                          (find schema-2 (closer-mop:method-specializers method)))
+                        (closer-mop:generic-function-methods gf))))
+          (is (eq :external status))
+          (is (eq writer-1 gf))
+          (is method)
+          (is (eq (closer-mop:method-function
+                   (first (closer-mop:generic-function-methods writer-2)))
+                  (closer-mop:method-function method))))))))
+
 (test protocol
   (when (find-package "namespace")
     (delete-package "namespace"))
