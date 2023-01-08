@@ -859,6 +859,23 @@
 
 ;;; intern
 
+(declaim
+ (ftype (function (generic-function list) (values &optional)) add-methods))
+(defun add-methods (gf methods)
+  (let ((method-class (closer-mop:generic-function-method-class gf)))
+    (labels ((make-new-method (method)
+               (make-instance
+                method-class
+                :qualifiers (method-qualifiers method)
+                :lambda-list (closer-mop:method-lambda-list method)
+                :documentation (documentation method t)
+                :specializers (closer-mop:method-specializers method)
+                :function (closer-mop:method-function method)))
+             (add-new-method (method)
+               (add-method gf (make-new-method method))))
+      (map nil #'add-new-method methods)))
+  (values))
+
 (defmethod api:intern ((instance api:record) &key null-namespace)
   (declare (ignore null-namespace))
   (loop
@@ -869,22 +886,21 @@
          for symbol = (intern (symbol-name reader) intern:*intern-package*)
          for function = (fdefinition reader)
          do
-            ;; TODO use add-method instead
-            (assert (not (fboundp symbol)) (symbol) "Function already exists")
             (export symbol intern:*intern-package*)
-            (setf (fdefinition symbol) function))
+            (if (not (fboundp symbol))
+                (setf (fdefinition symbol) function)
+                (add-methods (fdefinition symbol)
+                             (closer-mop:generic-function-methods function))))
        (loop
          for writer in (internal:writers field)
          for symbol = (intern (symbol-name (second writer)) intern:*intern-package*)
+         for setf-symbol = `(setf ,symbol)
          for function = (fdefinition writer)
          do
-            ;; TODO use add-method instead
-            (assert (not
-                     (handler-case
-                         (fdefinition `(setf ,symbol))
-                       (undefined-function ()
-                         nil)))
-                    (symbol)
-                    "Function already exists")
             (export symbol intern:*intern-package*)
-            (setf (fdefinition `(setf ,symbol)) function))))
+            (handler-case
+                (let ((gf (fdefinition setf-symbol)))
+                  (add-methods gf
+                               (closer-mop:generic-function-methods function)))
+              (undefined-function ()
+                (setf (fdefinition setf-symbol) function))))))
