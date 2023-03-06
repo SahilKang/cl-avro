@@ -133,6 +133,16 @@
                  (:file "server"
                   :depends-on ("framing" "protocol" "protocol-object"))))))
 
+(defsystem #:cl-avro/asdf
+  :description "Utilities to define ASDF systems containing avro source files."
+  :version (:read-file-form "version.lisp")
+  :author "Sahil Kang <sahil.kang@asilaycomputing.com>"
+  :license "GPLv3"
+  :build-pathname "cl-avro"
+  :pathname "src"
+  :depends-on (#:cl-avro)
+  :components ((:file "asdf")))
+
 (defsystem #:cl-avro/test
   :description "Tests for cl-avro."
   :version (:read-file-form "version.lisp")
