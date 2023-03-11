@@ -418,5 +418,7 @@
   (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
   (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
          (class-name (api:intern schema :null-namespace null-namespace)))
-    (setf (find-class class-name) instance)
+    ;; Muffle bogus warning about changing meta class
+    (handler-bind ((warning #'muffle-warning))
+      (setf (find-class class-name) instance))
     class-name))
