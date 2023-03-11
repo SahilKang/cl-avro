@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -38,7 +38,7 @@
            #:*primitives*))
 (in-package #:cl-avro.internal.defprimitive)
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *primitives* nil
     "List of primitive schemas."))
 

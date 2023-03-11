@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -120,7 +120,7 @@
 
 ;;; define-io-test
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun schema-pair-p (schema)
     (declare ((or symbol cons) schema))
     (and (consp schema)

@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -23,7 +23,7 @@
    (#:base #:cl-avro/test/resolution/base)))
 (in-package #:cl-avro/test/resolution/map)
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (declaim
    (ftype (function (symbol) (values cons &optional)) find-schema))
   (defun find-schema (name)
