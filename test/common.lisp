@@ -166,7 +166,7 @@
                                  (if (symbolp schema)
                                      (if (typep schema 'avro:schema)
                                          `',schema
-                                         (find-class schema))
+                                         `(find-class ',schema))
                                      schema)))
               (,object-symbol ,object)
               (serialized (make-array ,(length serialized)
