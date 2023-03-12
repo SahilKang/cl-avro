@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -86,7 +86,7 @@
     ((schema symbol) input &rest initargs)
   (apply #'api:deserialize (find-class schema) input initargs))
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (declaim (ftype (function (symbol) (values symbol &optional)) +p))
   (defun +p (name)
     (nth-value 0 (intern (format nil "~SP" name)))))
