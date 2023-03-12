@@ -153,7 +153,6 @@ The returned values conform to NAMESPACE-RETURN-TYPE."
     (let* ((intern:*intern-package* (or (find-package namespace)
                                         (make-package namespace)))
            (class-name (intern name intern:*intern-package*)))
-      (assert (not (find-class class-name nil)) (class-name) "Class already exists")
       (export class-name intern:*intern-package*)
       (setf (find-class class-name) instance)
       (call-next-method instance :null-namespace null-namespace)

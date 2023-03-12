@@ -247,7 +247,6 @@
   (flet ((intern-message (message)
            (let* ((name (symbol-name (closer-mop:generic-function-name message)))
                   (symbol (intern name intern:*intern-package*)))
-             (assert (not (fboundp symbol)) (symbol) "Function already exists")
              (export symbol intern:*intern-package*)
              (setf (fdefinition symbol) message))))
     (map nil #'intern-message (api:messages instance))))

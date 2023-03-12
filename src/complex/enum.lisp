@@ -320,6 +320,5 @@
       for symbol = (intern symbol-name package)
       for object = (make-instance instance :enum symbol-name)
       do
-         (assert (not (boundp symbol)) (symbol) "Symbol ~S already exists" symbol)
          (export symbol package)
          (setf (symbol-value symbol) object))))
