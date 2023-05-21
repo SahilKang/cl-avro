@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -61,13 +61,40 @@
 (defclass all-or-nothing-reinitialization ()
   ())
 
+(declaim
+ (ftype (function (standard-class list) (values &optional)) %remove-accessors))
+(defun %remove-accessors (class names)
+  (loop
+    for name in names
+    for accessor = (fdefinition name)
+    do
+       (loop
+         for method in (closer-mop:generic-function-methods accessor)
+         for specializers = (closer-mop:method-specializers method)
+         when (member class specializers :test #'eq) do
+           (remove-method accessor method)))
+  (values))
+
+(declaim
+ (ftype (function (standard-class) (values &optional)) remove-accessors))
+(defun remove-accessors (class)
+  (loop
+    for slot in (closer-mop:class-direct-slots class)
+    for readers = (closer-mop:slot-definition-readers slot)
+    for writers = (closer-mop:slot-definition-writers slot)
+    do
+       (%remove-accessors class readers)
+       (%remove-accessors class writers))
+  (values))
+
 (defmethod reinitialize-instance :around
     ((instance all-or-nothing-reinitialization) &rest initargs &key &allow-other-keys)
-  (let ((new (apply #'make-instance (class-of instance) initargs))
-        (instance (call-next-method)))
+  (let* ((class (class-of instance))
+         (new (apply #'make-instance class initargs))
+         (instance (call-next-method)))
     (loop
       with terminals = (mapcar #'find-class '(standard-class standard-object))
-      and classes = (list (class-of instance))
+      and classes = (list class)
 
       while classes
       for class = (pop classes)
@@ -80,6 +107,8 @@
             (setf (slot-value instance name) (slot-value new name))
           else do
             (slot-makunbound instance name)))
+    (when (closer-mop:subclassp class 'standard-class)
+      (remove-accessors new))
     (closer-mop:finalize-inheritance instance)
     instance))
 

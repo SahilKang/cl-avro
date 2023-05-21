@@ -189,7 +189,7 @@
           (symbol (gensym)))
       (unless readers
         (push symbol readers))
-      (unless (closer-mop:slot-definition-initargs field)
+      (unless (or writers (closer-mop:slot-definition-initargs field))
         (push `(setf ,symbol) writers))
       (push readers initargs)
       (push :readers initargs)
@@ -406,15 +406,23 @@
         (record (gensym))
         (condition-slots (gensym)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (let* ((,record (add-accessors-and-initargs
-                        (apply #'make-instance 'api:record ',record-initargs)))
-              (,condition-slots (make-condition-slots ,record)))
+       (let* ((,record
+                (add-accessors-and-initargs
+                 (let ((class (find-class ',name nil)))
+                   (if class
+                       (let ((record
+                               (internal:schema (closer-mop:class-prototype class))))
+                         (apply #'reinitialize-instance record ',record-initargs))
+                       (apply #'make-instance 'api:record ',record-initargs)))))
+              (,condition-slots
+                (make-condition-slots ,record)))
          (eval
           (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))
 
 ;;; intern
 
-(defmethod api:intern ((instance class) &key null-namespace)
+(defmethod api:intern
+    ((instance class) &key (null-namespace api:*null-namespace*))
   (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
   (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
          (class-name (api:intern schema :null-namespace null-namespace)))
