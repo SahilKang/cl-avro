@@ -406,9 +406,16 @@
         (record (gensym))
         (condition-slots (gensym)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (let* ((,record (add-accessors-and-initargs
-                        (apply #'make-instance 'api:record ',record-initargs)))
-              (,condition-slots (make-condition-slots ,record)))
+       (let* ((,record
+                (add-accessors-and-initargs
+                 (let ((class (find-class ',name nil)))
+                   (if class
+                       (let ((record
+                               (internal:schema (closer-mop:class-prototype class))))
+                         (apply #'reinitialize-instance record ',record-initargs))
+                       (apply #'make-instance 'api:record ',record-initargs)))))
+              (,condition-slots
+                (make-condition-slots ,record)))
          (eval
           (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))
 
