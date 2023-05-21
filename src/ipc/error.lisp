@@ -189,7 +189,7 @@
           (symbol (gensym)))
       (unless readers
         (push symbol readers))
-      (unless (closer-mop:slot-definition-initargs field)
+      (unless (or writers (closer-mop:slot-definition-initargs field))
         (push `(setf ,symbol) writers))
       (push readers initargs)
       (push :readers initargs)
