@@ -421,7 +421,8 @@
 
 ;;; intern
 
-(defmethod api:intern ((instance class) &key null-namespace)
+(defmethod api:intern
+    ((instance class) &key (null-namespace api:*null-namespace*))
   (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
   (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
          (class-name (api:intern schema :null-namespace null-namespace)))
