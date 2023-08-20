@@ -170,9 +170,8 @@
           "Expected a plist with an even number of elements: ~S" plist)
   (loop
     for key in plist by #'cddr
-    unless (member key expected-keys)
-      do (error "Unknown key ~S, expected one of ~S" key expected-keys)
-    collect key into keys
+    when (member key expected-keys)
+      collect key into keys
     finally
        (loop
          for expected-key in expected-keys
@@ -221,7 +220,7 @@
            (%late-request types request)))
     (make-instance
      'api:record
-     :name "anonymous"
+     :name (make-symbol "anonymous")
      :direct-slots (map 'list #'%late-request request))))
 
 (declaim

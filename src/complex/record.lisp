@@ -424,8 +424,7 @@
     for index below (length fields)
     for field = (elt fields index)
     for value = (elt values index)
-    for initarg of-type (or null keyword)
-      = (first (closer-mop:slot-definition-initargs field))
+    for initarg = (first (closer-mop:slot-definition-initargs field))
 
     if initarg do
       (push value initargs)
@@ -766,6 +765,10 @@
 
 ;;; jso
 
+(defparameter api:*add-accessors-and-initargs-p* t
+  "When non-nil, record and error deserializtion adds field accessors
+and initargs.")
+
 (declaim
  (ftype (function (st-json:jso hash-table name:namespace)
                   (values list &optional))
@@ -782,6 +785,14 @@
       (assert typep () "Field type must be provided.")
       (push (internal:read-jso type fullname->schema enclosing-namespace) initargs)
       (push :type initargs))
+    (when api:*add-accessors-and-initargs-p*
+      (let ((name (getf initargs :name)))
+        (push (list name) initargs)
+        (push :initargs initargs)
+        (push (list name) initargs)
+        (push :readers initargs)
+        (push (list `(setf ,name)) initargs)
+        (push :writers initargs)))
     initargs))
 
 (declaim
@@ -859,48 +870,70 @@
 
 ;;; intern
 
-(declaim
- (ftype (function (generic-function list) (values &optional)) add-methods))
-(defun add-methods (gf methods)
-  (let ((method-class (closer-mop:generic-function-method-class gf)))
-    (labels ((make-new-method (method)
-               (make-instance
-                method-class
-                :qualifiers (method-qualifiers method)
-                :lambda-list (closer-mop:method-lambda-list method)
-                :documentation (documentation method t)
-                :specializers (closer-mop:method-specializers method)
-                :function (closer-mop:method-function method)))
-             (add-new-method (method)
-               (add-method gf (make-new-method method))))
-      (map nil #'add-new-method methods)))
-  (values))
-
 (defmethod api:intern ((instance api:record) &key null-namespace)
   (declare (ignore null-namespace))
   (loop
+    with direct-slots = nil
+
     for field across (api:fields instance)
+    for direct-slot = (list :name (closer-mop:slot-definition-name field)
+                            :type (closer-mop:slot-definition-type field))
     do
+       (multiple-value-bind (order orderp) (api:order field)
+         (when orderp
+           (push order direct-slot)
+           (push :order direct-slot)))
+       (multiple-value-bind (default defaultp) (api:default field)
+         (when defaultp
+           (push default direct-slot)
+           (push :default direct-slot)))
+       (let ((aliases (api:aliases field)))
+         (when aliases
+           (push aliases direct-slot)
+           (push :aliases direct-slot)))
        (loop
+         with initargs = nil
+         for initarg in (closer-mop:slot-definition-initargs field)
+         do
+            (push initarg initargs)
+            (push (intern (symbol-name initarg) 'keyword) initargs)
+         finally
+            (push (nreverse initargs) direct-slot)
+            (push :initargs direct-slot))
+       (loop
+         with readers = nil
          for reader in (internal:readers field)
          for symbol = (intern (symbol-name reader) intern:*intern-package*)
-         for function = (fdefinition reader)
          do
             (export symbol intern:*intern-package*)
-            (if (not (fboundp symbol))
-                (setf (fdefinition symbol) function)
-                (add-methods (fdefinition symbol)
-                             (closer-mop:generic-function-methods function))))
+            (push reader readers)
+            (push symbol readers)
+         finally
+            (push (nreverse readers) direct-slot)
+            (push :readers direct-slot))
        (loop
+         with writers = nil
          for writer in (internal:writers field)
          for symbol = (intern (symbol-name (second writer)) intern:*intern-package*)
          for setf-symbol = `(setf ,symbol)
-         for function = (fdefinition writer)
          do
             (export symbol intern:*intern-package*)
-            (handler-case
-                (let ((gf (fdefinition setf-symbol)))
-                  (add-methods gf
-                               (closer-mop:generic-function-methods function)))
-              (undefined-function ()
-                (setf (fdefinition setf-symbol) function))))))
+            (push writer writers)
+            (push setf-symbol writers)
+         finally
+            (push (nreverse writers) direct-slot)
+            (push :writers direct-slot))
+       (push direct-slot direct-slots)
+    finally
+       (let ((initargs (list :direct-slots (nreverse direct-slots)
+                             :name (nth-value 1 (api:name instance)))))
+         (multiple-value-bind (deduced provided provided-p) (api:namespace instance)
+           (declare (ignore deduced))
+           (when provided-p
+             (push provided initargs)
+             (push :namespace initargs)))
+         (let ((aliases (api:aliases instance)))
+           (when aliases
+             (push aliases initargs)
+             (push :aliases initargs)))
+         (apply #'reinitialize-instance instance initargs))))
