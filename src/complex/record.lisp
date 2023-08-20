@@ -424,8 +424,7 @@
     for index below (length fields)
     for field = (elt fields index)
     for value = (elt values index)
-    for initarg of-type (or null keyword)
-      = (first (closer-mop:slot-definition-initargs field))
+    for initarg = (first (closer-mop:slot-definition-initargs field))
 
     if initarg do
       (push value initargs)
@@ -766,6 +765,10 @@
 
 ;;; jso
 
+(defparameter api:*add-accessors-and-initargs-p* t
+  "When non-nil, record and error deserializtion adds field accessors
+and initargs.")
+
 (declaim
  (ftype (function (st-json:jso hash-table name:namespace)
                   (values list &optional))
@@ -782,6 +785,14 @@
       (assert typep () "Field type must be provided.")
       (push (internal:read-jso type fullname->schema enclosing-namespace) initargs)
       (push :type initargs))
+    (when api:*add-accessors-and-initargs-p*
+      (let ((name (getf initargs :name)))
+        (push (list name) initargs)
+        (push :initargs initargs)
+        (push (list name) initargs)
+        (push :readers initargs)
+        (push (list `(setf ,name)) initargs)
+        (push :writers initargs)))
     initargs))
 
 (declaim

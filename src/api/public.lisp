@@ -66,6 +66,7 @@
            #:symbols
            #:default
            #:record
+           #:*add-accessors-and-initargs-p*
            #:record-object
            #:fields
            #:field

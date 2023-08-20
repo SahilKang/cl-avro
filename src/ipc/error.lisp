@@ -99,8 +99,7 @@
     for index below (length fields)
     for field = (elt fields index)
     for value = (elt values index)
-    for initarg of-type (or null keyword)
-      = (first (closer-mop:slot-definition-initargs field))
+    for initarg = (first (closer-mop:slot-definition-initargs field))
 
     if initarg do
       (push value initargs)
@@ -247,7 +246,7 @@
                 initargs)
       ,@(mapcan (lambda (reader)
                   `(:reader ,reader))
-                (list* name readers))
+                readers)
       ,@(mapcan (lambda (writer)
                   `(:writer ,writer))
                 writers))))
@@ -269,13 +268,14 @@
 
      (find-class ',name)))
 
-(declaim (ftype (function (api:record) (values class &optional)) to-error))
-(defun to-error (record)
+(declaim
+ (ftype (function (api:record &optional symbol) (values class &optional))
+        to-error))
+(defun to-error (record &optional (name (make-symbol (api:name record))))
   (let* ((record (add-accessors-and-initargs record))
          (condition-slots (make-condition-slots record))
          (condition-options (when (documentation record t)
-                              `((:documentation ,(documentation record t)))))
-         (name (make-symbol (api:name record))))
+                              `((:documentation ,(documentation record t))))))
     (eval
      (expand-define-condition name condition-slots condition-options record))))
 
@@ -426,6 +426,7 @@
   (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
   (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
          (class-name (api:intern schema :null-namespace null-namespace)))
+    (assert (eq instance (to-error schema (class-name instance))))
     ;; Muffle bogus warning about changing meta class
     (handler-bind ((warning #'muffle-warning))
       (setf (find-class class-name) instance))
