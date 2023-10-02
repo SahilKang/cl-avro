@@ -895,30 +895,27 @@ and initargs.")
          with initargs = nil
          for initarg in (closer-mop:slot-definition-initargs field)
          do
-            (push initarg initargs)
             (push (intern (symbol-name initarg) 'keyword) initargs)
          finally
             (push (nreverse initargs) direct-slot)
             (push :initargs direct-slot))
        (loop
          with readers = nil
-         for reader in (internal:readers field)
-         for symbol = (intern (symbol-name reader) intern:*intern-package*)
+         for symbol in (internal:readers field)
+         for interned = (intern (symbol-name symbol) intern:*intern-package*)
          do
-            (export symbol intern:*intern-package*)
-            (push reader readers)
-            (push symbol readers)
+            (export interned intern:*intern-package*)
+            (push interned readers)
          finally
             (push (nreverse readers) direct-slot)
             (push :readers direct-slot))
        (loop
          with writers = nil
-         for writer in (internal:writers field)
-         for symbol = (intern (symbol-name (second writer)) intern:*intern-package*)
-         for setf-symbol = `(setf ,symbol)
+         for symbol in (internal:writers field)
+         for interned = (intern (symbol-name (second symbol)) intern:*intern-package*)
+         for setf-symbol = `(setf ,interned)
          do
-            (export symbol intern:*intern-package*)
-            (push writer writers)
+            (export interned intern:*intern-package*)
             (push setf-symbol writers)
          finally
             (push (nreverse writers) direct-slot)
