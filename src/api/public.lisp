@@ -186,7 +186,18 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (cl:defgeneric serialized-size (object))
 
-(cl:defgeneric deserialize (schema input cl:&key cl:&allow-other-keys))
+(cl:defgeneric deserialize (schema input cl:&key cl:&allow-other-keys)
+  (:documentation
+   "Deserialize INPUT according to SCHEMA.
+
+If SCHEMA is eql to the symbol SCHEMA or PROTOCOL, then INPUT will be
+interpreted as its json representation. Otherwise, INPUT will be interpreted as
+the octets of an OBJECT adhering to SCHEMA. SCHEMA may also be eql to
+FINGERPRINT, indicating that INPUT is in single object encoding form. In this
+latter case, only the fingerprint from INPUT is deserialized.
+
+INPUT may be a stream or vector. If INPUT is a vector, then :START indicates
+where to start deserializing from."))
 
 (cl:defgeneric serialize (object cl:&key cl:&allow-other-keys)
   (:documentation
