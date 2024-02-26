@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2022, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -241,13 +241,11 @@
   (declare (ignore schema seen canonical-form-p))
   nil)
 
-(defgeneric write-json (object into &key &allow-other-keys))
-
-(defmethod write-json
+(defmethod internal:write-json
     (object (into stream) &key)
   (st-json:write-json object into))
 
-(defmethod write-json
+(defmethod internal:write-json
     (object (into string) &key (start 0))
   (declare (ufixnum start))
   (with-output-to-string
@@ -282,7 +280,7 @@
                    (or canonical-form-p
                        st-json:*output-literal-unicode*))
                  (jso (internal:write-jso object seen canonical-form-p)))
-            (apply #'write-json jso into initargs))
+            (apply #'internal:write-json jso into initargs))
           into)))
   (define-serialize api:complex-schema)
   (define-serialize api:logical-schema))

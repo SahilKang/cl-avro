@@ -1,4 +1,4 @@
-;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2021, 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -86,10 +86,16 @@
 ;;; serialize
 
 (defmethod api:serialize
-    ((protocol api:protocol) &key)
-  "Return json string representation of PROTOCOL."
-  (st-json:write-json-to-string
-   (internal:write-jso protocol (make-hash-table :test #'eq) nil)))
+    ((protocol api:protocol)
+     &key
+       (into (make-array
+              0 :element-type 'character :adjustable t :fill-pointer t))
+       (start 0)
+       (canonical-form-p nil))
+  (let ((jso-object (internal:write-jso
+                     protocol (make-hash-table :test #'eq) canonical-form-p)))
+    (internal:write-json jso-object into :start start)
+    into))
 
 (defmethod internal:write-jso
     ((protocol api:protocol) seen canonical-form-p)

@@ -1,4 +1,4 @@
-;;; Copyright 2022 Google LLC
+;;; Copyright 2022, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -48,6 +48,7 @@
            #:read-jso
            #:with-initargs
            #:write-jso
+           #:write-json
            #:logical-name
            #:downcase-symbol))
 
@@ -56,6 +57,8 @@
 (cl:defgeneric logical-name (schema))
 
 (cl:defgeneric write-jso (schema seen canonical-form-p))
+
+(cl:defgeneric write-json (jso-object into cl:&key cl:&allow-other-keys))
 
 (cl:defgeneric crc-64-avro-little-endian (schema))
 
