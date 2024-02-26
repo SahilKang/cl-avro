@@ -132,9 +132,13 @@
 ;;; deserialize
 
 (defmethod api:deserialize
-    ((protocol (eql 'api:protocol)) (input string) &key)
-  "Read a protocol from the json INPUT."
+    ((protocol (eql 'api:protocol)) (input stream) &key)
   (jso->protocol (st-json:read-json input t)))
+
+(defmethod api:deserialize
+    ((protocol (eql 'api:protocol)) (input string) &key (start 0))
+  (jso->protocol
+   (st-json:read-json-from-string input :start start :junk-allowed-p t)))
 
 (declaim
  (ftype (function (st-json:jso) (values api:protocol &optional)) jso->protocol))
