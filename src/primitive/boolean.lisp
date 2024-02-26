@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -67,11 +67,6 @@
     ((object (eql 'api:false)))
   (declare (ignore object))
   1)
-
-(defmethod api:serialize
-    ((schema (eql 'api:boolean)) &key)
-  (declare (ignore schema))
-  +json+)
 
 (defmethod internal:serialize
     ((object (eql 'api:true)) (into vector) &key (start 0))

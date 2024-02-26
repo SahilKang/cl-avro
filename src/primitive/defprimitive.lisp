@@ -1,4 +1,4 @@
-;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2021, 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -19,6 +19,7 @@
 (defpackage #:cl-avro.internal.defprimitive
   (:use #:cl)
   (:local-nicknames
+   (#:api #:cl-avro)
    (#:little-endian #:cl-avro.internal.little-endian))
   (:import-from #:cl-avro.internal.type
                 #:uint8
@@ -38,6 +39,24 @@
            #:*primitives*))
 (in-package #:cl-avro.internal.defprimitive)
 
+(defgeneric write-json-string
+    (string into &key &allow-other-keys))
+
+(defmethod write-json-string
+    ((string simple-string) (into stream) &key)
+  (write-string string into)
+  into)
+
+(defmethod write-json-string
+    ((string simple-string) (into string) &key (start 0))
+  (replace into string :start1 start)
+  into)
+
+(defmethod write-json-string
+    ((string simple-string) (into null) &key)
+  (declare (ignore into))
+  string)
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *primitives* nil
     "List of primitive schemas."))
@@ -49,6 +68,7 @@
   (pushnew name *primitives* :test #'eq)
   (let ((+jso+ (intern "+JSO+"))
         (+json+ (intern "+JSON+"))
+        (+json-non-canonical+ (intern "+JSON-NON-CANONICAL+"))
         (+crc-64-avro+ (intern "+CRC-64-AVRO+"))
         (+crc-64-avro-little-endian+ (intern "+CRC-64-AVRO-LITTLE-ENDIAN+"))
         (string (string-downcase (string name))))
@@ -67,6 +87,14 @@
        (declaim (simple-string ,+json+))
        (define-constant ,+json+
            (st-json:write-json-to-string ,+jso+)
+         :test #'string=)
+
+       (declaim (simple-string ,+json-non-canonical+))
+       (define-constant ,+json-non-canonical+
+           (st-json:write-json-to-string
+            (let ((hash-table (make-hash-table)))
+              (setf (gethash "type" hash-table) ,+jso+)
+              hash-table))
          :test #'string=)
 
        (declaim (uint64 ,+crc-64-avro+))
@@ -98,4 +126,10 @@
        (defmethod write-jso
            ((schema (eql ',name)) seen canonical-form-p)
          (declare (ignore schema seen canonical-form-p))
-         ,+jso+))))
+         ,+jso+)
+
+       (defmethod api:serialize
+           ((schema (eql ',name)) &key into (start 0) (canonical-form-p t))
+         (declare (ignore schema))
+         (let ((string (if canonical-form-p ,+json+ ,+json-non-canonical+)))
+           (write-json-string string into :start start))))))

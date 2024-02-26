@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -54,11 +54,6 @@
     ((object string))
   (let ((length (babel:string-size-in-octets object :encoding :utf-8)))
     (the size (+ (long:serialized-size length) length))))
-
-(defmethod api:serialize
-    ((schema (eql 'api:string)) &key)
-  (declare (ignore schema))
-  +json+)
 
 (defmethod internal:serialize
     ((object string) (into vector) &key (start 0))
