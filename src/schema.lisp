@@ -287,6 +287,7 @@
 
 (defmethod api:serialize
     ((object symbol) &rest initargs)
+  "Serialize the class named OBJECT."
   (apply #'api:serialize (find-class object) initargs))
 
 ;;; coerce

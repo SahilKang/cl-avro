@@ -1,4 +1,4 @@
-;;; Copyright 2022-2023 Google LLC
+;;; Copyright 2022-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -188,7 +188,24 @@ LEFT and RIGHT may not necessarily be fully consumed."))
 
 (cl:defgeneric deserialize (schema input cl:&key cl:&allow-other-keys))
 
-(cl:defgeneric serialize (object cl:&key cl:&allow-other-keys))
+(cl:defgeneric serialize (object cl:&key cl:&allow-other-keys)
+  (:documentation
+   "Serialize OBJECT, which may be an avro SCHEMA, PROTOCOL, or OBJECT.
+
+If OBJECT is an avro SCHEMA or PROTOCOL, then the json representation of OBJECT
+is serialized. Otherwise, if OBJECT is an avro OBJECT, then it's serialized
+according to its avro SCHEMA.
+
+:INTO can be a vector or stream, defaulting to a vector if not provided. :INTO
+should accept characters for avro SCHEMAs or PROTOCOLs, and octets for avro
+OBJECTs. If :INTO is a vector, then :START specifies where to start storing the
+output.
+
+For avro SCHEMAs or PROTOCOLs, :CANONICAL-FORM-P will determine if the json
+output is in avro canonical form.
+
+For avro OBJECTs, :SINGLE-OBJECT-ENCODING-P will determine if the octet output
+adheres to avro single object encoding."))
 
 (cl:defgeneric one-way (message))
 
