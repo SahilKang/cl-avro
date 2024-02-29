@@ -1,4 +1,4 @@
-;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2021, 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -274,6 +274,7 @@
 
 (defmethod api:fields
     ((instance api:record))
+  "Return fields from INSTANCE."
   (closer-mop:ensure-finalized instance)
   (slot-value instance 'fields))
 
@@ -766,7 +767,7 @@
 ;;; jso
 
 (defparameter api:*add-accessors-and-initargs-p* t
-  "When non-nil, record and error deserializtion adds field accessors
+  "When non-nil, record and error deserialization adds field accessors
 and initargs.")
 
 (declaim

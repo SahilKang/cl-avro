@@ -1,5 +1,5 @@
 ;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -45,7 +45,9 @@
   (:name "Magic")
   (:enclosing-namespace "org.apache.avro.file")
   (:default-initargs
-   :initial-contents +magic+))
+   :initial-contents +magic+)
+  (:documentation
+   "Magic field for object container file headers."))
 
 (defmethod initialize-instance :after
     ((instance api:magic) &key)
@@ -63,7 +65,9 @@
     :initarg :codec
     :type simple-string))
   (:metaclass api:map)
-  (:values api:bytes))
+  (:values api:bytes)
+  (:documentation
+   "Meta field for object container file headers."))
 
 (defmethod initialize-instance :after
     ((instance api:meta) &key)
@@ -86,6 +90,7 @@
 
 (defmethod api:schema
     ((instance api:meta))
+  "Return the schema associated with file-header meta INSTANCE."
   (if (slot-boundp instance 'schema)
       (slot-value instance 'schema)
       (setf (slot-value instance 'schema)
@@ -102,6 +107,7 @@
 
 (defmethod api:codec
     ((instance api:meta))
+  "Return the codec from INSTANCE."
   (if (slot-boundp instance 'codec)
       (slot-value instance 'codec)
       (setf (slot-value instance 'codec)
@@ -116,7 +122,9 @@
   (:name "Sync")
   (:enclosing-namespace "org.apache.avro.file")
   (:default-initargs
-   :initial-contents (loop repeat 16 collect (random 256))))
+   :initial-contents (loop repeat 16 collect (random 256)))
+  (:documentation
+   "Sync field for object container file headers."))
 
 ;;; file-header
 
@@ -124,25 +132,32 @@
   ((|magic|
     :initarg :magic
     :type api:magic
-    :reader api:magic)
+    :reader api:magic
+    :documentation "Magic field.")
    (|meta|
     :initarg :meta
     :type api:meta
-    :reader api:meta)
+    :reader api:meta
+    :documentation "Meta field.")
    (|sync|
     :initarg :sync
     :type api:sync
-    :reader api:sync))
+    :reader api:sync
+    :documentation "Sync field."))
   (:metaclass api:record)
   (:name "org.apache.avro.file.Header")
   (:default-initargs
    :magic (make-instance 'api:magic)
-   :sync (make-instance 'api:sync)))
+   :sync (make-instance 'api:sync))
+  (:documentation
+   "File header for object container files."))
 
 (defmethod api:schema
     ((instance api:file-header))
+  "Return the schema associated with file-header INSTANCE."
   (api:schema (api:meta instance)))
 
 (defmethod api:codec
     ((instance api:file-header))
+  "Return the codec from INSTANCE."
   (api:codec (api:meta instance)))

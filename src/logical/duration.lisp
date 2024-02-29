@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -133,14 +133,17 @@
 
 (defmethod api:months
     ((object api:duration-object))
+  "Return months for OBJECT."
   (time-interval::interval-months object))
 
 (defmethod api:days
     ((object api:duration-object))
+  "Return days for OBJECT."
   (time-interval::interval-days object))
 
 (defmethod api:milliseconds
     ((object api:duration-object))
+  "Return milliseconds for OBJECT."
   (milliseconds object))
 
 ;;; serialized-size

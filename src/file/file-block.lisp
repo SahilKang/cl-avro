@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -42,17 +42,22 @@
   ((count
     :initarg :count
     :type api:long
-    :reader api:count)
+    :reader api:count
+    :documentation "The number of objects in this block.")
    (bytes
     :initarg :bytes
     :type api:bytes
-    :reader api:bytes)
+    :reader api:bytes
+    :documentation "The serialized and compressed data for this block.")
    (sync
     :initarg :sync
     :type api:sync
-    :reader api:sync))
+    :reader api:sync
+    :documentation "Sync field."))
   (:metaclass api:record)
-  (:name "org.apache.avro.file.Block"))
+  (:name "org.apache.avro.file.Block")
+  (:documentation
+   "File block for object container files."))
 
 ;;; decompress
 
@@ -62,19 +67,36 @@
 (declaim (decompress api:*decompress-deflate*))
 (defvar api:*decompress-deflate*
   (lambda (bytes)
-    (chipz:decompress nil 'chipz:deflate bytes)))
+    (chipz:decompress nil 'chipz:deflate bytes))
+  "The function used to decompress deflate-compressed data.")
 
 (declaim (decompress api:*decompress-bzip2*))
 (defvar api:*decompress-bzip2*)
+(setf (documentation 'api:*decompress-bzip2* 'variable)
+      "The function used to decompress bzip2-compressed data.
+
+A default implementation is not provided.")
 
 (declaim (decompress api:*decompress-snappy*))
 (defvar api:*decompress-snappy*)
+(setf (documentation 'api:*decompress-snappy* 'variable)
+      "The function used to decompress snappy-compressed data.
+
+A default implementation is not provided.")
 
 (declaim (decompress api:*decompress-xz*))
 (defvar api:*decompress-xz*)
+(setf (documentation 'api:*decompress-xz* 'variable)
+      "The function used to decompress xz-compressed data.
+
+A default implementation is not provided.")
 
 (declaim (decompress api:*decompress-zstandard*))
 (defvar api:*decompress-zstandard*)
+(setf (documentation 'api:*decompress-zstandard* 'variable)
+      "The function used to decompress zstandard-compressed data.
+
+A default implementation is not provided.")
 
 (defgeneric codec->decompress (codec)
   (:generic-function-class pattern-generic-function))
@@ -115,19 +137,36 @@
 (declaim (compress api:*compress-deflate*))
 (defvar api:*compress-deflate*
   (lambda (bytes)
-    (salza2:compress-data bytes 'salza2:deflate-compressor)))
+    (salza2:compress-data bytes 'salza2:deflate-compressor))
+  "The function used to perform deflate compression.")
 
 (declaim (compress api:*compress-bzip2*))
 (defvar api:*compress-bzip2*)
+(setf (documentation 'api:*compress-bzip2* 'variable)
+      "The function used to perform bzip2 compression.
+
+A default implementation is not provided.")
 
 (declaim (compress api:*compress-snappy*))
 (defvar api:*compress-snappy*)
+(setf (documentation 'api:*compress-snappy* 'variable)
+      "The function used to perform snappy compression.
+
+A default implementation is not provided.")
 
 (declaim (compress api:*compress-xz*))
 (defvar api:*compress-xz*)
+(setf (documentation 'api:*compress-xz* 'variable)
+      "The function used to perform xz compression.
+
+A default implementation is not provided.")
 
 (declaim (compress api:*compress-zstandard*))
 (defvar api:*compress-zstandard*)
+(setf (documentation 'api:*compress-zstandard* 'variable)
+      "The function used to perform zstandard compression.
+
+A default implementation is not provided.")
 
 (defgeneric codec->compress (codec)
   (:generic-function-class pattern-generic-function))

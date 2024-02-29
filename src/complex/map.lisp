@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -65,7 +65,7 @@
 ;;; map-object
 
 (defclass api:map-object (backed-by-hash-table api:complex-object)
-  ((hash-table :reader api:raw))
+  ((hash-table :reader api:raw :documentation "The underlying hash-table."))
   (:documentation
    "Base class for instances of an avro map schema."))
 
@@ -85,32 +85,39 @@
 
 (defmethod api:hash-table-count
     ((object api:map-object))
+  "Return the number of entries in OBJECT, like hash-table-count."
   (hash-table-count (hash-table object)))
 
 (defmethod api:hash-table-size
     ((object api:map-object))
+  "Return the underlying size of OBJECT, like hash-table-size."
   (hash-table-size (hash-table object)))
 
 (defmethod api:clrhash
     ((object api:map-object))
+  "Clear the entries from OBJECT before returning OBJECT, like clrhash."
   (prog1 object
     (clrhash (hash-table object))))
 
 (defmethod api:maphash
     ((function function) (object api:map-object))
+  "Call FUNCTION for each entry in OBJECT, like maphash."
   (maphash function (hash-table object)))
 
 (defmethod api:gethash
     ((key string) (object api:map-object) &optional default)
+  "Return the value associated with KEY or DEFAULT if not found, like gethash."
   (gethash key (hash-table object) default))
 
 (defmethod (setf api:gethash)
     (value (key string) (object api:map-object))
+  "Assign the value associated with KEY, like (setf gethash)."
   (assert (typep value (api:values (class-of object))))
   (setf (gethash key (hash-table object)) value))
 
 (defmethod api:remhash
     ((key string) (object api:map-object))
+  "Remove the entry associated with KEY, returning t if found or nil otherwise."
   (remhash key (hash-table object)))
 
 ;;; serialized-size

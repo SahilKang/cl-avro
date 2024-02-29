@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -81,7 +81,7 @@
 
 (defclass api:array-object
     (buffered api:complex-object #+sbcl sequence #-sbcl sequences:sequence)
-  ((buffer :reader api:raw))
+  ((buffer :reader api:raw :documentation "The underlying vector."))
   (:documentation
    "Base class for instances of an avro array schema."))
 
@@ -107,11 +107,13 @@
 
 (defmethod api:push
     (element (instance api:array-object))
+  "Push ELEMENT onto end of INSTANCE."
   (assert (typep element (api:items (class-of instance))))
   (vector-push-extend element (buffer instance)))
 
 (defmethod api:pop
     ((instance api:array-object))
+  "Pop the last element from INSTANCE."
   (vector-pop (buffer instance)))
 
 (defmethod sequences:length

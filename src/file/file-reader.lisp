@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -39,7 +39,8 @@
    (file-header
     :type api:file-header
     :reader api:file-header
-    :accessor file-header)
+    :accessor file-header
+    :documentation "File header.")
    (file-block
     :type (or null api:file-block)
     :accessor file-block))
@@ -82,6 +83,7 @@
  (ftype (function (api:file-reader) (values (or null api:file-block) &optional))
         api:skip-block))
 (defun api:skip-block (file-reader)
+  "Skips the current block from FILE-READER."
   (prog1 (file-block file-reader)
     (set-next-file-block file-reader)))
 

@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2022, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -69,7 +69,9 @@ perform one successfully."))
 ;;; stateless-client
 
 (defclass api:stateless-client (internal:client)
-  ())
+  ()
+  (:documentation
+   "Base class of stateless avro ipc clients."))
 
 (defmethod internal:add-methods
     ((protocol api:protocol)
@@ -84,7 +86,9 @@ perform one successfully."))
 ;;; stateful-client
 
 (defclass api:stateful-client (internal:client)
-  ())
+  ()
+  (:documentation
+   "Base class of stateful avro ipc clients."))
 
 (defmethod internal:add-methods
     ((protocol api:protocol)
