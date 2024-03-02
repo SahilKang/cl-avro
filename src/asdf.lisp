@@ -1,4 +1,4 @@
-;;; Copyright 2023 Google LLC
+;;; Copyright 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -20,7 +20,54 @@
   (:use #:cl)
   (:local-nicknames
    (#:api #:cl-avro))
-  (:export #:avro-file))
+  (:export #:avro-file)
+  (:documentation
+   "Integrates avro files with asdf.
+
+This package provides an AVRO-FILE asdf component which integrates avro schema
+and protocol json files with asdf. Avro files can be specified alongside lisp
+source files, and AVRO-FILE will \"generate code\" based on those avro files:
+schemas and protocols will be deserialized from their json forms and the
+resulting classes interned in the deduced packages.
+
+An example project looks like:
+
+  ;;;
+  ;;; file example.asd
+  ;;;
+
+  (in-package #:asdf-user)
+
+  (defsystem #:example
+    :defsystem-depends-on (#:cl-avro/asdf)
+    :depends-on (#:cl-avro)
+    :components ((:file \"example\")
+                 (:avro-file \"example.avsc\")))
+
+  ;;;
+  ;;; file foo.avsc
+  ;;;
+
+  {
+      \"name\": \"EXAMPLE.CARTESIAN_POINT\",
+      \"type\": \"record\",
+      \"fields\": [
+           {\"name\": \"X\", \"type\": \"int\"},
+           {\"name\": \"Y\", \"type\": \"int\"},
+      ],
+  }
+
+  ;;;
+  ;;; file example.lisp
+  ;;;
+
+  (in-package #:cl-user)
+
+  (let ((point (make-instance 'example:cartesian_point :x 3 :y 4)))
+    (example:x point)  ;; => 3
+    (example:y point)  ;; => 4
+    (setf (example:y point) 7)
+    (example:y point)) ;; => 7"))
 (in-package #:cl-avro/asdf)
 
 (defclass avro-file (asdf:file-component)
