@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2022, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -42,7 +42,9 @@
 (defclass api:map<bytes> ()
   ()
   (:metaclass api:map)
-  (:values api:bytes))
+  (:values api:bytes)
+  (:documentation
+   "An avro map schema associating strings to bytes."))
 
 (defclass internal:union<null-map<bytes>> ()
   ()

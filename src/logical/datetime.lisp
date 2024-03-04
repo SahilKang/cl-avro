@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -70,14 +70,20 @@
 
 (defmethod api:year
     ((object local-date) &key)
+  "Return year of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-year object :timezone (local-timezone object)))
 
 (defmethod api:month
     ((object local-date) &key)
+  "Return the month of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-month object :timezone (local-timezone object)))
 
 (defmethod api:day
     ((object local-date) &key)
+  "Return the day of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-day object :timezone (local-timezone object)))
 
 ;;; local-hour-minute
@@ -87,10 +93,14 @@
 
 (defmethod api:hour
     ((object local-hour-minute) &key)
+  "Return the hour of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-hour object :timezone (local-timezone object)))
 
 (defmethod api:minute
     ((object local-hour-minute) &key)
+  "Return the minute of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-minute object :timezone (local-timezone object)))
 
 ;;; local-second-millis
@@ -100,6 +110,8 @@
 
 (defmethod api:second
     ((object local-second-millis) &key)
+  "Return seconds of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second
                  object :timezone (local-timezone object)))
         (millisecond (local-time:timestamp-millisecond object)))
@@ -109,6 +121,8 @@
 
 (defmethod api:millisecond
     ((object local-second-millis) &key)
+  "Return milliseconds of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second
                  object :timezone (local-timezone object)))
         (millisecond (local-time:timestamp-millisecond object)))
@@ -123,6 +137,8 @@
 
 (defmethod api:second
     ((object local-second-micros) &key)
+  "Return seconds of OBJECT in OBJECT'S local timezone, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second
                  object :timezone (local-timezone object)))
         (microsecond (local-time:timestamp-microsecond object)))
@@ -132,6 +148,8 @@
 
 (defmethod api:microsecond
     ((object local-second-micros) &key)
+  "Return microseconds of OBJECT in OBJECT's local timezone, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second
                  object :timezone (local-timezone object)))
         (microsecond (local-time:timestamp-microsecond object)))
@@ -146,14 +164,20 @@
 
 (defmethod api:year
     ((object global-date) &key (timezone local-time:*default-timezone*))
+  "Return the year of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-year object :timezone timezone))
 
 (defmethod api:month
     ((object global-date) &key (timezone local-time:*default-timezone*))
+  "Return the month of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-month object :timezone timezone))
 
 (defmethod api:day
     ((object global-date) &key (timezone local-time:*default-timezone*))
+  "Return the day of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-day object :timezone timezone))
 
 ;;; global-hour-minute
@@ -163,10 +187,14 @@
 
 (defmethod api:hour
     ((object global-hour-minute) &key (timezone local-time:*default-timezone*))
+  "Return the hour of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-hour object :timezone timezone))
 
 (defmethod api:minute
     ((object global-hour-minute) &key (timezone local-time:*default-timezone*))
+  "Return the minute of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (local-time:timestamp-minute object :timezone timezone))
 
 ;;; global-second-millis
@@ -177,6 +205,8 @@
 (defmethod api:second
     ((object global-second-millis)
      &key (timezone local-time:*default-timezone*))
+  "Return seconds of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second object :timezone timezone))
         (millisecond (local-time:timestamp-millisecond object)))
     (declare ((mod 60) second)
@@ -186,6 +216,8 @@
 (defmethod api:millisecond
     ((object global-second-millis)
      &key (timezone local-time:*default-timezone*))
+  "Return milliseconds of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second object :timezone timezone))
         (millisecond (local-time:timestamp-millisecond object)))
     (declare ((mod 60) second)
@@ -200,6 +232,8 @@
 (defmethod api:second
     ((object global-second-micros)
      &key (timezone local-time:*default-timezone*))
+  "Return seconds of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second object :timezone timezone))
         (microsecond (local-time:timestamp-microsecond object)))
     (declare ((mod 60) second)
@@ -209,6 +243,8 @@
 (defmethod api:microsecond
     ((object global-second-micros)
      &key (timezone local-time:*default-timezone*))
+  "Return microseconds of OBJECT in TIMEZONE, defaulting to
+local-time:*default-timezone*."
   (let ((second (local-time:timestamp-second object :timezone timezone))
         (microsecond (local-time:timestamp-microsecond object)))
     (declare ((mod 60) second)

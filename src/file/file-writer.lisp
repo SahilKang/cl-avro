@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -34,7 +34,8 @@
    (file-header
     :type api:file-header
     :reader api:file-header
-    :accessor file-header)
+    :accessor file-header
+    :documentation "File header.")
    (wrote-header-p
     :type boolean
     :initform nil
@@ -61,6 +62,7 @@
                           (values api:file-block &optional))
                 api:write-block))
 (defun api:write-block (file-writer objects)
+  "Writes OBJECTS as a block into FILE-WRITER."
   (with-accessors
         ((file-header file-header)
          (output-stream output-stream)

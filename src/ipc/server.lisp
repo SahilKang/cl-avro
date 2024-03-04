@@ -1,4 +1,4 @@
-;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2021-2022, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -29,7 +29,9 @@
 ;;; server
 
 (defclass api:server ()
-  ())
+  ()
+  (:documentation
+   "Base class of avro ipc servers."))
 
 (defgeneric api:client-protocol (server client-hash)
   (:documentation

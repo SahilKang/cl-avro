@@ -1,4 +1,4 @@
-;;; Copyright 2021-2023 Google LLC
+;;; Copyright 2021-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -394,6 +394,7 @@
             fields (gather-into fields :initarg :initargs)))))
 
 (defmacro api:define-error (name (&rest fields) &body options)
+  "Define NAME as a DECLARED-RPC-ERROR with condition FIELDS and OPTIONS."
   (declare (symbol name))
   (assert-valid-options options)
   (let ((record-initargs (list*

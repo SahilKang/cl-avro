@@ -1,4 +1,4 @@
-;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2021, 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -84,6 +84,7 @@
 
 (defmethod api:deserialize
     ((schema symbol) input &rest initargs)
+  "Deserialize with class named SCHEMA."
   (apply #'api:deserialize (find-class schema) input initargs))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

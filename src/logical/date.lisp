@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -58,14 +58,17 @@ particular timezone or time-of-day."))
 
 (defmethod api:year
     ((object api:date) &key)
+  "Return the year of OBJECT in utc."
   (local-time:timestamp-year object :timezone local-time:+utc-zone+))
 
 (defmethod api:month
     ((object api:date) &key)
+  "Return the month of object in utc."
   (local-time:timestamp-month object :timezone local-time:+utc-zone+))
 
 (defmethod api:day
     ((object api:date) &key)
+  "Return the day of object in utc."
   (local-time:timestamp-day object :timezone local-time:+utc-zone+))
 
 ;;; to/from-underlying

@@ -1,4 +1,4 @@
-;;; Copyright 2023 Google LLC
+;;; Copyright 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -24,7 +24,8 @@
 (in-package #:cl-avro.internal.intern)
 
 (declaim (simple-string api:*null-namespace*))
-(defparameter api:*null-namespace* "AVRO.NULL")
+(defparameter api:*null-namespace* "AVRO.NULL"
+  "The default null namespace to use for INTERN.")
 
 (declaim (package *intern-package*))
 (defvar *intern-package*)

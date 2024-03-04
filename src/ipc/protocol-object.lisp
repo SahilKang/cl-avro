@@ -1,4 +1,4 @@
-;;; Copyright 2021 Google LLC
+;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -30,7 +30,9 @@
     :type (or internal:client api:server)
     :documentation "Protocol transceiver."))
   (:default-initargs
-   :transceiver (error "Must supply TRANSCEIVER")))
+   :transceiver (error "Must supply TRANSCEIVER"))
+  (:documentation
+   "Base class of avro protocols."))
 
 (defmethod initialize-instance :after
     ((instance api:protocol-object) &key)

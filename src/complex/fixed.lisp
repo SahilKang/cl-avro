@@ -1,4 +1,4 @@
-;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2021, 2023-2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -80,7 +80,7 @@
 
 (defclass api:fixed-object
     (buffered api:complex-object #+sbcl sequence #-sbcl sequences:sequence)
-  ((buffer :reader api:raw))
+  ((buffer :reader api:raw :documentation "The underlying octet vector."))
   (:documentation
    "Base class for instances of an avro fixed schema."))
 
