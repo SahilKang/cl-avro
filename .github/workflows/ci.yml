@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: docker run
+        run: |
+          docker build . -f ./test/Dockerfile.test -t cl-avro:v1
+          docker run --rm cl-avro:v1
