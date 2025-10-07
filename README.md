@@ -1,20 +1,16 @@
 # cl-avro
 
+[![tag](https://img.shields.io/github/tag/SahilKang/cl-avro.svg)](https://github.com/SahilKang/cl-avro/tags)
 [![license](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](https://github.com/SahilKang/cl-avro/blob/master/LICENSE)
-
-:warning: This is under active development :construction:
 
 A Common Lisp implementation of the
 [Apache Avro](https://github.com/apache/avro) data serialization system.
 
-The API is still baking :bread:, but this is by and large a complete
-implementation: recursive schemas, serialization, ipc/rpc,
-fingerprinting, schema resolution, object container files, and single
-object encodings are all supported.
-
 # Public API
 
-The public api is exported through the `cl-avro` and `cl-avro/asdf` packages.
+The public api is exported through the `cl-avro` and `cl-avro/asdf` packages:
+to output their documentation, run `(documentation (find-package 'cl-avro) t)`
+or `(documentation (find-package 'cl-avro/asdf) t)`.
 
 # Running Tests
 
