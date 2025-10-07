@@ -1,4 +1,5 @@
 ;;; Copyright 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/intern
   (:local-nicknames
    (#:avro #:cl-avro))
@@ -25,7 +26,8 @@
 (test fixed
   (when (find-package "foo")
     (delete-package "foo"))
-  (let* ((schema (make-instance 'avro:fixed :namespace "foo" :name "bar" :size 2))
+  (let* ((schema
+           (make-instance 'avro:fixed :namespace "foo" :name "bar" :size 2))
          (interned (avro:intern schema)))
     (multiple-value-bind (symbol status)
         (find-symbol "bar" (find-package "foo"))
@@ -38,8 +40,9 @@
     (delete-package "namespace"))
   (when (find-package "namespace.enum_name")
     (delete-package "namespace.enum_name"))
-  (let* ((schema (make-instance 'avro:enum :namespace "namespace" :name "enum_name"
-                                           :symbols '("FOO" "BAR" "BAZ")))
+  (let* ((schema
+           (make-instance 'avro:enum :namespace "namespace" :name "enum_name"
+                                     :symbols '("FOO" "BAR" "BAZ")))
          (interned (avro:intern schema)))
     (multiple-value-bind (symbol status)
         (find-symbol "enum_name" (find-package "namespace"))
@@ -63,13 +66,14 @@
 (test record
   (when (find-package "namespace")
     (delete-package "namespace"))
-  (let* ((schema (make-instance 'avro:record :namespace "namespace"
-                                             :name '#:record_name
-                                             :direct-slots
-                                             '((:name #:foo
-                                                :type avro:int
-                                                :readers (#:read-foo)
-                                                :writers ((setf #:write-foo))))))
+  (let* ((schema
+           (make-instance 'avro:record :namespace "namespace"
+                                       :name '#:record_name
+                                       :direct-slots
+                                       '((:name #:foo
+                                          :type avro:int
+                                          :readers (#:read-foo)
+                                          :writers ((setf #:write-foo))))))
          (interned (avro:intern schema))
          (package (find-package "namespace")))
     (multiple-value-bind (symbol status)
@@ -95,20 +99,22 @@
 (test record-add-methods
   (when (find-package "namespace")
     (delete-package "namespace"))
-  (let* ((schema-1 (make-instance 'avro:record :namespace "namespace"
-                                               :name '#:record_name_1
-                                               :direct-slots
-                                               '((:name #:foo
-                                                  :type avro:int
-                                                  :readers (#:read-foo)
-                                                  :writers ((setf #:write-foo))))))
-         (schema-2 (make-instance 'avro:record :namespace "namespace"
-                                               :name '#:record_name_2
-                                               :direct-slots
-                                               '((:name #:foo
-                                                  :type avro:int
-                                                  :readers (#:read-foo)
-                                                  :writers ((setf #:write-foo))))))
+  (let* ((schema-1 (make-instance 'avro:record
+                                  :namespace "namespace"
+                                  :name '#:record_name_1
+                                  :direct-slots
+                                  '((:name #:foo
+                                     :type avro:int
+                                     :readers (#:read-foo)
+                                     :writers ((setf #:write-foo))))))
+         (schema-2 (make-instance 'avro:record
+                                  :namespace "namespace"
+                                  :name '#:record_name_2
+                                  :direct-slots
+                                  '((:name #:foo
+                                     :type avro:int
+                                     :readers (#:read-foo)
+                                     :writers ((setf #:write-foo))))))
          (interned-1 (avro:intern schema-1))
          (interned-2 (avro:intern schema-2))
          (package (find-package "namespace")))
@@ -153,7 +159,8 @@
                                   :types errors
                                   :messages
                                   `((:name #:message_name
-                                     :request ((:name #:greeting :type avro:string))
+                                     :request ((:name #:greeting
+                                                :type avro:string))
                                      :response avro:null
                                      :errors ,errors))))
          (interned (avro:intern protocol)))

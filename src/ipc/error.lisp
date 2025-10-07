@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.error
   (:use #:cl)
   (:local-nicknames
@@ -197,7 +198,8 @@
     initargs))
 
 (declaim
- (ftype (function (fields) (values list &optional)) %add-accessors-and-initargs))
+ (ftype (function (fields) (values list &optional))
+        %add-accessors-and-initargs))
 (defun %add-accessors-and-initargs (fields)
   (map 'list #'%%add-accessors-and-initargs fields))
 
@@ -207,10 +209,13 @@
 (defun add-accessors-and-initargs (record)
   (let ((initargs
           (list
-           :direct-default-initargs (closer-mop:class-direct-default-initargs record)
+           :direct-default-initargs (closer-mop:class-direct-default-initargs
+                                     record)
            :documentation (documentation record t)
-           :direct-superclasses (closer-mop:class-direct-superclasses record))))
-    (multiple-value-bind (deduced-namespace provided-namespace namespace-provided-p)
+           :direct-superclasses (closer-mop:class-direct-superclasses
+                                 record))))
+    (multiple-value-bind
+          (deduced-namespace provided-namespace namespace-provided-p)
         (api:namespace record)
       (when namespace-provided-p
         (push provided-namespace initargs)
@@ -292,7 +297,8 @@
 (define-pattern-method 'internal:read-jso
     '(lambda ((jso ("type" "error")) fullname->schema enclosing-namespace)
       (setf (st-json:getjso "type" jso) "record")
-      (let* ((record (internal:read-jso jso fullname->schema enclosing-namespace))
+      (let* ((record
+               (internal:read-jso jso fullname->schema enclosing-namespace))
              (condition (to-error record)))
         (setf (gethash (api:fullname record) fullname->schema) condition)
         condition)))
@@ -333,7 +339,8 @@
         nconc (list key (cdr assoc))))
 
   (declaim
-   (ftype (function (list) (values list &optional)) options->condition-options))
+   (ftype (function (list) (values list &optional))
+          options->condition-options))
   (defun options->condition-options (options)
     (loop
       with keys = '(:default-initargs :documentation :report)
@@ -411,20 +418,24 @@
                 (add-accessors-and-initargs
                  (let ((class (find-class ',name nil)))
                    (if class
-                       (let ((record
-                               (internal:schema (closer-mop:class-prototype class))))
-                         (apply #'reinitialize-instance record ',record-initargs))
-                       (apply #'make-instance 'api:record ',record-initargs)))))
+                       (let ((record (internal:schema
+                                      (closer-mop:class-prototype class))))
+                         (apply
+                          #'reinitialize-instance record ',record-initargs))
+                       (apply
+                        #'make-instance 'api:record ',record-initargs)))))
               (,condition-slots
                 (make-condition-slots ,record)))
          (eval
-          (expand-define-condition ',name ,condition-slots ',condition-options ,record))))))
+          (expand-define-condition
+           ',name ,condition-slots ',condition-options ,record))))))
 
 ;;; intern
 
 (defmethod api:intern
     ((instance class) &key (null-namespace api:*null-namespace*))
-  (assert (subtypep instance 'api:declared-rpc-error) (instance) "Not an error class")
+  (assert (subtypep instance 'api:declared-rpc-error) (instance)
+          "Not an error class")
   (let* ((schema (internal:schema (closer-mop:class-prototype instance)))
          (class-name (api:intern schema :null-namespace null-namespace)))
     (assert (eq instance (to-error schema (class-name instance))))

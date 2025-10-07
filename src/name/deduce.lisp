@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.name.deduce
   (:use #:cl)
   (:local-nicknames
@@ -37,7 +38,8 @@
 ;;; fullname->name
 
 (declaim
- (ftype (function (type:fullname) (values type:name &optional)) fullname->name))
+ (ftype (function (type:fullname) (values type:name &optional))
+        fullname->name))
 (defun fullname->name (fullname)
   "Return namespace unqualified name."
   (let ((last-dot-position (last-dot-position fullname)))

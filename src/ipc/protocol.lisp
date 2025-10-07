@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023-2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.protocol
   (:use #:cl)
   (:local-nicknames
@@ -141,7 +142,8 @@
    (st-json:read-json-from-string input :start start :junk-allowed-p t)))
 
 (declaim
- (ftype (function (st-json:jso) (values api:protocol &optional)) jso->protocol))
+ (ftype (function (st-json:jso) (values api:protocol &optional))
+        jso->protocol))
 (defun jso->protocol (jso)
   (let ((fullname->schema (make-hash-table :test #'equal))
         initargs name enclosing-namespace)
@@ -165,12 +167,14 @@
     (multiple-value-bind (types typesp)
         (st-json:getjso "types" jso)
       (when typesp
-        (push (parse-types types fullname->schema enclosing-namespace) initargs)
+        (push (parse-types types fullname->schema enclosing-namespace)
+              initargs)
         (push :types initargs)))
     (multiple-value-bind (messages messagesp)
         (st-json:getjso "messages" jso)
       (when messagesp
-        (push (parse-messages messages fullname->schema enclosing-namespace) initargs)
+        (push (parse-messages messages fullname->schema enclosing-namespace)
+              initargs)
         (push :messages initargs)))
     (let ((protocol (apply #'make-instance 'api:protocol initargs)))
       (closer-mop:finalize-inheritance protocol)
@@ -201,7 +205,8 @@
         parse-messages))
 (defun parse-messages (messages fullname->schema enclosing-namespace)
   (check-type messages st-json:jso)
-  (let ((vector (make-array 0 :element-type 'cons :adjustable t :fill-pointer t)))
+  (let ((vector (make-array 0 :element-type 'cons :adjustable t
+                              :fill-pointer t)))
     (flet ((fill-vector (key value)
              (let ((initargs (list :name (make-symbol key))))
                (multiple-value-bind (one-way one-way-p)
@@ -212,7 +217,8 @@
                (multiple-value-bind (request requestp)
                    (st-json:getjso "request" value)
                  (when requestp
-                   (push (parse-request request fullname->schema enclosing-namespace)
+                   (push (parse-request
+                          request fullname->schema enclosing-namespace)
                          initargs)
                    (push :request initargs)))
                (multiple-value-bind (response responsep)
@@ -225,7 +231,8 @@
                (multiple-value-bind (errors errorsp)
                    (st-json:getjso "errors" value)
                  (when errorsp
-                   (push (parse-errors errors fullname->schema enclosing-namespace)
+                   (push (parse-errors
+                          errors fullname->schema enclosing-namespace)
                          initargs)
                    (push :errors initargs)))
                (vector-push-extend initargs vector))))
@@ -255,7 +262,8 @@
            (api:intern type :null-namespace null-namespace)))
     (map nil #'intern-type (api:types instance)))
   (flet ((intern-message (message)
-           (let* ((name (symbol-name (closer-mop:generic-function-name message)))
+           (let* ((name (symbol-name
+                         (closer-mop:generic-function-name message)))
                   (symbol (intern name intern:*intern-package*)))
              (export symbol intern:*intern-package*)
              (setf (fdefinition symbol) message))))

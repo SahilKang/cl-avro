@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.timestamp-millis
   (:use #:cl)
   (:local-nicknames
@@ -64,7 +65,8 @@ timeline, independent of a particular timezone or calendar."))
  (ftype (function (api:timestamp-millis) (values api:long &optional))
         to-underyling))
 (defun to-underlying (timestamp-millis)
-  "Serialized as the number of milliseconds from the UTC unix epoch 1970-01-01T00:00:00.000."
+  "Serialized as the number of milliseconds from the UTC unix epoch
+1970-01-01T00:00:00.000."
   (let ((diff (local-time-duration:timestamp-difference
                timestamp-millis +utc-unix-epoch+)))
     (multiple-value-bind (second-diff diff)
@@ -146,7 +148,8 @@ timeline, independent of a particular timezone or calendar."))
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))

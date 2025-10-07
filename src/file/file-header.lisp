@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021, 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;; Copyright 2021, 2024 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
@@ -16,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.file.header
   (:use #:cl)
   (:local-nicknames

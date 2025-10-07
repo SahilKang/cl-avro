@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2022 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/ipc/stateful/server
   (:use #:cl)
   (:local-nicknames
@@ -98,7 +99,8 @@
                  (setf (avro:gethash "baz" map)
                        (babel:string-to-octets message :encoding :utf-8))
                  map)))
-      (t (make-instance '|Greeting| :message (format nil "Hello ~A!" message))))))
+      (t (make-instance
+          '|Greeting| :message (format nil "Hello ~A!" message))))))
 
 (declaim
  (ftype (function (fixnum cl-avro.internal.ipc.framing:buffers)
@@ -109,10 +111,12 @@
          (client-protocol (gethash client-id (connected-clients +server+)))
          (response
            (if client-protocol
-               (avro:receive-from-connected-client +service+ request client-protocol)
+               (avro:receive-from-connected-client
+                +service+ request client-protocol)
                (multiple-value-bind (response client-protocol)
                    (avro:receive-from-unconnected-client +service+ request)
-                 (setf (gethash client-id (connected-clients +server+)) client-protocol)
+                 (setf (gethash client-id (connected-clients +server+))
+                       client-protocol)
                  response))))
     (when response
       (flatten response))))
@@ -263,7 +267,8 @@
       (is (equalp (avro:raw expected-response-metadata)
                   (avro:raw response-metadata)))
       (is (typep response 'client:|Greeting|))
-      (is (string= "baz with metadata" (slot-value response 'client:|message|))))))
+      (is (string=
+           "baz with metadata" (slot-value response 'client:|message|))))))
 
 (test metadata-response-metadata
   (setf server:*metadata* nil)
@@ -284,7 +289,8 @@
       (is (equalp (avro:raw expected-response-metadata)
                   (avro:raw response-metadata)))
       (is (typep response 'client:|Greeting|))
-      (is (string= "baz with metadata" (slot-value response 'client:|message|))))))
+      (is (string=
+           "baz with metadata" (slot-value response 'client:|message|))))))
 
 (test declared-error
   (setf server:*metadata* nil)

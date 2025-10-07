@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/base
   (:use #:cl)
   (:local-nicknames
@@ -48,7 +49,8 @@
 
   (declaim
    (ftype (function (symbol)
-                    (values (or (eql :millisecond) (eql :microsecond)) &optional))
+                    (values (or (eql :millisecond)
+                                (eql :microsecond)) &optional))
           initarg-for-millis/micros))
   (defun initarg-for-millis/micros (symbol)
     (let ((suffix (suffix (string symbol))))
@@ -62,7 +64,8 @@
                   (values (simple-array (unsigned-byte 8) (*)) &optional))
         bytes))
 (defun bytes (&rest bytes)
-  (make-array (length bytes) :element-type '(unsigned-byte 8) :initial-contents bytes))
+  (make-array
+   (length bytes) :element-type '(unsigned-byte 8) :initial-contents bytes))
 
 (declaim
  (ftype (function (local-time:timestamp) (values avro:int &optional))

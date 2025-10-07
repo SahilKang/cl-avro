@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.parse
   (:use #:cl)
   (:local-nicknames
@@ -110,7 +111,8 @@
 
 (declaim (ftype (function (t) (values cons &optional)) early-message))
 (defun early-message (message)
-  (assert-plist message :name :one-way :documentation :request :response :errors)
+  (assert-plist
+   message :name :one-way :documentation :request :response :errors)
   (assert (member :name message))
   (check-type (getf message :name) symbol)
   (check-type (getf message :one-way) boolean)
@@ -210,7 +212,8 @@
     (when (member :errors message)
       (push (late-errors types (getf message :errors)) initargs)
       (push :errors initargs))
-    (setf (symbol-function name) (apply #'make-instance 'api:message initargs))))
+    (setf (symbol-function name)
+          (apply #'make-instance 'api:message initargs))))
 
 (declaim
  (ftype (function (classes? sequence) (values api:record &optional))
@@ -231,7 +234,7 @@
                           (not (typep type 'api:schema)))
                      (find-class type)
                      type)))
-    (if (or (eq type schema)           ; when schema is defined inline
+    (if (or (eq type schema)            ; when schema is defined inline
             (and (typep schema 'api:schema)
                  (not (typep schema 'name:named-schema))))
         request
@@ -263,7 +266,8 @@
     (map 'classes #'late-error errors)))
 
 (declaim
- (ftype (function (classes? symbol/class) (values class &optional)) late-error))
+ (ftype (function (classes? symbol/class) (values class &optional))
+        late-error))
 (defun late-error (types error?)
   (let ((error (if (symbolp error?)
                    (find-class error?)

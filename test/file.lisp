@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2021 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021, 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;; Copyright 2021 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
@@ -16,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/file
   (:local-nicknames
    (#:avro #:cl-avro))
@@ -46,7 +46,8 @@
                       ("012650-99999" -655509600000 78)))
           (actual (loop
                     with records = nil
-                    with reader = (make-instance 'avro:file-reader :input stream)
+                    with reader = (make-instance
+                                   'avro:file-reader :input stream)
                     for block = (avro:read-block reader)
                     while block
                     do (setf records (concatenate 'list records block))
@@ -62,15 +63,16 @@
 
 (test write-file
   (let ((bytes (flexi-streams:make-in-memory-output-stream)))
-    (with-open-file (stream *weather-filespec* :element-type '(unsigned-byte 8))
+    (with-open-file
+        (stream *weather-filespec* :element-type '(unsigned-byte 8))
       (loop
         with reader = (make-instance 'avro:file-reader :input stream)
-        with writer = (make-instance 'avro:file-writer
-                                     :meta (make-instance
-                                            'avro:meta
-                                            :schema (avro:schema
-                                                     (avro:file-header reader)))
-                                     :output bytes)
+        with writer = (make-instance
+                       'avro:file-writer
+                       :meta (make-instance
+                              'avro:meta
+                              :schema (avro:schema (avro:file-header reader)))
+                       :output bytes)
         for block = (avro:read-block reader)
         while block
         do (avro:write-block writer block)))
@@ -81,9 +83,11 @@
                       ("012650-99999" -655509600000 78)))
           (actual (loop
                     with records = nil
-                    with reader = (make-instance
-                                   'avro:file-reader
-                                   :input (flexi-streams:get-output-stream-sequence bytes))
+                    with reader
+                      = (make-instance
+                         'avro:file-reader
+                         :input (flexi-streams:get-output-stream-sequence
+                                 bytes))
                     for block = (avro:read-block reader)
                     while block
                     do (setf records (concatenate 'list records block))

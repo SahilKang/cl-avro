@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2022, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.server
   (:use #:cl)
   (:local-nicknames
@@ -49,12 +50,14 @@
         call-function))
 (defun call-function
     (client-request request-metadata server-message request-stream)
-  (let* ((parameters (api:coerce (api:deserialize client-request request-stream)
-                                 (api:request server-message)))
+  (let* ((parameters (api:coerce
+                      (api:deserialize client-request request-stream)
+                      (api:request server-message)))
          (lambda-list (map
                        'list
                        (lambda (field)
-                         (slot-value parameters (nth-value 1 (api:name field))))
+                         (slot-value parameters
+                                     (nth-value 1 (api:name field))))
                        (api:fields (class-of parameters))))
          (errors-union (nth-value 1 (api:errors server-message))))
     (handler-case
@@ -97,15 +100,17 @@ client-protocol. Otherwise, it will be nil."
               (null client-protocol))
           (values (framing:frame response-handshake)
                   client-protocol)
-          (let ((client-request (api:request
-                                 (find message-name
-                                       (api:messages client-protocol)
-                                       :test #'string=
-                                       :key #'closer-mop:generic-function-name)))
-                (server-message (find message-name
-                                      (api:messages (class-of protocol-object))
-                                      :test #'string=
-                                      :key #'closer-mop:generic-function-name)))
+          (let ((client-request
+                  (api:request
+                   (find message-name
+                         (api:messages client-protocol)
+                         :test #'string=
+                         :key #'closer-mop:generic-function-name)))
+                (server-message
+                  (find message-name
+                        (api:messages (class-of protocol-object))
+                        :test #'string=
+                        :key #'closer-mop:generic-function-name)))
             (multiple-value-bind (response response-metadata errorp)
                 (call-function
                  client-request request-metadata server-message request-stream)
@@ -120,12 +125,14 @@ client-protocol. Otherwise, it will be nil."
 (defun handshake-response (protocol-object request-handshake)
   (let* ((client-hash (api:raw (internal:client-hash request-handshake)))
          (server-hash (api:raw (internal:server-hash request-handshake)))
-         (client-protocol (api:object (internal:client-protocol request-handshake)))
+         (client-protocol (api:object
+                           (internal:client-protocol request-handshake)))
          (server (api:transceiver protocol-object))
          (protocol (class-of protocol-object))
          (md5 (internal:md5 protocol)))
     (if client-protocol
-        (let ((client-protocol (api:deserialize 'api:protocol client-protocol)))
+        (let ((client-protocol (api:deserialize
+                                'api:protocol client-protocol)))
           (setf (api:client-protocol server client-hash) client-protocol)
           (if (equalp server-hash (api:raw md5))
               (values (make-instance
@@ -138,16 +145,17 @@ client-protocol. Otherwise, it will be nil."
                                      'internal:union<null-md5>
                                      :object nil))
                       client-protocol)
-              (values (make-instance
-                       'internal:response
-                       :match (make-instance 'internal:match :enum "CLIENT")
-                       :server-protocol (make-instance
-                                         'internal:union<null-string>
-                                         :object (api:serialize protocol))
-                       :server-hash (make-instance
-                                     'internal:union<null-md5>
-                                     :object md5))
-                      client-protocol)))
+              (values
+               (make-instance
+                'internal:response
+                :match (make-instance 'internal:match :enum "CLIENT")
+                :server-protocol (make-instance
+                                  'internal:union<null-string>
+                                  :object (api:serialize protocol))
+                :server-hash (make-instance
+                              'internal:union<null-md5>
+                              :object md5))
+               client-protocol)))
         (let ((client-protocol (api:client-protocol server client-hash)))
           (if client-protocol
               (if (equalp server-hash (api:raw md5))
@@ -199,7 +207,8 @@ client-protocol. Otherwise, it will be nil."
  (ftype (function (api:protocol-object (or vector<uint8> stream) api:protocol)
                   (values (or null framing:buffers) &optional))
         api:receive-from-connected-client))
-(defun api:receive-from-connected-client (protocol-object input client-protocol)
+(defun api:receive-from-connected-client
+    (protocol-object input client-protocol)
   "Generate a response without performing a handshake.
 
 A return value of nil indicates no response should be sent to the

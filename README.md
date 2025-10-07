@@ -1,6 +1,5 @@
 # cl-avro
 
-[![CircleCI](https://circleci.com/gh/SahilKang/cl-avro.svg?style=shield)](https://circleci.com/gh/SahilKang/cl-avro)
 [![license](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](https://github.com/SahilKang/cl-avro/blob/master/LICENSE)
 
 :warning: This is under active development :construction:
@@ -12,3 +11,26 @@ The API is still baking :bread:, but this is by and large a complete
 implementation: recursive schemas, serialization, ipc/rpc,
 fingerprinting, schema resolution, object container files, and single
 object encodings are all supported.
+
+# Public API
+
+The public api is exported through the `cl-avro` and `cl-avro/asdf` packages.
+
+# Running Tests
+
+Tests can be run either through a lisp repl or docker.
+
+## Lisp REPL
+
+```lisp
+(ql:quickload 'cl-avro/test)
+(asdf:test-system 'cl-avro)
+```
+
+## Docker
+
+```shell
+docker build . -f ./test/Dockerfile.test -t cl-avro:v1
+
+docker run -it --rm cl-avro:v1
+```

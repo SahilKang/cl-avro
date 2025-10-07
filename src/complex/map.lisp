@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.map
   (:use #:cl)
   (:shadow #:hash-table)
@@ -203,7 +204,8 @@
            (incf bytes-written
                  (internal:serialize key into :start (+ start bytes-written)))
            (incf bytes-written
-                 (internal:serialize value into :start (+ start bytes-written)))))
+                 (internal:serialize
+                  value into :start (+ start bytes-written)))))
     (+ bytes-written
        (long:serialize-into-vector 0 into (+ start bytes-written)))))
 
@@ -250,7 +252,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -476,7 +479,8 @@
       (multiple-value-bind (values valuesp)
           (st-json:getjso "values" jso)
         (if valuesp
-            (let ((values (internal:read-jso values fullname->schema enclosing-namespace)))
+            (let ((values (internal:read-jso
+                           values fullname->schema enclosing-namespace)))
               (make-instance 'api:map :values values))
             (make-instance 'api:map)))))
 

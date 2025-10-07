@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/fixed
   (:use #:cl #:1am)
   (:local-nicknames
@@ -32,7 +33,8 @@
                          :name "baz"
                          :aliases '("baz.bar")
                          :size 3))
-         (writer-object (make-instance writer-schema :initial-contents '(2 4 6)))
+         (writer-object (make-instance
+                         writer-schema :initial-contents '(2 4 6)))
          (reader-object (avro:coerce
                          (avro:deserialize
                           writer-schema (avro:serialize writer-object))

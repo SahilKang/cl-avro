@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.array
   (:use #:cl)
   (:local-nicknames
@@ -320,7 +321,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -511,7 +513,7 @@
 
     finally
        (return
-         (values (cond 
+         (values (cond
                    ((= 0 left-count right-count) 0)
                    ((= 0 left-count) -1)
                    (t 1))
@@ -609,7 +611,7 @@
 
     finally
        (return
-         (values (cond 
+         (values (cond
                    ((= 0 left-count right-count) 0)
                    ((= 0 left-count) -1)
                    (t 1))
@@ -623,7 +625,8 @@
 ;;; coerce
 
 (declaim
- (ftype (function (vector api:schema) (values vector &optional)) coerce-buffer))
+ (ftype (function (vector api:schema) (values vector &optional))
+        coerce-buffer))
 (defun coerce-buffer (buffer items)
   (loop
     with buffer = (if (subtypep (array-element-type buffer)
@@ -665,7 +668,8 @@
     ((schema api:array) (default list))
   (flet ((deserialize-elt (elt)
            (internal:deserialize-field-default (api:items schema) elt)))
-    (make-instance schema :initial-contents (mapcar #'deserialize-elt default))))
+    (make-instance
+     schema :initial-contents (mapcar #'deserialize-elt default))))
 
 ;;; jso
 
@@ -674,7 +678,8 @@
       (multiple-value-bind (items itemsp)
           (st-json:getjso "items" jso)
         (if itemsp
-            (let ((items (internal:read-jso items fullname->schema enclosing-namespace)))
+            (let ((items (internal:read-jso
+                          items fullname->schema enclosing-namespace)))
               (make-instance 'api:array :items items))
             (make-instance 'api:array)))))
 

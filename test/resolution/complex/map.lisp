@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/map
   (:use #:cl #:1am)
   (:local-nicknames
@@ -52,7 +53,8 @@
 (declaim
  (ftype (function (avro:map-object
                    avro:map-object
-                   (function (avro:object avro:object) (values boolean &optional)))
+                   (function (avro:object avro:object)
+                             (values boolean &optional)))
                   (values (eql t) &optional))
         assert-map=))
 (defun assert-map= (left right compare)

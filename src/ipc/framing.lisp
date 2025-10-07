@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.framing
   (:use #:cl)
   (:local-nicknames
@@ -54,7 +55,8 @@
 
 ;;; frame
 
-(declaim (ftype (function (buffer-size) (values buffer &optional)) make-buffer))
+(declaim
+ (ftype (function (buffer-size) (values buffer &optional)) make-buffer))
 (defun make-buffer (size)
   (loop
     with buffer = (make-array (+ 4 size) :element-type 'uint8)
@@ -69,7 +71,8 @@
        (return
          buffer)))
 
-(declaim (ftype (function (api:object) (values buffer &optional)) buffer-object))
+(declaim
+ (ftype (function (api:object) (values buffer &optional)) buffer-object))
 (defun buffer-object (object)
   (let ((buffer (make-buffer (api:serialized-size object))))
     (api:serialize object :into buffer :start 4)
@@ -193,7 +196,8 @@
     (map nil #'serialize objects))
   (values))
 
-(declaim (ftype (function (list) (values object-sizes &optional)) object-sizes))
+(declaim
+ (ftype (function (list) (values object-sizes &optional)) object-sizes))
 (defun object-sizes (objects)
   (map 'object-sizes #'api:serialized-size objects))
 
@@ -203,11 +207,13 @@
 (defun frame-with-handshake (handshake objects)
   (let* ((object-sizes (object-sizes objects))
          (buffers (allocate-buffers object-sizes 1)))
-    (frame-into objects (make-instance 'output-stream :buffers buffers :start 1))
+    (frame-into objects (make-instance
+                         'output-stream :buffers buffers :start 1))
     (setf (elt buffers 0) (buffer-object handshake))
     buffers))
 
-(declaim (ftype (function (&rest api:object) (values buffers &optional)) frame))
+(declaim
+ (ftype (function (&rest api:object) (values buffers &optional)) frame))
 (defun frame (&rest objects)
   (if (typep (first objects) 'internal:request)
       (frame-with-handshake (first objects) (rest objects))
@@ -331,7 +337,8 @@
 (defun stream->input-stream (stream)
   (loop
     with size-buffer = (make-array 4 :element-type 'uint8)
-    and buffers = (make-array 0 :element-type 'buffer :adjustable t :fill-pointer t)
+    and buffers = (make-array 0 :element-type 'buffer :adjustable t
+                                :fill-pointer t)
 
     for size = (read-size stream size-buffer)
     until (zerop size)

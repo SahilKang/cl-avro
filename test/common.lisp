@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/common
   (:use #:cl)
   (:local-nicknames
@@ -86,7 +87,8 @@
 ;;; define-schema-test
 
 (defmacro define-schema-test
-    (name json canonical-form fingerprint make-instance-schema &rest defclass-schema)
+    (name json canonical-form fingerprint make-instance-schema
+     &rest defclass-schema)
   (declare (symbol name)
            (string json canonical-form)
            ((unsigned-byte 64) fingerprint)
@@ -109,13 +111,15 @@
 
        (1am:is (string= canonical-form (avro:serialize
                                         defclass-schema :canonical-form-p t)))
-       (1am:is (string= canonical-form (avro:serialize
-                                        make-instance-schema :canonical-form-p t)))
+       (1am:is
+        (string= canonical-form (avro:serialize
+                                 make-instance-schema :canonical-form-p t)))
        (1am:is (string= canonical-form (avro:serialize
                                         actual-schema :canonical-form-p t)))
 
        (1am:is (= expected-fingerprint (avro:fingerprint defclass-schema)))
-       (1am:is (= expected-fingerprint (avro:fingerprint make-instance-schema)))
+       (1am:is
+        (= expected-fingerprint (avro:fingerprint make-instance-schema)))
        (1am:is (= expected-fingerprint (avro:fingerprint actual-schema))))))
 
 ;;; define-io-test
@@ -124,7 +128,8 @@
   (defun schema-pair-p (schema)
     (declare ((or symbol cons) schema))
     (and (consp schema)
-         (not (member (first schema) '(make-instance closer-mop:ensure-class))))))
+         (not
+          (member (first schema) '(make-instance closer-mop:ensure-class))))))
 
 (declaim
  (ftype (function (avro:schema)
@@ -172,13 +177,14 @@
               (serialized (make-array ,(length serialized)
                                       :element-type '(unsigned-byte 8)
                                       :initial-contents ',serialized))
-              (schema-to-check ,(if schema-to-check
-                                    (if (symbolp schema-to-check)
-                                        (if (typep schema-to-check 'avro:schema)
-                                            `',schema-to-check
-                                            (find-class schema-to-check))
-                                        schema-to-check)
-                                    schema-symbol)))
+              (schema-to-check
+                ,(if schema-to-check
+                     (if (symbolp schema-to-check)
+                         (if (typep schema-to-check 'avro:schema)
+                             `',schema-to-check
+                             (find-class schema-to-check))
+                         schema-to-check)
+                     schema-symbol)))
          (flet ((check (,arg)
                   (declare (ignorable ,arg))
                   ,@check))
@@ -278,7 +284,8 @@
                      (multiple-value-bind (returned size)
                          (avro:serialize
                           ,object-symbol
-                          :into stream :single-object-encoding-p ,schema-symbol)
+                          :into stream
+                          :single-object-encoding-p ,schema-symbol)
                        (1am:is (eq stream returned))
                        (1am:is (= (+ 10 (length serialized)) size))))))
              (setf bytes (coerce bytes '(simple-array (unsigned-byte 8) (*))))

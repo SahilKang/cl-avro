@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2023-2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.record
   (:use #:cl)
   (:local-nicknames
@@ -259,8 +260,10 @@
         (push writer writers)))
     ;; delete-duplicates will discard the earlier duplicate, which
     ;; works fine because we're reversing afterwards
-    (setf (readers effective-slot) (nreverse (delete-duplicates readers :test #'eq))
-          (writers effective-slot) (nreverse (delete-duplicates writers :test #'equal)))
+    (setf (readers effective-slot) (nreverse
+                                    (delete-duplicates readers :test #'eq))
+          (writers effective-slot) (nreverse
+                                    (delete-duplicates writers :test #'equal)))
     effective-slot))
 
 (defmethod (setf closer-mop:slot-value-using-class)
@@ -323,7 +326,8 @@
     ((schema api:record))
   (let* ((fields (api:fields schema))
          (types (map '(simple-array api:schema (*)) #'api:type fields))
-         (sizes (map '(simple-array ufixnum? (*)) #'internal:fixed-size types)))
+         (sizes
+           (map '(simple-array ufixnum? (*)) #'internal:fixed-size types)))
     (declare (fields fields))
     (when (every #'identity sizes)
       (reduce #'+ sizes :initial-value 0))))
@@ -379,7 +383,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -630,7 +635,8 @@
         with writer of-type api:schema = (class-of object)
         with writer-fields of-type fields = (api:fields writer)
         and reader-fields of-type fields = (api:fields schema)
-        with values = (make-array (length reader-fields) :element-type 'api:object)
+        with values = (make-array (length reader-fields)
+                                  :element-type 'api:object)
 
           initially
              (name:assert-matching-names schema writer)
@@ -784,7 +790,8 @@ and initargs.")
     (multiple-value-bind (type typep)
         (st-json:getjso "type" jso)
       (assert typep () "Field type must be provided.")
-      (push (internal:read-jso type fullname->schema enclosing-namespace) initargs)
+      (push (internal:read-jso type fullname->schema enclosing-namespace)
+            initargs)
       (push :type initargs))
     (when api:*add-accessors-and-initargs-p*
       (let ((name (getf initargs :name)))
@@ -820,14 +827,16 @@ and initargs.")
           (assert (not (gethash fullname fullname->schema)) ()
                   "Name ~S is already taken" fullname)
           (setf (gethash fullname fullname->schema) schema
-                (getf initargs :direct-slots) (read-fields jso schema fullname->schema))
+                (getf initargs :direct-slots) (read-fields
+                                               jso schema fullname->schema))
           (apply #'reinitialize-instance schema initargs)))))
 
 (defmethod internal:write-jso
     ((field api:field) seen canonical-form-p)
   (let ((initargs (list
                    "name" (api:name field)
-                   "type" (internal:write-jso (api:type field) seen canonical-form-p)))
+                   "type" (internal:write-jso
+                           (api:type field) seen canonical-form-p)))
         (aliases (api:aliases field))
         (documentation (documentation field t)))
     (unless canonical-form-p
@@ -913,7 +922,8 @@ and initargs.")
        (loop
          with writers = nil
          for symbol in (internal:writers field)
-         for interned = (intern (symbol-name (second symbol)) intern:*intern-package*)
+         for interned = (intern
+                         (symbol-name (second symbol)) intern:*intern-package*)
          for setf-symbol = `(setf ,interned)
          do
             (export interned intern:*intern-package*)
@@ -925,7 +935,9 @@ and initargs.")
     finally
        (let ((initargs (list :direct-slots (nreverse direct-slots)
                              :name (nth-value 1 (api:name instance)))))
-         (multiple-value-bind (deduced provided provided-p) (api:namespace instance)
+         (multiple-value-bind
+               (deduced provided provided-p)
+             (api:namespace instance)
            (declare (ignore deduced))
            (when provided-p
              (push provided initargs)

@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/uuid
   (:use #:cl #:1am)
   (:local-nicknames
@@ -23,7 +24,8 @@
 (in-package #:cl-avro/test/resolution/uuid)
 
 (test uuid->uuid
-  (let* ((writer (make-instance 'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
+  (let* ((writer (make-instance
+                  'avro:uuid :uuid "6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
          (reader (avro:coerce
                   (avro:deserialize 'avro:uuid (avro:serialize writer))
                   'avro:uuid)))

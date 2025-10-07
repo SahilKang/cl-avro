@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2022, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.schema
   (:use #:cl)
   (:local-nicknames
@@ -120,8 +121,9 @@
           '(member ,@*primitives*))))
   (defschema))
 
-(defclass api:complex-schema
-    (crc-64-avro-little-endian mop:all-or-nothing-reinitialization standard-class)
+(defclass api:complex-schema (crc-64-avro-little-endian
+                              mop:all-or-nothing-reinitialization
+                              standard-class)
   ()
   (:documentation
    "Base metaclass of avro complex schemas."))
@@ -131,15 +133,17 @@
   t)
 
 (defmethod closer-mop:validate-superclass
-    ((class api:complex-schema) (superclass mop:all-or-nothing-reinitialization))
+    ((class api:complex-schema)
+     (superclass mop:all-or-nothing-reinitialization))
   t)
 
 (defmethod closer-mop:validate-superclass
     ((class api:complex-schema) (superclass standard-class))
   t)
 
-(defclass api:logical-schema
-    (crc-64-avro-little-endian mop:all-or-nothing-reinitialization standard-class)
+(defclass api:logical-schema (crc-64-avro-little-endian
+                              mop:all-or-nothing-reinitialization
+                              standard-class)
   ()
   (:documentation
    "Base metaclass of avro logical schemas."))
@@ -149,7 +153,8 @@
   t)
 
 (defmethod closer-mop:validate-superclass
-    ((class api:logical-schema) (superclass mop:all-or-nothing-reinitialization))
+    ((class api:logical-schema)
+     (superclass mop:all-or-nothing-reinitialization))
   t)
 
 (defmethod closer-mop:validate-superclass
@@ -270,8 +275,8 @@
             ((object ,object-specializer)
              &rest initargs
              &key
-               (into (make-array
-                      0 :element-type 'character :adjustable t :fill-pointer t))
+               (into (make-array 0 :element-type 'character :adjustable t
+                                   :fill-pointer t))
                (start 0)
                (canonical-form-p nil))
           (declare (ignore start))

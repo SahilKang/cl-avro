@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2022, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.ipc.client
   (:use #:cl)
   (:local-nicknames
@@ -128,7 +129,8 @@ perform one successfully."))
                                       (list ,@lambda-list-without-optional)))
                          (response-stream
                            (perform-handshake
-                            ,protocol ,client ,message-name parameters metadata)))
+                            ,protocol ,client ,message-name
+                            parameters metadata)))
                     ,(if (api:one-way message)
                          `(declare (ignore response-stream))
                          `(process-response
@@ -139,7 +141,8 @@ perform one successfully."))
                            ,errors-union)))))
              (method-lambda
                (closer-mop:make-method-lambda
-                message (closer-mop:class-prototype (find-class 'standard-method))
+                message (closer-mop:class-prototype
+                         (find-class 'standard-method))
                 body nil))
              (documentation
                "Some auto-generated documentation would be nice.")
@@ -193,11 +196,13 @@ perform one successfully."))
                                     (framing:to-input-stream
                                      (api:send-and-receive
                                       ,client (framing:frame
-                                               metadata ,message-name parameters)))
+                                               metadata
+                                               ,message-name parameters)))
                                     (prog1 (perform-handshake
                                             ,protocol ,client ,message-name
                                             parameters metadata)
-                                      (setf (api:sent-handshake-p ,client) t)))))))
+                                      (setf (api:sent-handshake-p ,client)
+                                            t)))))))
                     ,@(if (api:one-way message)
                           `((if (api:sent-handshake-p ,client)
                                 (api:send
@@ -217,7 +222,8 @@ perform one successfully."))
                              ,errors-union))))))
              (method-lambda
                (closer-mop:make-method-lambda
-                message (closer-mop:class-prototype (find-class 'standard-method))
+                message (closer-mop:class-prototype
+                         (find-class 'standard-method))
                 body nil))
              (documentation
                "Some auto-generated documentation would be nice.")
@@ -301,7 +307,8 @@ perform one successfully."))
                  errors-union)
                 metadata))
         (values (api:coerce
-                 (api:deserialize (api:response server-message) response-stream)
+                 (api:deserialize
+                  (api:response server-message) response-stream)
                  response-schema)
                 metadata))))
 
@@ -322,7 +329,8 @@ perform one successfully."))
 
 (defmacro handshake-match (handshake &body cases)
   (declare (symbol handshake))
-  (let ((known-cases (map 'list #'intern (api:symbols (find-class 'internal:match)))))
+  (let ((known-cases
+          (map 'list #'intern (api:symbols (find-class 'internal:match)))))
     (map nil
          (lambda (case)
            (check-type case cons)
@@ -340,11 +348,13 @@ perform one successfully."))
            (boolean checkp))
   (let* ((server-hash (gensym))
          (server-protocol-json (gensym))
-         (server-protocol `(api:deserialize `api:protocol ,server-protocol-json))
+         (server-protocol `(api:deserialize
+                            `api:protocol ,server-protocol-json))
          (server-hash-accessor `(internal:server-hash ,client))
          (server-protocol-accessor `(internal:server-protocol ,client)))
     `(let ((,server-hash (api:object (internal:server-hash ,handshake)))
-           (,server-protocol-json (api:object (internal:server-protocol ,handshake))))
+           (,server-protocol-json (api:object
+                                   (internal:server-protocol ,handshake))))
        ,@(if checkp
              `((when ,server-hash
                  (setf ,server-hash-accessor ,server-hash))
