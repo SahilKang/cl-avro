@@ -180,26 +180,22 @@
 
 (define-schema-test schema-fixed
   {
-    "type": {
-      "type": "fixed",
-      "name": "foo",
-      "size": 2
-    },
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 2
+  "type": "fixed",
+  "name": "foo",
+  "size": 2,
+  "logicalType": "decimal",
+  "precision": 4,
+  "scale": 2
   }
   {
-    "type": {
-      "name": "foo",
-      "type": "fixed",
-      "size": 2
-    },
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 2
+  "name": "foo",
+  "type": "fixed",
+  "size": 2,
+  "logicalType": "decimal",
+  "precision": 4,
+  "scale": 2
   }
-  #x38262a1302a1557f
+  #x2d0126a63b744038
   (make-instance
    'avro:decimal
    :underlying (make-instance
@@ -236,26 +232,22 @@
 
 (define-schema-test schema-fixed-same-scale-and-precision
   {
-    "type": {
-      "type": "fixed",
-      "name": "foo",
-      "size": 4
-    },
+    "type": "fixed",
+    "name": "foo",
+    "size": 4,
     "logicalType": "decimal",
     "precision": 4,
     "scale": 4
   }
   {
-    "type": {
-      "name": "foo",
-      "type": "fixed",
-      "size": 4
-    },
+    "name": "foo",
+    "type": "fixed",
+    "size": 4,
     "logicalType": "decimal",
     "precision": 4,
     "scale": 4
   }
-  #x6cc413011b16903f
+  #x4f28f84ecb23847f
   (make-instance
    'avro:decimal
    :underlying (make-instance
@@ -292,24 +284,20 @@
 
 (define-schema-test schema-fixed-default-scale
   {
-    "type": {
-      "type": "fixed",
-      "name": "foo",
-      "size": 4
-    },
+    "type": "fixed",
+    "name": "foo",
+    "size": 4,
     "logicalType": "decimal",
     "precision": 4,
   }
   {
-    "type": {
-      "name": "foo",
-      "type": "fixed",
-      "size": 4
-    },
+    "name": "foo",
+    "type": "fixed",
+    "size": 4,
     "logicalType": "decimal",
     "precision": 4
   }
-  #xa67f01d3bbb18067
+  #xd4d0cf1bd485575d
   (make-instance
    'avro:decimal
    :underlying (make-instance

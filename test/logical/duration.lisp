@@ -32,22 +32,18 @@
 
 (define-schema-test schema
   {
-    "type": {
-      "type": "fixed",
-      "name": "foo",
-      "size": 12
-    },
+    "type": "fixed",
+    "name": "foo",
+    "size": 12,
     "logicalType": "duration"
   }
   {
-    "type": {
-      "name": "foo",
-      "type": "fixed",
-      "size": 12
-    },
+    "name": "foo",
+    "type": "fixed",
+    "size": 12,
     "logicalType": "duration"
   }
-  #x49f6bf2b9652c399
+  #x32c5d8454be57da6
   (make-instance
    'avro:duration
    :underlying (make-instance
