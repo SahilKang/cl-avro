@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.file.block
   (:use #:cl)
   (:local-nicknames
@@ -244,12 +245,14 @@ A default implementation is not provided.")
         objects->block))
 (defun objects->block (objects header-sync schema compress)
   (loop
-    with bytes = (make-array (%serialized-size objects schema) :element-type 'uint8)
+    with bytes = (make-array (%serialized-size objects schema)
+                             :element-type 'uint8)
     and bytes-written of-type ufixnum = 0
 
     for object across objects
     do (incf bytes-written
-             (nth-value 1 (api:serialize object :into bytes :start bytes-written)))
+             (nth-value 1 (api:serialize
+                           object :into bytes :start bytes-written)))
 
     finally
        (return

@@ -1,4 +1,5 @@
 ;;; Copyright 2022 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/name
   (:local-nicknames
    (#:avro #:cl-avro))
@@ -25,7 +26,8 @@
 (test both
   (let* ((class-name (gensym))
          (name "foo")
-         (schema (make-instance 'avro:fixed :name class-name :name name :size 1)))
+         (schema (make-instance
+                  'avro:fixed :name class-name :name name :size 1)))
     (is (eq (class-name schema) class-name))
     (is (string= (avro:name schema) name))))
 
@@ -45,7 +47,8 @@
          (name "foo")
          (other-name (format nil "~A_bar" name))
          (other-class-name (gensym))
-         (schema (make-instance 'avro:fixed :name class-name :name name :size 1)))
+         (schema (make-instance
+                  'avro:fixed :name class-name :name name :size 1)))
     (is (eq (class-name schema) class-name))
     (is (string= (avro:name schema) name))
     (is (eq schema (reinitialize-instance
@@ -58,10 +61,12 @@
          (class-name (make-symbol name))
          (other-name (format nil "~A_bar" name))
          (other-class-name (make-symbol other-name))
-         (schema (make-instance 'avro:fixed :name class-name :name name :size 1)))
+         (schema (make-instance
+                  'avro:fixed :name class-name :name name :size 1)))
     (is (eq (class-name schema) class-name))
     (is (string= (avro:name schema) name))
-    (is (eq schema (reinitialize-instance schema :name other-class-name :size 1)))
+    (is (eq schema (reinitialize-instance
+                    schema :name other-class-name :size 1)))
     (is (eq (class-name schema) other-class-name))
     (is (string= (avro:name schema) other-name))))
 
@@ -69,7 +74,8 @@
   (let* ((name "foo")
          (class-name (make-symbol name))
          (other-name (format nil "~A_bar" name))
-         (schema (make-instance 'avro:fixed :name class-name :name name :size 1)))
+         (schema (make-instance
+                  'avro:fixed :name class-name :name name :size 1)))
     (is (eq (class-name schema) class-name))
     (is (string= (avro:name schema) name))
     (is (eq schema (reinitialize-instance schema :name other-name :size 1)))
@@ -80,7 +86,8 @@
   (let* ((name "foo")
          (other-name (format nil "~A_bar" name))
          (class-name (make-symbol other-name))
-         (schema (make-instance 'avro:fixed :name class-name :name name :size 1)))
+         (schema (make-instance
+                  'avro:fixed :name class-name :name name :size 1)))
     (is (eq (class-name schema) class-name))
     (is (string= (avro:name schema) name))
     (is (eq schema (reinitialize-instance schema :size 1)))

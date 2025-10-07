@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.decimal
   (:use #:cl)
   (:local-nicknames
@@ -234,7 +235,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -356,7 +358,8 @@
     ((schema api:decimal) (default string))
   (let* ((buffer (babel:string-to-octets default :encoding :latin-1))
          (twos-complement (big-endian:from-vector buffer 0 (length buffer)))
-         (unscaled (from-twos-complement twos-complement (* 8 (length buffer))))
+         (unscaled
+           (from-twos-complement twos-complement (* 8 (length buffer))))
          (%decimal-object (make-instance '%decimal-object)))
     (declare ((simple-array uint8 (*)) buffer))
     (setf (unscaled %decimal-object) unscaled)

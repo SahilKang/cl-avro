@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.logical.datetime
   (:use #:cl)
   (:local-nicknames
@@ -277,9 +278,10 @@ local-time:*default-timezone*."
 (defun local-unix-epoch-diff (local-timestamp)
   (let* ((timezone (local-timezone local-timestamp))
          (unix-epoch (unix-epoch timezone))
-         (local-timestamp (if (not (daylight-savings-p local-timestamp timezone))
-                              local-timestamp
-                              (local-time:adjust-timestamp
-                                  local-timestamp
-                                (offset :hour 1)))))
+         (local-timestamp
+           (if (not (daylight-savings-p local-timestamp timezone))
+               local-timestamp
+               (local-time:adjust-timestamp
+                local-timestamp
+                (offset :hour 1)))))
     (local-time-duration:timestamp-difference local-timestamp unix-epoch)))

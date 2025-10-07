@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/duration
   (:use #:cl #:1am)
   (:local-nicknames
@@ -43,7 +44,8 @@
   (:underlying reader_fixed))
 
 (test duration->duration
-  (let* ((writer (make-instance 'writer-schema :months 3 :days 4 :milliseconds 5))
+  (let* ((writer (make-instance
+                  'writer-schema :months 3 :days 4 :milliseconds 5))
          (reader (avro:coerce
                   (avro:deserialize 'writer-schema (avro:serialize writer))
                   'reader-schema)))

@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.mop
   (:use #:cl)
   (:export #:definit
@@ -88,7 +89,8 @@
   (values))
 
 (defmethod reinitialize-instance :around
-    ((instance all-or-nothing-reinitialization) &rest initargs &key &allow-other-keys)
+    ((instance all-or-nothing-reinitialization)
+     &rest initargs &key &allow-other-keys)
   (let* ((class (class-of instance))
          (new (apply #'make-instance class initargs))
          (instance (call-next-method)))
@@ -99,7 +101,8 @@
       while classes
       for class = (pop classes)
       unless (member class terminals) do
-        (setf classes (append classes (closer-mop:class-direct-superclasses class)))
+        (setf classes
+              (append classes (closer-mop:class-direct-superclasses class)))
         (loop
           for slot in (closer-mop:class-direct-slots class)
           for name = (closer-mop:slot-definition-name slot)

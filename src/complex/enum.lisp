@@ -1,4 +1,5 @@
 ;;; Copyright 2021-2023 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.enum
   (:use #:cl)
   (:shadow #:position)
@@ -188,7 +189,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -255,13 +257,15 @@
         (name:assert-matching-names schema (class-of object))
         (let* ((chosen (api:which-one object))
                (reader-symbols (api:symbols schema))
-               (position (or (cl:position chosen reader-symbols :test #'string=)
-                             (nth-value 1 (api:default schema)))))
+               (position
+                 (or (cl:position chosen reader-symbols :test #'string=)
+                     (nth-value 1 (api:default schema)))))
           (declare (name:name chosen)
                    (array<name> reader-symbols)
                    (position? position))
           (assert position nil
-                  "Reader enum has no default for unknown writer symbol ~S" chosen)
+                  "Reader enum has no default for unknown writer symbol ~S"
+                  chosen)
           (setf (position object) position)
           (change-class object schema)))))
 

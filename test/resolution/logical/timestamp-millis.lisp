@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/timestamp-millis
   (:use #:cl #:1am)
   (:local-nicknames
@@ -25,7 +26,8 @@
 (in-package #:cl-avro/test/resolution/timestamp-millis)
 
 (declaim
- (ftype (function (local-time:timestamp local-time:timestamp) (values &optional))
+ (ftype (function (local-time:timestamp local-time:timestamp)
+                  (values &optional))
         assert=))
 (defun assert= (writer reader)
   (is (= (avro:year writer) (avro:year reader)))

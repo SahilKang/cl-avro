@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.recursive-descent.pattern
   (:use #:cl)
   (:local-nicknames
@@ -46,7 +47,8 @@
     ((instance pattern-specializer) &key)
   (when (consp (pattern instance))
     (assert (evenp (length (pattern instance))) ((pattern instance))
-            "Pattern has an odd number of key-value pairs: ~S" (pattern instance))))
+            "Pattern has an odd number of key-value pairs: ~S"
+            (pattern instance))))
 
 (defmethod closer-mop:specializer-direct-methods
     ((specializer pattern-specializer))
@@ -54,7 +56,8 @@
 
 (defmethod closer-mop:specializer-direct-generic-functions
     ((specializer pattern-specializer))
-  (let ((gfs (mapcar #'closer-mop:method-generic-function (methods specializer))))
+  (let ((gfs
+          (mapcar #'closer-mop:method-generic-function (methods specializer))))
     (delete-duplicates (delete nil gfs))))
 
 (defmethod closer-mop:add-direct-method
@@ -100,7 +103,8 @@
 
 (declaim ((vector pattern-specializer) *pattern-specializers*))
 (defparameter *pattern-specializers*
-  (make-array 0 :element-type 'pattern-specializer :adjustable t :fill-pointer t))
+  (make-array 0 :element-type 'pattern-specializer :adjustable t
+                :fill-pointer t))
 
 (declaim
  (ftype (function (t) (values (or null pattern-specializer) &optional))
@@ -135,7 +139,8 @@
 (defun set-argument-order (gf)
   (let ((lambda-list (closer-mop:generic-function-lambda-list gf))
         (ordered (closer-mop:generic-function-argument-precedence-order gf)))
-    (setf (argument-order gf) (make-array (length ordered) :element-type 'ufixnum))
+    (setf (argument-order gf)
+          (make-array (length ordered) :element-type 'ufixnum))
     (loop
       for index below (length ordered)
       for argument = (elt ordered index)
@@ -228,7 +233,8 @@
      (typep argument specializer))))
 
 (declaim
- (ftype (function (method list) (values boolean &optional)) applicable-method-p))
+ (ftype (function (method list) (values boolean &optional))
+        applicable-method-p))
 (defun applicable-method-p (method arguments)
   (let ((specializers (closer-mop:method-specializers method)))
     (every #'applicable-specializer-p specializers arguments)))

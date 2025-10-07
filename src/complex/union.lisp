@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.union
   (:use #:cl)
   (:shadow #:union
@@ -121,7 +122,8 @@
 (deftype schema-key ()
   '(or symbol name:valid-fullname))
 
-(declaim (ftype (function (api:schema) (values schema-key &optional)) schema-key))
+(declaim
+ (ftype (function (api:schema) (values schema-key &optional)) schema-key))
 (defun schema-key (schema)
   (if (symbolp schema)
       schema
@@ -230,7 +232,8 @@
     (when position
       (elt wrapper-classes position))))
 
-(declaim (ftype (function (api:union t) (values wrapper-object &optional)) wrap))
+(declaim
+ (ftype (function (api:union t) (values wrapper-object &optional)) wrap))
 (defun wrap (union object)
   (let ((wrapper-class (find-wrapper-class union object)))
     (unless wrapper-class
@@ -282,7 +285,8 @@
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))
@@ -439,7 +443,7 @@
       (multiple-value-bind (coerced position)
           (first-coercion (api:object object) (api:schemas schema))
         (unless position
-          (error "None of the reader union's schemas match the chosen writer schema"))
+          (error "None of the reader union's schemas match the writer schema"))
         (let* ((wrapper-classes (wrapper-classes schema))
                (chosen-wrapper-class (elt wrapper-classes position)))
           (change-class (wrapped-object object) chosen-wrapper-class)

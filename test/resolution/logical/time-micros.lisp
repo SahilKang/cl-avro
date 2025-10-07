@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/time-micros
   (:use #:cl #:1am)
   (:local-nicknames
@@ -27,7 +28,8 @@
 (in-package #:cl-avro/test/resolution/time-micros)
 
 (declaim
- (ftype (function (local-time:timestamp local-time:timestamp) (values &optional))
+ (ftype (function (local-time:timestamp local-time:timestamp)
+                  (values &optional))
         assert=))
 (defun assert= (writer reader)
   (is (= (avro:hour writer) (avro:hour reader)))
@@ -36,7 +38,8 @@
   (values))
 
 (test time-micros->time-micros
-  (let* ((writer (make-instance 'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
+  (let* ((writer (make-instance
+                  'avro:time-micros :hour 2 :minute 25 :microsecond 32350450))
          (reader (avro:coerce
                   (avro:deserialize 'avro:time-micros (avro:serialize writer))
                   'avro:time-micros)))
@@ -45,7 +48,8 @@
     (assert= writer reader)))
 
 (test time-millis->time-micros
-  (let* ((writer (make-instance 'avro:time-millis :hour 2 :minute 25 :millisecond 32350))
+  (let* ((writer (make-instance
+                  'avro:time-millis :hour 2 :minute 25 :millisecond 32350))
          (reader (avro:coerce
                   (avro:deserialize 'avro:time-millis (avro:serialize writer))
                   'avro:time-micros)))

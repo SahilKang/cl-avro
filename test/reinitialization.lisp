@@ -1,4 +1,5 @@
 ;;; Copyright 2022 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/reinitialization
   (:local-nicknames
    (#:avro #:cl-avro))
@@ -29,7 +30,8 @@
     (is (= 2 (avro:size schema)))))
 
 (test inherited
-  (let ((schema (make-instance 'avro:fixed :name "bar" :namespace "foo" :size 1)))
+  (let ((schema (make-instance
+                 'avro:fixed :name "bar" :namespace "foo" :size 1)))
     (is (string= "foo.bar" (avro:fullname schema)))
     (is (eq schema (reinitialize-instance schema :name "bar" :size 1)))
     (is (string= "bar" (avro:fullname schema)))))

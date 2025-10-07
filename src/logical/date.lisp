@@ -1,4 +1,5 @@
 ;;; Copyright 2021, 2024 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.date
   (:use #:cl)
   (:local-nicknames
@@ -73,13 +74,16 @@ particular timezone or time-of-day."))
 
 ;;; to/from-underlying
 
-(declaim (ftype (function (api:date) (values api:int &optional)) to-underlying))
+(declaim
+ (ftype (function (api:date) (values api:int &optional)) to-underlying))
 (defun to-underlying (date)
   "Serialized as the number of days from the ISO unix epoch 1970-01-01."
-  (let ((diff (local-time-duration:timestamp-difference date +utc-unix-epoch+)))
+  (let ((diff
+          (local-time-duration:timestamp-difference date +utc-unix-epoch+)))
     (nth-value 0 (local-time-duration:duration-as diff :day))))
 
-(declaim (ftype (function (api:int) (values api:date &optional)) from-underlying))
+(declaim
+ (ftype (function (api:int) (values api:date &optional)) from-underlying))
 (defun from-underlying (days)
   (let ((timestamp (local-time:adjust-timestamp!
                        (unix-epoch local-time:+utc-zone+)
@@ -115,7 +119,8 @@ particular timezone or time-of-day."))
      &rest initargs
      &key
        ((:single-object-encoding-p sp))
-       (into (make-array (+ (if sp 10 0) (api:serialized-size object)) :element-type 'uint8))
+       (into (make-array (+ (if sp 10 0) (api:serialized-size object))
+                         :element-type 'uint8))
        (start 0))
   (declare (ignore start))
   (values into (apply #'internal:serialize object into initargs)))

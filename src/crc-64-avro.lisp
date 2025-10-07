@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.crc-64-avro
   (:use #:cl)
   (:import-from #:cl-avro.internal.type
@@ -43,11 +44,13 @@
          (loop for i below 256 collect i))
   :test #'equalp)
 
-(declaim (ftype (function (uint64 uint8) (values uint64 &optional)) %crc-64-avro))
+(declaim
+ (ftype (function (uint64 uint8) (values uint64 &optional)) %crc-64-avro))
 (defun %crc-64-avro (fp byte)
   (let ((table-ref (elt +table+ (logand #xff (logxor fp byte)))))
     (logxor (ash fp -8) table-ref)))
 
-(declaim (ftype (function (vector<uint8>) (values uint64 &optional)) crc-64-avro))
+(declaim
+ (ftype (function (vector<uint8>) (values uint64 &optional)) crc-64-avro))
 (defun crc-64-avro (bytes)
   (reduce #'%crc-64-avro bytes :initial-value +empty+))

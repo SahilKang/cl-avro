@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro.internal.name.schema
   (:use #:cl)
   (:local-nicknames
@@ -53,7 +54,8 @@
   (defun primitive-name-p (name start)
     (make-or-form name start)))
 
-(declaim (ftype (function (t) (values boolean &optional)) not-primitive-name-p))
+(declaim
+ (ftype (function (t) (values boolean &optional)) not-primitive-name-p))
 (defun not-primitive-name-p (name)
   (not
    (when (simple-string-p name)

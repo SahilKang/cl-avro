@@ -1,4 +1,5 @@
 ;;; Copyright 2021 Google LLC
+;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -15,7 +16,7 @@
 ;;; You should have received a copy of the GNU General Public License
 ;;; along with cl-avro.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package #:cl-user)
+(cl:in-package #:cl-user)
 (defpackage #:cl-avro/test/resolution/record
   (:use #:cl #:1am)
   (:local-nicknames
@@ -124,7 +125,8 @@
                      'writer_schema?
                      :object (make-instance
                               'writer_schema
-                              :nums (make-instance 'array<int> :initial-contents '(8 10 12))
+                              :nums (make-instance
+                                     'array<int> :initial-contents '(8 10 12))
                               :num 14
                               :str "bar"
                               :extra 'avro:false))))
@@ -175,7 +177,8 @@
                     'writer_schema?
                     :object (make-instance
                              'writer_schema
-                             :nums (make-instance 'array<int> :initial-contents '(8 10 12))
+                             :nums (make-instance
+                                    'array<int> :initial-contents '(8 10 12))
                              :num 14
                              :str "bar"
                              :extra 'avro:false)))))
