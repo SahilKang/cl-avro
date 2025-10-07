@@ -372,9 +372,14 @@
                     "logicalType" "decimal"))
               fullname->schema
               enclosing-namespace)
-      (let ((underlying (internal:read-jso (st-json:getjso "type" jso)
-                                           fullname->schema
-                                           enclosing-namespace)))
+      (let ((underlying
+              (internal:read-jso
+               (prog1 jso
+                 (setf (st-json::jso-alist jso)
+                       (delete "logicalType" (st-json::jso-alist jso)
+                               :key #'car :test #'string=)))
+               fullname->schema
+               enclosing-namespace)))
         (handler-case
             (internal:with-initargs (precision scale) jso
               (push underlying initargs)

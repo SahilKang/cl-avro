@@ -236,10 +236,17 @@
     ((schema api:logical-schema) seen canonical-form-p)
   (let ((underlying (internal:write-jso
                      (internal:underlying schema) seen canonical-form-p)))
-    (apply #'st-json:jso
-           (list* "type" underlying
-                  "logicalType" (internal:logical-name schema)
-                  (call-next-method)))))
+    (unless (st-json::jso-p underlying)
+      (setf underlying (st-json:jso "type" underlying)))
+    (setf (st-json::jso-alist underlying)
+          (nconc (st-json::jso-alist underlying)
+                 (list (cons "logicalType" (internal:logical-name schema)))))
+    (loop
+      #:for (key value) #:on (call-next-method) #:by #'cddr
+      #:do (setf (st-json::jso-alist underlying)
+                 (nconc (st-json::jso-alist underlying)
+                        (list (cons key value))))
+      #:finally (return underlying))))
 
 (defmethod internal:write-jso
     ((schema api:logical-schema) seen canonical-form-p)
