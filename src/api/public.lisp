@@ -19,6 +19,7 @@
 (cl:in-package #:cl-user)
 
 (defpackage #:cl-avro
+  (:use)
   (:export #:schema
            #:object
            #:intern

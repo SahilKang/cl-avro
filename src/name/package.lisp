@@ -19,6 +19,7 @@
 (cl:in-package #:cl-user)
 
 (defpackage #:cl-avro.internal.name
+  (:use)
   (:import-from #:cl-avro.internal.name.type
                 #:name
                 #:namespace
