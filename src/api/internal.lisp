@@ -19,6 +19,7 @@
 (cl:in-package #:cl-user)
 
 (defpackage #:cl-avro.internal
+  (:use)
   (:export #:fixed-size
            #:serialize-field-default
            #:deserialize-field-default
