@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -28,8 +28,6 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/decimal)
 
-(named-readtables:in-readtable json-syntax)
-
 ;;; underlying bytes
 
 ;; TODO fall-through
@@ -43,18 +41,18 @@
 
 ;; TODO canonical form isn't specified for logical schemas
 (define-schema-test schema-bytes
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 2
-  }
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 2
-  }
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 2
+  }"
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 2
+  }"
   #xeeb4ee37786d146e
   (make-instance
    'avro:decimal
@@ -84,18 +82,18 @@
     (make-instance schema :unscaled -12340)))
 
 (define-schema-test schema-bytes-same-scale-and-precision
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 4
-  }
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 4
-  }
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 4
+  }"
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 4
+  }"
   #xf07f87a02e62b644
   (make-instance
    'avro:decimal
@@ -125,16 +123,16 @@
     (make-instance schema :unscaled 12340)))
 
 (define-schema-test schema-bytes-default-scale
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 3,
-  }
-  {
-    "type": "bytes",
-    "logicalType": "decimal",
-    "precision": 3
-  }
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 3,
+  }"
+  "{
+    \"type\": \"bytes\",
+    \"logicalType\": \"decimal\",
+    \"precision\": 3
+  }"
   #x69151c93bbffa7b8
   (make-instance
    'avro:decimal
@@ -179,22 +177,22 @@
   (is (= expected-size (avro:size schema))))
 
 (define-schema-test schema-fixed
-  {
-  "type": "fixed",
-  "name": "foo",
-  "size": 2,
-  "logicalType": "decimal",
-  "precision": 4,
-  "scale": 2
-  }
-  {
-  "name": "foo",
-  "type": "fixed",
-  "size": 2,
-  "logicalType": "decimal",
-  "precision": 4,
-  "scale": 2
-  }
+  "{
+  \"type\": \"fixed\",
+  \"name\": \"foo\",
+  \"size\": 2,
+  \"logicalType\": \"decimal\",
+  \"precision\": 4,
+  \"scale\": 2
+  }"
+  "{
+  \"name\": \"foo\",
+  \"type\": \"fixed\",
+  \"size\": 2,
+  \"logicalType\": \"decimal\",
+  \"precision\": 4,
+  \"scale\": 2
+  }"
   #x2d0126a63b744038
   (make-instance
    'avro:decimal
@@ -231,22 +229,22 @@
     (make-instance schema :unscaled -12340)))
 
 (define-schema-test schema-fixed-same-scale-and-precision
-  {
-    "type": "fixed",
-    "name": "foo",
-    "size": 4,
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 4
-  }
-  {
-    "name": "foo",
-    "type": "fixed",
-    "size": 4,
-    "logicalType": "decimal",
-    "precision": 4,
-    "scale": 4
-  }
+  "{
+    \"type\": \"fixed\",
+    \"name\": \"foo\",
+    \"size\": 4,
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 4
+  }"
+  "{
+    \"name\": \"foo\",
+    \"type\": \"fixed\",
+    \"size\": 4,
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+    \"scale\": 4
+  }"
   #x4f28f84ecb23847f
   (make-instance
    'avro:decimal
@@ -283,20 +281,20 @@
     (make-instance schema :unscaled 12340)))
 
 (define-schema-test schema-fixed-default-scale
-  {
-    "type": "fixed",
-    "name": "foo",
-    "size": 4,
-    "logicalType": "decimal",
-    "precision": 4,
-  }
-  {
-    "name": "foo",
-    "type": "fixed",
-    "size": 4,
-    "logicalType": "decimal",
-    "precision": 4
-  }
+  "{
+    \"type\": \"fixed\",
+    \"name\": \"foo\",
+    \"size\": 4,
+    \"logicalType\": \"decimal\",
+    \"precision\": 4,
+  }"
+  "{
+    \"name\": \"foo\",
+    \"type\": \"fixed\",
+    \"size\": 4,
+    \"logicalType\": \"decimal\",
+    \"precision\": 4
+  }"
   #xd4d0cf1bd485575d
   (make-instance
    'avro:decimal

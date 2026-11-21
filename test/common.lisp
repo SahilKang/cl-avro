@@ -1,5 +1,5 @@
 ;;; Copyright 2021, 2023 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -95,8 +95,12 @@
            (cons defclass-schema)
            (cons make-instance-schema))
   `(1am:test ,name
-     (let* ((expected-json ,json)
-            (canonical-form ,canonical-form)
+     (let* ((expected-json
+              ,(st-json:write-json-to-string
+                (st-json:read-json-from-string json)))
+            (canonical-form
+              ,(st-json:write-json-to-string
+                (st-json:read-json-from-string canonical-form)))
             (expected-fingerprint ,fingerprint)
             (make-instance-schema ,make-instance-schema)
             (defclass-schema (progn ,@defclass-schema))
@@ -302,18 +306,3 @@
                  (1am:is (= (length serialized) size))
                  (1am:is (eq schema-to-check (avro:schema-of deserialized)))
                  (check deserialized)))))))))
-
-;;; json-syntax
-
-(defun read-{ (stream char)
-  (unread-char char stream)
-  (st-json:write-json-to-string (st-json:read-json stream)))
-
-(defun read-[ (stream char)
-  (unread-char char stream)
-  (st-json:write-json-to-string (st-json:read-json stream)))
-
-(named-readtables:defreadtable json-syntax
-  (:merge :standard)
-  (:macro-char #\{ #'read-{)
-  (:macro-char #\[ #'read-[))

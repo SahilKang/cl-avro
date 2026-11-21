@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/float)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "float"})
+  (let ((json "{\"type\": \"float\"}")
         (fingerprint #x4d7c02cb3ea8d790))
     (is (eq 'avro:float (avro:deserialize 'avro:schema json)))
     (is (string= "\"float\"" (avro:serialize 'avro:float)))

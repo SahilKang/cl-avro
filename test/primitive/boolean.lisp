@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/boolean)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "boolean"})
+  (let ((json "{\"type\": \"boolean\"}")
         (fingerprint #x9f42fc78a4d4f764))
     (is (eq 'avro:boolean (avro:deserialize 'avro:schema json)))
     (is (string= "\"boolean\"" (avro:serialize 'avro:boolean)))

@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,10 +27,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/date)
 
-(named-readtables:in-readtable json-syntax)
-
 (test schema
-  (let ((json {"type": "int", "logicalType": "date"})
+  (let ((json "{\"type\": \"int\", \"logicalType\": \"date\"}")
         (fingerprint #xf9171af064bdedf2)
         (expected (find-class 'avro:date)))
     (is (eq expected (avro:deserialize 'avro:schema json)))

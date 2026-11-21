@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/null)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "null"})
+  (let ((json "{\"type\": \"null\"}")
         (fingerprint #x63dd24e7cc258f8a))
     (is (eq 'avro:null (avro:deserialize 'avro:schema json)))
     (is (string= "\"null\"" (avro:serialize 'avro:null)))

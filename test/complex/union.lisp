@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,11 +27,9 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/union)
 
-(named-readtables:in-readtable json-syntax)
-
 (define-schema-test python-test
-  ["string", "null", "long"]
-  ["string", "null", "long"]
+  "[\"string\", \"null\", \"long\"]"
+  "[\"string\", \"null\", \"long\"]"
   #x6675680d41bea565
   (make-instance
    'avro:union
@@ -42,23 +40,23 @@
     (:schemas avro:string avro:null avro:long)))
 
 (define-schema-test fixed-union
-  [
-    "string",
+  "[
+    \"string\",
     {
-      "type": "fixed",
-      "name": "baz",
-      "namespace": "foo.bar",
-      "size": 12
+      \"type\": \"fixed\",
+      \"name\": \"baz\",
+      \"namespace\": \"foo.bar\",
+      \"size\": 12
     }
-  ]
-  [
-    "string",
+  ]"
+  "[
+    \"string\",
     {
-      "name": "foo.bar.baz",
-      "type": "fixed",
-      "size": 12
+      \"name\": \"foo.bar.baz\",
+      \"type\": \"fixed\",
+      \"size\": 12
     }
-  ]
+  ]"
   #x370f6358da669947
   (make-instance
    'avro:union

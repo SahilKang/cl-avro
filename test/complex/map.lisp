@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,18 +27,16 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/map)
 
-(named-readtables:in-readtable json-syntax)
-
 ;; TODO need to support default
 (define-schema-test long-map
-  {
-    "type": "map",
-    "values": "long"
-  }
-  {
-    "type": "map",
-    "values": "long"
-  }
+  "{
+    \"type\": \"map\",
+    \"values\": \"long\"
+  }"
+  "{
+    \"type\": \"map\",
+    \"values\": \"long\"
+  }"
   #x4e33b109e4f4746f
   (make-instance
    'avro:map
@@ -49,22 +47,22 @@
     (:values avro:long)))
 
 (define-schema-test enum-map
-  {
-    "type": "map",
-    "values": {
-      "type": "enum",
-      "name": "Test",
-      "symbols": ["A", "B"]
+  "{
+    \"type\": \"map\",
+    \"values\": {
+      \"type\": \"enum\",
+      \"name\": \"Test\",
+      \"symbols\": [\"A\", \"B\"]
     }
-  }
-  {
-    "type": "map",
-    "values": {
-      "name": "Test",
-      "type": "enum",
-      "symbols": ["A", "B"]
+  }"
+  "{
+    \"type\": \"map\",
+    \"values\": {
+      \"name\": \"Test\",
+      \"type\": \"enum\",
+      \"symbols\": [\"A\", \"B\"]
     }
-  }
+  }"
   #x2d816b6f62b02adf
   (make-instance
    'avro:map
@@ -82,31 +80,31 @@
     (:values |Test|)))
 
 (define-schema-test map<enum-name>
-  {
-    "type": "map",
-    "values": {
-      "type": "enum",
-      "name": "EnumName",
-      "default": "BAR",
-      "symbols": [
-        "FOO",
-        "BAR",
-        "BAZ"
+  "{
+    \"type\": \"map\",
+    \"values\": {
+      \"type\": \"enum\",
+      \"name\": \"EnumName\",
+      \"default\": \"BAR\",
+      \"symbols\": [
+        \"FOO\",
+        \"BAR\",
+        \"BAZ\"
       ]
     }
-  }
-  {
-    "type": "map",
-    "values": {
-      "name": "EnumName",
-      "type": "enum",
-      "symbols": [
-        "FOO",
-        "BAR",
-        "BAZ"
+  }"
+  "{
+    \"type\": \"map\",
+    \"values\": {
+      \"name\": \"EnumName\",
+      \"type\": \"enum\",
+      \"symbols\": [
+        \"FOO\",
+        \"BAR\",
+        \"BAZ\"
       ]
     }
-  }
+  }"
   #x94b9ced2264892b3
   (make-instance
    'avro:map
