@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/bytes)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "bytes"})
+  (let ((json "{\"type\": \"bytes\"}")
         (fingerprint #x4fc016dac3201965))
     (is (eq 'avro:bytes (avro:deserialize 'avro:schema json)))
     (is (string= "\"bytes\"" (avro:serialize 'avro:bytes)))

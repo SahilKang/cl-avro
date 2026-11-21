@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,10 +27,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/timestamp-millis)
 
-(named-readtables:in-readtable json-syntax)
-
 (test schema
-  (let ((json {"type": "long", "logicalType": "timestamp-millis"})
+  (let ((json "{\"type\": \"long\", \"logicalType\": \"timestamp-millis\"}")
         (fingerprint #xc5682e291a99aa86)
         (expected (find-class 'avro:timestamp-millis)))
     (is (eq expected (avro:deserialize 'avro:schema json)))

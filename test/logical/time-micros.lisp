@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,10 +27,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/time-micros)
 
-(named-readtables:in-readtable json-syntax)
-
 (test schema
-  (let ((json {"type": "long", "logicalType": "time-micros"})
+  (let ((json "{\"type\": \"long\", \"logicalType\": \"time-micros\"}")
         (fingerprint #xbb205318e6ed8d62)
         (expected (find-class 'avro:time-micros)))
     (is (eq expected (avro:deserialize 'avro:schema json)))

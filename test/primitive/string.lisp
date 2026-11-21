@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/string)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "string"})
+  (let ((json "{\"type\": \"string\"}")
         (fingerprint #x8f014872634503c7))
     (is (eq 'avro:string (avro:deserialize 'avro:schema json)))
     (is (string= "\"string\"" (avro:serialize 'avro:string)))

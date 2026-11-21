@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,19 +27,17 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/enum)
 
-(named-readtables:in-readtable json-syntax)
-
 (define-schema-test python-test
-  {
-    "type": "enum",
-    "name": "Test",
-    "symbols": ["A", "B"]
-  }
-  {
-    "name": "Test",
-    "type": "enum",
-    "symbols": ["A", "B"]
-  }
+  "{
+    \"type\": \"enum\",
+    \"name\": \"Test\",
+    \"symbols\": [\"A\", \"B\"]
+  }"
+  "{
+    \"name\": \"Test\",
+    \"type\": \"enum\",
+    \"symbols\": [\"A\", \"B\"]
+  }"
   #x167a7fe2c2f2a203
   (make-instance
    'avro:enum
@@ -51,17 +49,17 @@
     (:symbols "A" "B")))
 
 (define-schema-test python-test-with-doc
-  {
-    "type": "enum",
-    "name": "Test",
-    "symbols": ["A", "B"],
-    "doc": "Doc String"
-  }
-  {
-    "name": "Test",
-    "type": "enum",
-    "symbols": ["A", "B"],
-  }
+  "{
+    \"type\": \"enum\",
+    \"name\": \"Test\",
+    \"symbols\": [\"A\", \"B\"],
+    \"doc\": \"Doc String\"
+  }"
+  "{
+    \"name\": \"Test\",
+    \"type\": \"enum\",
+    \"symbols\": [\"A\", \"B\"],
+  }"
   #x167a7fe2c2f2a203
   (make-instance
    'avro:enum
@@ -75,20 +73,20 @@
     (:documentation "Doc String")))
 
 (define-schema-test all-fields
-  {
-    "type": "enum",
-    "name": "baz",
-    "namespace": "foo.bar",
-    "aliases": ["some", "foo.bar.alias"],
-    "doc": "Here's a doc",
-    "symbols": ["FOO", "BAR", "BAZ"],
-    "default": "BAR"
-  }
-  {
-    "name": "foo.bar.baz",
-    "type": "enum",
-    "symbols": ["FOO", "BAR", "BAZ"]
-  }
+  "{
+    \"type\": \"enum\",
+    \"name\": \"baz\",
+    \"namespace\": \"foo.bar\",
+    \"aliases\": [\"some\", \"foo.bar.alias\"],
+    \"doc\": \"Here's a doc\",
+    \"symbols\": [\"FOO\", \"BAR\", \"BAZ\"],
+    \"default\": \"BAR\"
+  }"
+  "{
+    \"name\": \"foo.bar.baz\",
+    \"type\": \"enum\",
+    \"symbols\": [\"FOO\", \"BAR\", \"BAZ\"]
+  }"
   #x2d77464e9fd3b6b5
   (make-instance
    'avro:enum
@@ -108,26 +106,26 @@
     (:default "BAR")))
 
 (define-schema-test optional-fields
-  {
-    "type": "enum",
-    "name": "EnumName",
-    "aliases": [],
-    "default": "FOO",
-    "symbols": [
-      "FOO",
-      "BAR",
-      "BAZ"
+  "{
+    \"type\": \"enum\",
+    \"name\": \"EnumName\",
+    \"aliases\": [],
+    \"default\": \"FOO\",
+    \"symbols\": [
+      \"FOO\",
+      \"BAR\",
+      \"BAZ\"
     ]
-  }
-  {
-    "name": "EnumName",
-    "type": "enum",
-    "symbols": [
-      "FOO",
-      "BAR",
-      "BAZ"
+  }"
+  "{
+    \"name\": \"EnumName\",
+    \"type\": \"enum\",
+    \"symbols\": [
+      \"FOO\",
+      \"BAR\",
+      \"BAZ\"
     ]
-  }
+  }"
   #xcda0ac7bef77b89c
   (make-instance
    'avro:enum

@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -28,29 +28,27 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/record)
 
-(named-readtables:in-readtable json-syntax)
-
 (define-schema-test python-test
-  {
-    "type": "record",
-    "name": "Test",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"Test\",
+    \"fields\": [
       {
-        "name": "f",
-        "type": "long"
+        \"name\": \"f\",
+        \"type\": \"long\"
       }
     ]
-  }
-  {
-    "name": "Test",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"Test\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "f",
-        "type": "long"
+        \"name\": \"f\",
+        \"type\": \"long\"
       }
     ]
-  }
+  }"
   #x8e58ebe6f5e594ed
   (make-instance
    'avro:record
@@ -61,40 +59,40 @@
     (:metaclass avro:record)))
 
 (define-schema-test python-node
-  {
-    "type": "record",
-    "name": "Node",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"Node\",
+    \"fields\": [
       {
-        "name": "label",
-        "type": "string"
+        \"name\": \"label\",
+        \"type\": \"string\"
       },
       {
-        "name": "children",
-        "type": {
-          "type": "array",
-          "items": "Node"
+        \"name\": \"children\",
+        \"type\": {
+          \"type\": \"array\",
+          \"items\": \"Node\"
         }
       }
     ]
-  }
-  {
-    "name": "Node",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"Node\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "label",
-        "type": "string"
+        \"name\": \"label\",
+        \"type\": \"string\"
       },
       {
-        "name": "children",
-        "type": {
-          "type": "array",
-          "items": "Node"
+        \"name\": \"children\",
+        \"type\": {
+          \"type\": \"array\",
+          \"items\": \"Node\"
         }
       }
     ]
-  }
+  }"
   #xb756e7c344a5cb52
   (closer-mop:ensure-class
    '|Node|
@@ -116,60 +114,60 @@
     (:metaclass avro:record)))
 
 (define-schema-test python-lisp
-  {
-    "type": "record",
-    "name": "Lisp",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"Lisp\",
+    \"fields\": [
       {
-        "name": "value",
-        "type": [
-          "null",
-          "string",
+        \"name\": \"value\",
+        \"type\": [
+          \"null\",
+          \"string\",
           {
-            "type": "record",
-            "name": "Cons",
-            "fields": [
+            \"type\": \"record\",
+            \"name\": \"Cons\",
+            \"fields\": [
               {
-                "name": "car",
-                "type": "Lisp"
+                \"name\": \"car\",
+                \"type\": \"Lisp\"
               },
               {
-                "name": "cdr",
-                "type": "Lisp"
+                \"name\": \"cdr\",
+                \"type\": \"Lisp\"
               }
             ]
           }
         ]
       }
     ]
-  }
-  {
-    "name": "Lisp",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"Lisp\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "value",
-        "type": [
-          "null",
-          "string",
+        \"name\": \"value\",
+        \"type\": [
+          \"null\",
+          \"string\",
           {
-            "name": "Cons",
-            "type": "record",
-            "fields": [
+            \"name\": \"Cons\",
+            \"type\": \"record\",
+            \"fields\": [
               {
-                "name": "car",
-                "type": "Lisp"
+                \"name\": \"car\",
+                \"type\": \"Lisp\"
               },
               {
-                "name": "cdr",
-                "type": "Lisp"
+                \"name\": \"cdr\",
+                \"type\": \"Lisp\"
               }
             ]
           }
         ]
       }
     ]
-  }
+  }"
   #x06b3a0ed231ad968
   (closer-mop:ensure-class
    '|Lisp|
@@ -200,77 +198,77 @@
     (:metaclass avro:record)))
 
 (define-schema-test python-handshake-request
-  {
-    "type": "record",
-    "name": "HandshakeRequest",
-    "namespace": "org.apache.avro.ipc",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"HandshakeRequest\",
+    \"namespace\": \"org.apache.avro.ipc\",
+    \"fields\": [
       {
-        "name": "clientHash",
-        "type": {
-          "type": "fixed",
-          "name": "MD5",
-          "size": 16
+        \"name\": \"clientHash\",
+        \"type\": {
+          \"type\": \"fixed\",
+          \"name\": \"MD5\",
+          \"size\": 16
         }
       },
       {
-        "name": "clientProtocol",
-        "type": [
-          "null",
-          "string"
+        \"name\": \"clientProtocol\",
+        \"type\": [
+          \"null\",
+          \"string\"
         ]
       },
       {
-        "name": "serverHash",
-        "type": "MD5"
+        \"name\": \"serverHash\",
+        \"type\": \"MD5\"
       },
       {
-        "name": "meta",
-        "type": [
-          "null",
+        \"name\": \"meta\",
+        \"type\": [
+          \"null\",
           {
-            "type": "map",
-            "values": "bytes"
+            \"type\": \"map\",
+            \"values\": \"bytes\"
           }
         ]
       }
     ]
-  }
-  {
-    "name": "org.apache.avro.ipc.HandshakeRequest",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"org.apache.avro.ipc.HandshakeRequest\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "clientHash",
-        "type": {
-          "name": "org.apache.avro.ipc.MD5",
-          "type": "fixed",
-          "size": 16
+        \"name\": \"clientHash\",
+        \"type\": {
+          \"name\": \"org.apache.avro.ipc.MD5\",
+          \"type\": \"fixed\",
+          \"size\": 16
         }
       },
       {
-        "name": "clientProtocol",
-        "type": [
-          "null",
-          "string"
+        \"name\": \"clientProtocol\",
+        \"type\": [
+          \"null\",
+          \"string\"
         ]
       },
       {
-        "name": "serverHash",
-        "type": "org.apache.avro.ipc.MD5"
+        \"name\": \"serverHash\",
+        \"type\": \"org.apache.avro.ipc.MD5\"
       },
       {
-        "name": "meta",
-        "type": [
-          "null",
+        \"name\": \"meta\",
+        \"type\": [
+          \"null\",
           {
-            "type": "map",
-            "values": "bytes"
+            \"type\": \"map\",
+            \"values\": \"bytes\"
           }
         ]
       }
     ]
-  }
+  }"
   #x57577c5a9ed76ab9
   (make-instance
    'avro:record
@@ -314,99 +312,99 @@
     (:namespace "org.apache.avro.ipc")))
 
 (define-schema-test python-handshake-response
-  {
-    "type": "record",
-    "name": "HandshakeResponse",
-    "namespace": "org.apache.avro.ipc",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"HandshakeResponse\",
+    \"namespace\": \"org.apache.avro.ipc\",
+    \"fields\": [
       {
-        "name": "match",
-        "type": {
-          "type": "enum",
-          "name": "HandshakeMatch",
-          "symbols": [
-            "BOTH",
-            "CLIENT",
-            "NONE"
+        \"name\": \"match\",
+        \"type\": {
+          \"type\": \"enum\",
+          \"name\": \"HandshakeMatch\",
+          \"symbols\": [
+            \"BOTH\",
+            \"CLIENT\",
+            \"NONE\"
           ]
         }
       },
       {
-        "name": "serverProtocol",
-        "type": [
-          "null",
-          "string"
+        \"name\": \"serverProtocol\",
+        \"type\": [
+          \"null\",
+          \"string\"
         ]
       },
       {
-        "name": "serverHash",
-        "type": [
-          "null",
+        \"name\": \"serverHash\",
+        \"type\": [
+          \"null\",
           {
-            "name": "MD5",
-            "size": 16,
-            "type": "fixed"
+            \"name\": \"MD5\",
+            \"size\": 16,
+            \"type\": \"fixed\"
           }
         ]
       },
       {
-        "name": "meta",
-        "type": [
-          "null",
+        \"name\": \"meta\",
+        \"type\": [
+          \"null\",
           {
-            "type": "map",
-            "values": "bytes"
+            \"type\": \"map\",
+            \"values\": \"bytes\"
           }
         ]
       }
     ]
-  }
-  {
-    "name": "org.apache.avro.ipc.HandshakeResponse",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"org.apache.avro.ipc.HandshakeResponse\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "match",
-        "type": {
-          "name": "org.apache.avro.ipc.HandshakeMatch",
-          "type": "enum",
-          "symbols": [
-            "BOTH",
-            "CLIENT",
-            "NONE"
+        \"name\": \"match\",
+        \"type\": {
+          \"name\": \"org.apache.avro.ipc.HandshakeMatch\",
+          \"type\": \"enum\",
+          \"symbols\": [
+            \"BOTH\",
+            \"CLIENT\",
+            \"NONE\"
           ]
         }
       },
       {
-        "name": "serverProtocol",
-        "type": [
-          "null",
-          "string"
+        \"name\": \"serverProtocol\",
+        \"type\": [
+          \"null\",
+          \"string\"
         ]
       },
       {
-        "name": "serverHash",
-        "type": [
-          "null",
+        \"name\": \"serverHash\",
+        \"type\": [
+          \"null\",
           {
-            "name": "org.apache.avro.ipc.MD5",
-            "type": "fixed",
-            "size": 16
+            \"name\": \"org.apache.avro.ipc.MD5\",
+            \"type\": \"fixed\",
+            \"size\": 16
           }
         ]
       },
       {
-        "name": "meta",
-        "type": [
-          "null",
+        \"name\": \"meta\",
+        \"type\": [
+          \"null\",
           {
-            "type": "map",
-            "values": "bytes"
+            \"type\": \"map\",
+            \"values\": \"bytes\"
           }
         ]
       }
     ]
-  }
+  }"
   #x0ea54ede01eefe00
   (make-instance
    'avro:record
@@ -475,231 +473,231 @@
     (:namespace "org.apache.avro.ipc")))
 
 (define-schema-test python-interop
-  {
-    "type": "record",
-    "name": "Interop",
-    "namespace": "org.apache.avro",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"Interop\",
+    \"namespace\": \"org.apache.avro\",
+    \"fields\": [
       {
-        "name": "intField",
-        "type": "int"
+        \"name\": \"intField\",
+        \"type\": \"int\"
       },
       {
-        "name": "longField",
-        "type": "long"
+        \"name\": \"longField\",
+        \"type\": \"long\"
       },
       {
-        "name": "stringField",
-        "type": "string"
+        \"name\": \"stringField\",
+        \"type\": \"string\"
       },
       {
-        "name": "boolField",
-        "type": "boolean"
+        \"name\": \"boolField\",
+        \"type\": \"boolean\"
       },
       {
-        "name": "floatField",
-        "type": "float"
+        \"name\": \"floatField\",
+        \"type\": \"float\"
       },
       {
-        "name": "doubleField",
-        "type": "double"
+        \"name\": \"doubleField\",
+        \"type\": \"double\"
       },
       {
-        "name": "bytesField",
-        "type": "bytes"
+        \"name\": \"bytesField\",
+        \"type\": \"bytes\"
       },
       {
-        "name": "nullField",
-        "type": "null"
+        \"name\": \"nullField\",
+        \"type\": \"null\"
       },
       {
-        "name": "arrayField",
-        "type": {
-          "type": "array",
-          "items": "double"
+        \"name\": \"arrayField\",
+        \"type\": {
+          \"type\": \"array\",
+          \"items\": \"double\"
         }
       },
       {
-        "name": "mapField",
-        "type": {
-          "type": "map",
-          "values": {
-            "name": "Foo",
-            "type": "record",
-            "fields": [
+        \"name\": \"mapField\",
+        \"type\": {
+          \"type\": \"map\",
+          \"values\": {
+            \"name\": \"Foo\",
+            \"type\": \"record\",
+            \"fields\": [
               {
-                "name": "label",
-                "type": "string"
+                \"name\": \"label\",
+                \"type\": \"string\"
               }
             ]
           }
         }
       },
       {
-        "name": "unionField",
-        "type": [
-          "boolean",
-          "double",
+        \"name\": \"unionField\",
+        \"type\": [
+          \"boolean\",
+          \"double\",
           {
-            "type": "array",
-            "items": "bytes"
+            \"type\": \"array\",
+            \"items\": \"bytes\"
           }
         ]
       },
       {
-        "name": "enumField",
-        "type": {
-          "type": "enum",
-          "name": "Kind",
-          "symbols": [
-            "A",
-            "B",
-            "C"
+        \"name\": \"enumField\",
+        \"type\": {
+          \"type\": \"enum\",
+          \"name\": \"Kind\",
+          \"symbols\": [
+            \"A\",
+            \"B\",
+            \"C\"
           ]
         }
       },
       {
-        "name": "fixedField",
-        "type": {
-          "type": "fixed",
-          "name": "MD5",
-          "size": 16
+        \"name\": \"fixedField\",
+        \"type\": {
+          \"type\": \"fixed\",
+          \"name\": \"MD5\",
+          \"size\": 16
         }
       },
       {
-        "name": "recordField",
-        "type": {
-          "type": "record",
-          "name": "Node",
-          "fields": [
+        \"name\": \"recordField\",
+        \"type\": {
+          \"type\": \"record\",
+          \"name\": \"Node\",
+          \"fields\": [
             {
-              "name": "label",
-              "type": "string"
+              \"name\": \"label\",
+              \"type\": \"string\"
             },
             {
-              "name": "children",
-              "type": {
-                "type": "array",
-                "items": "Node"
+              \"name\": \"children\",
+              \"type\": {
+                \"type\": \"array\",
+                \"items\": \"Node\"
               }
             }
           ]
         }
       }
     ]
-  }
-  {
-    "name": "org.apache.avro.Interop",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"org.apache.avro.Interop\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "intField",
-        "type": "int"
+        \"name\": \"intField\",
+        \"type\": \"int\"
       },
       {
-        "name": "longField",
-        "type": "long"
+        \"name\": \"longField\",
+        \"type\": \"long\"
       },
       {
-        "name": "stringField",
-        "type": "string"
+        \"name\": \"stringField\",
+        \"type\": \"string\"
       },
       {
-        "name": "boolField",
-        "type": "boolean"
+        \"name\": \"boolField\",
+        \"type\": \"boolean\"
       },
       {
-        "name": "floatField",
-        "type": "float"
+        \"name\": \"floatField\",
+        \"type\": \"float\"
       },
       {
-        "name": "doubleField",
-        "type": "double"
+        \"name\": \"doubleField\",
+        \"type\": \"double\"
       },
       {
-        "name": "bytesField",
-        "type": "bytes"
+        \"name\": \"bytesField\",
+        \"type\": \"bytes\"
       },
       {
-        "name": "nullField",
-        "type": "null"
+        \"name\": \"nullField\",
+        \"type\": \"null\"
       },
       {
-        "name": "arrayField",
-        "type": {
-          "type": "array",
-          "items": "double"
+        \"name\": \"arrayField\",
+        \"type\": {
+          \"type\": \"array\",
+          \"items\": \"double\"
         }
       },
       {
-        "name": "mapField",
-        "type": {
-          "type": "map",
-          "values": {
-            "name": "org.apache.avro.Foo",
-            "type": "record",
-            "fields": [
+        \"name\": \"mapField\",
+        \"type\": {
+          \"type\": \"map\",
+          \"values\": {
+            \"name\": \"org.apache.avro.Foo\",
+            \"type\": \"record\",
+            \"fields\": [
               {
-                "name": "label",
-                "type": "string"
+                \"name\": \"label\",
+                \"type\": \"string\"
               }
             ]
           }
         }
       },
       {
-        "name": "unionField",
-        "type": [
-          "boolean",
-          "double",
+        \"name\": \"unionField\",
+        \"type\": [
+          \"boolean\",
+          \"double\",
           {
-            "type": "array",
-            "items": "bytes"
+            \"type\": \"array\",
+            \"items\": \"bytes\"
           }
         ]
       },
       {
-        "name": "enumField",
-        "type": {
-          "name": "org.apache.avro.Kind",
-          "type": "enum",
-          "symbols": [
-            "A",
-            "B",
-            "C"
+        \"name\": \"enumField\",
+        \"type\": {
+          \"name\": \"org.apache.avro.Kind\",
+          \"type\": \"enum\",
+          \"symbols\": [
+            \"A\",
+            \"B\",
+            \"C\"
           ]
         }
       },
       {
-        "name": "fixedField",
-        "type": {
-          "name": "org.apache.avro.MD5",
-          "type": "fixed",
-          "size": 16
+        \"name\": \"fixedField\",
+        \"type\": {
+          \"name\": \"org.apache.avro.MD5\",
+          \"type\": \"fixed\",
+          \"size\": 16
         }
       },
       {
-        "name": "recordField",
-        "type": {
-          "name": "org.apache.avro.Node",
-          "type": "record",
-          "fields": [
+        \"name\": \"recordField\",
+        \"type\": {
+          \"name\": \"org.apache.avro.Node\",
+          \"type\": \"record\",
+          \"fields\": [
             {
-              "name": "label",
-              "type": "string"
+              \"name\": \"label\",
+              \"type\": \"string\"
             },
             {
-              "name": "children",
-              "type": {
-                "type": "array",
-                "items": "org.apache.avro.Node"
+              \"name\": \"children\",
+              \"type\": {
+                \"type\": \"array\",
+                \"items\": \"org.apache.avro.Node\"
               }
             }
           ]
         }
       }
     ]
-  }
+  }"
   #xa4b5a0a6930a2ce8
   (make-instance
    'avro:record
@@ -820,48 +818,48 @@
     (:namespace "org.apache.avro")))
 
 (define-schema-test python-ipaddr
-  {
-    "type": "record",
-    "name": "ipAddr",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"ipAddr\",
+    \"fields\": [
       {
-        "name": "addr",
-        "type": [
+        \"name\": \"addr\",
+        \"type\": [
           {
-            "name": "IPv6",
-            "type": "fixed",
-            "size": 16
+            \"name\": \"IPv6\",
+            \"type\": \"fixed\",
+            \"size\": 16
           },
           {
-            "name": "IPv4",
-            "type": "fixed",
-            "size": 4
+            \"name\": \"IPv4\",
+            \"type\": \"fixed\",
+            \"size\": 4
           }
         ]
       }
     ]
-  }
-  {
-    "name": "ipAddr",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"ipAddr\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "addr",
-        "type": [
+        \"name\": \"addr\",
+        \"type\": [
           {
-            "name": "IPv6",
-            "type": "fixed",
-            "size": 16
+            \"name\": \"IPv6\",
+            \"type\": \"fixed\",
+            \"size\": 16
           },
           {
-            "name": "IPv4",
-            "type": "fixed",
-            "size": 4
+            \"name\": \"IPv4\",
+            \"type\": \"fixed\",
+            \"size\": 4
           }
         ]
       }
     ]
-  }
+  }"
   #x44188a294e1b968d
   (make-instance
    'avro:record
@@ -890,28 +888,28 @@
     (:metaclass avro:record)))
 
 (define-schema-test python-testdoc
-  {
-    "type": "record",
-    "name": "TestDoc",
-    "doc": "Doc string",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"TestDoc\",
+    \"doc\": \"Doc string\",
+    \"fields\": [
       {
-        "name": "name",
-        "type": "string",
-        "doc": "Doc String"
+        \"name\": \"name\",
+        \"type\": \"string\",
+        \"doc\": \"Doc String\"
       }
     ]
-  }
-  {
-    "name": "TestDoc",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"TestDoc\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "name",
-        "type": "string"
+        \"name\": \"name\",
+        \"type\": \"string\"
       }
     ]
-  }
+  }"
   #x09c1cd2bf060660e
   (make-instance
    'avro:record
@@ -925,55 +923,55 @@
     (:documentation "Doc string")))
 
 (define-schema-test inner-outer
-  {
-    "type": "record",
-    "name": "OuterRecord",
-    "fields": [
+  "{
+    \"type\": \"record\",
+    \"name\": \"OuterRecord\",
+    \"fields\": [
       {
-        "name": "name",
-        "type": "string"
+        \"name\": \"name\",
+        \"type\": \"string\"
       },
       {
-        "name": "nested",
-        "default": {
-          "value": 4
+        \"name\": \"nested\",
+        \"default\": {
+          \"value\": 4
         },
-        "type": {
-          "type": "record",
-          "name": "InnerRecord",
-          "fields": [
+        \"type\": {
+          \"type\": \"record\",
+          \"name\": \"InnerRecord\",
+          \"fields\": [
             {
-              "name": "value",
-              "type": "int"
+              \"name\": \"value\",
+              \"type\": \"int\"
             }
           ]
         }
       }
     ]
-  }
-  {
-    "name": "OuterRecord",
-    "type": "record",
-    "fields": [
+  }"
+  "{
+    \"name\": \"OuterRecord\",
+    \"type\": \"record\",
+    \"fields\": [
       {
-        "name": "name",
-        "type": "string"
+        \"name\": \"name\",
+        \"type\": \"string\"
       },
       {
-        "name": "nested",
-        "type": {
-          "name": "InnerRecord",
-          "type": "record",
-          "fields": [
+        \"name\": \"nested\",
+        \"type\": {
+          \"name\": \"InnerRecord\",
+          \"type\": \"record\",
+          \"fields\": [
             {
-              "name": "value",
-              "type": "int"
+              \"name\": \"value\",
+              \"type\": \"int\"
             }
           ]
         }
       }
     ]
-  }
+  }"
   #x66670f7ec6a70b6b
   (make-instance
    'avro:record

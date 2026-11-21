@@ -1,4 +1,4 @@
-;;; Copyright (C) 2019-2021, 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright (C) 2019-2021, 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;; Copyright 2021-2023 Google LLC
 ;;;
 ;;; This file is part of cl-avro.
@@ -186,7 +186,7 @@
   :license "GPLv3"
   :pathname "test"
   :perform (test-op (op sys) (uiop:symbol-call :1am :run))
-  :depends-on (#:cl-avro #:1am #:flexi-streams #:named-readtables #:babel)
+  :depends-on (#:cl-avro #:1am #:flexi-streams #:babel)
   :components ((:file "common")
                (:file "compare")
                (:file "file")

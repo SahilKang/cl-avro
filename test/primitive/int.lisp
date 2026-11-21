@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -26,10 +26,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/int)
 
-(named-readtables:in-readtable json-syntax)
-
 (test non-canonical-form
-  (let ((json {"type": "int"})
+  (let ((json "{\"type\": \"int\"}")
         (fingerprint #x7275d51a3f395c8f))
     (is (eq 'avro:int (avro:deserialize 'avro:schema json)))
     (is (string= "\"int\"" (avro:serialize 'avro:int)))

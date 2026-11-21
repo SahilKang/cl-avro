@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,10 +27,8 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/time-millis)
 
-(named-readtables:in-readtable json-syntax)
-
 (test schema
-  (let ((json {"type": "int", "logicalType": "time-millis"})
+  (let ((json "{\"type\": \"int\", \"logicalType\": \"time-millis\"}")
         (fingerprint #xbf34ac33708d105e)
         (expected (find-class 'avro:time-millis)))
     (is (eq expected (avro:deserialize 'avro:schema json)))

@@ -1,5 +1,5 @@
 ;;; Copyright 2021 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -27,18 +27,16 @@
                 #:define-io-test))
 (in-package #:cl-avro/test/array)
 
-(named-readtables:in-readtable json-syntax)
-
 ;; TODO need to support default
 (define-schema-test long-array
-  {
-    "type": "array",
-    "items": "long"
-  }
-  {
-    "type": "array",
-    "items": "long"
-  }
+  "{
+    \"type\": \"array\",
+    \"items\": \"long\"
+  }"
+  "{
+    \"type\": \"array\",
+    \"items\": \"long\"
+  }"
   #x5416c98ba22e5e71
   (make-instance
    'avro:array
@@ -49,22 +47,22 @@
     (:items avro:long)))
 
 (define-schema-test enum-array
-  {
-    "type": "array",
-    "items": {
-      "type": "enum",
-      "name": "Test",
-      "symbols": ["A", "B"]
+  "{
+    \"type\": \"array\",
+    \"items\": {
+      \"type\": \"enum\",
+      \"name\": \"Test\",
+      \"symbols\": [\"A\", \"B\"]
     }
-  }
-  {
-    "type": "array",
-    "items": {
-      "name": "Test",
-      "type": "enum",
-      "symbols": ["A", "B"]
+  }"
+  "{
+    \"type\": \"array\",
+    \"items\": {
+      \"name\": \"Test\",
+      \"type\": \"enum\",
+      \"symbols\": [\"A\", \"B\"]
     }
-  }
+  }"
   #x87033afae1add910
   (make-instance
    'avro:array
@@ -82,42 +80,42 @@
     (:items |Test|)))
 
 (define-schema-test record-array
-  {
-    "type": "array",
-    "items": {
-      "type": "record",
-      "name": "RecordName",
-      "fields": [
+  "{
+    \"type\": \"array\",
+    \"items\": {
+      \"type\": \"record\",
+      \"name\": \"RecordName\",
+      \"fields\": [
         {
-          "name": "Foo",
-          "type": "string",
-          "default": "foo"
+          \"name\": \"Foo\",
+          \"type\": \"string\",
+          \"default\": \"foo\"
         },
         {
-          "name": "Bar",
-          "type": "int",
-          "default": 7
+          \"name\": \"Bar\",
+          \"type\": \"int\",
+          \"default\": 7
         }
       ]
     }
-  }
-  {
-    "type": "array",
-    "items": {
-      "name": "RecordName",
-      "type": "record",
-      "fields": [
+  }"
+  "{
+    \"type\": \"array\",
+    \"items\": {
+      \"name\": \"RecordName\",
+      \"type\": \"record\",
+      \"fields\": [
         {
-          "name": "Foo",
-          "type": "string",
+          \"name\": \"Foo\",
+          \"type\": \"string\",
         },
         {
-          "name": "Bar",
-          "type": "int",
+          \"name\": \"Bar\",
+          \"type\": \"int\",
         }
       ]
     }
-  }
+  }"
   #x2a6ad7a6c7ab28ea
   (make-instance
    'avro:array
