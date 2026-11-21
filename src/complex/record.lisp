@@ -1,5 +1,5 @@
 ;;; Copyright 2021, 2023-2024 Google LLC
-;;; Copyright 2025 Sahil Kang <sahil.kang@asilaycomputing.com>
+;;; Copyright 2025-2026 Sahil Kang <sahil.kang@asilaycomputing.com>
 ;;;
 ;;; This file is part of cl-avro.
 ;;;
@@ -643,7 +643,12 @@
 
         for index below (length reader-fields)
         for reader-field = (elt reader-fields index)
-        for writer-field of-type (or null api:field)
+        ;; TODO For some reason the api:field type is not being found during
+        ;; SBCL's compile-file. The api:field defclass is found above in this
+        ;; file and the type is used in a function signature right before this
+        ;; defmethod. Uncomment this type declaration when the root cause is
+        ;; resolved.
+        for writer-field ; of-type (or null api:field)
           = (find-field reader-field writer-fields)
 
         if writer-field do
